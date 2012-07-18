@@ -2,9 +2,10 @@ EIPMI
 =====
 
 EIPMI is a native Erlang/OTP library application for IPMI/RMCP. The goal is to
-provide a simple and pragmatic way for Erlang developers to work with IPMI.
-We want to have a very low threshold for learning and using EIPMI, aiming to
-make it fit well with other Erlang/OTP concepts and solutions.
+implement the remote console part of the IPMI LAN interface, as specified here
+[http://www.intel.com/design/servers/ipmi/spec.htm]. We would like to provide a
+low threshold for learning and using EIPMI, aiming to make it fit well with
+other Erlang/OTP concepts and solutions.
 
 Initial planned features
 ------------------------
@@ -13,12 +14,12 @@ Initial planned features
 * Extensible design, open for contributions
 * RMCP presence ping/pong
 * Session initiation and activation
-* Some basic FRU queries
-* Support for LAN events (traps)
+* Some basic IPMI queries
+* Support for LAN alerts (events)
 
 We really want to provide a simple enough basic implementation, that is open
-for extension, and not going for a complete coverage of the specification
-[http://www.intel.com/design/servers/ipmi/spec.htm] right away.
+for extension, and not going for a complete coverage of the specification right
+away - that should be added by the community as the needs appear.
 
 Project structure
 -----------------
@@ -29,7 +30,7 @@ are preferring Maven at the moment, making it easy to also build deploy and
 manage EIPMI as a dependency-package, using the Maven-Erlang-Plugin
 [http://erlang-plugin.sourceforge.net/].
 
-To build, test, package and verify EIPMI with Maven, simply to:
+To build, test, package and verify EIPMI with Maven, simply do:
 ```
   mvn verify
 '''
