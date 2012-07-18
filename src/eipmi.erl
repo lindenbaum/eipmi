@@ -22,19 +22,10 @@
 %% Public API
 -export([ping/1]).
 
+-include("eipmi.hrl").
+
 -define(RMCP_PORT_NUMBER, 623).
 -define(ANY_FREE_PORT_NUMBER, 0).
-
--define(RMCP_VERSION, 16#06).
--define(RMCP_RESERVED, 0).
--define(RMCP_CLASS, 16#06).
--define(RMCP_IANA, 35505). %% TODO: Configuration option
--define(RMCP_PING, 16#80).
--define(RMCP_PONG, 16#40).
-
--define(PING_MSG(Sequence, Tag), <<?RMCP_VERSION, ?RMCP_RESERVED, Sequence, ?RMCP_CLASS, ?RMCP_IANA:(4*8), ?RMCP_PING, Tag, 0, 0>>).
--define(PONG_MSG(Sequence, Tag), <<?RMCP_VERSION, ?RMCP_RESERVED, Sequence, ?RMCP_CLASS, ?RMCP_IANA:(4*8), ?RMCP_PONG, Tag, _Rest/binary>>).
--define(ACK_MSG(Sequence),       <<?RMCP_VERSION, ?RMCP_RESERVED, Sequence, (2#10000000 + ?RMCP_CLASS)>>).
 
 %%%=============================================================================
 %%% API functions
@@ -47,16 +38,25 @@
 %%------------------------------------------------------------------------------
 ping(Address) ->
     {ok, Socket} = gen_udp:open(?ANY_FREE_PORT_NUMBER, [binary]),
-    Sequence = 0,
-    Tag = 11,
     Timeout = 1000,
-    ok = gen_udp:send(Socket, Address, ?RMCP_PORT_NUMBER, ?PING_MSG(Sequence, Tag)),
+    {ok, Ping} = eipmi_messages:encode(#rmcp_ping{seq_nr = 0, asf_tag = 0}),
+    ok = gen_udp:send(Socket, Address, ?RMCP_PORT_NUMBER, Ping),
     Result = receive
-                 {udp, Socket, _, _, ?ACK_MSG(Sequence)} ->
-                     receive
-                         {udp, Socket, _, _, ?PONG_MSG(Sequence, Tag)} ->
-                             pong
-                     after Timeout ->
+                 {udp, Socket, _, _, Bin1} ->
+                     case eipmi_messages:decode(Bin1) of
+                         {ok, #rmcp_ack{}} ->
+                             receive
+                                 {udp, Socket, _, _, Bin2} ->
+                                     case eipmi_messages:decode(Bin2) of
+                                         {ok, #rmcp_pong{}} ->
+                                             pong;
+                                         _ ->
+                                             pang
+                                     end
+                             after Timeout ->
+                                     pang
+                             end;
+                         _ ->
                              pang
                      end
              after Timeout ->
