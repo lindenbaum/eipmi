@@ -60,8 +60,8 @@ encode(Pong = #rmcp_pong{seq_nr = SeqNr, asf_tag = ASFTag}) ->
            16:8,
            (Pong#rmcp_pong.iana):32,
            (Pong#rmcp_pong.oem):32,
-           (Pong#rmcp_pong.entities):8,
-           (Pong#rmcp_pong.interactions):8,
+           (encode_supported_entities(Pong#rmcp_pong.entities)):8,
+           (encode_supported_interactions(Pong#rmcp_pong.interactions)):8,
            0:48>>};
 
 encode(Message) ->
@@ -117,15 +117,16 @@ rmcp_decode(SeqNr, ?ASF_PONG, <<ASFTag:8,
                                 ?ASF_RESERVED:8,16:8,
                                 IANAEnterprise:32,
                                 OEMDefined:32,
-                                SupportedEntities:8,
-                                SupportedInteractions:8,_:48>>) ->
+                                Entities:8,
+                                Interactions:8,
+                                _:48>>) ->
     {ok, #rmcp_pong{
        seq_nr = SeqNr,
        asf_tag = ASFTag,
        iana = IANAEnterprise,
        oem = OEMDefined,
-       entities = SupportedEntities,
-       interactions = SupportedInteractions}};
+       entities = decode_supported_entities(<<Entities:8>>),
+       interactions = decode_supported_interactions(<<Interactions:8>>)}};
 
 rmcp_decode(_SeqNr, Type, _Binary) ->
     {error, {unsupported_asf_message, Type}}.
@@ -135,3 +136,56 @@ rmcp_decode(_SeqNr, Type, _Binary) ->
 %%------------------------------------------------------------------------------
 ipmi_decode(_SeqNr, _Binary) ->
     {error, not_yet_implemented}.
+
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+encode_supported_entities(Entities) ->
+    lists:foldl(
+      fun(ipmi, Acc) ->
+              Acc bor 2#10000000
+      end,
+      2#00000001,
+      Entities).
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+decode_supported_entities(<<1:1,1:7>>) ->
+    [ipmi];
+
+decode_supported_entities(_) ->
+    [].
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+encode_supported_interactions(Interactions) ->
+    lists:foldl(
+      fun(rmcp_security_extensions, Acc) ->
+              Acc bor 2#10000000;
+
+         (dtmf_dash, Acc) ->
+              Acc bor 2#00100000
+      end,
+      2#00000000,
+      Interactions).
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+decode_supported_interactions(<<Sec:1,0:1,Dtmf:1,_:5>>) ->
+    case {Sec, Dtmf} of
+        {1, 1} ->
+            [rmcp_security_extensions, dtmf_dash];
+
+        {1, 0} ->
+            [rmcp_security_extensions];
+
+        {0, 1} ->
+            [dtmf_dash];
+
+        {0, 0} ->
+            []
+    end.

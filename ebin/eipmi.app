@@ -7,5 +7,6 @@
    {registered, ${REGISTERED}},
    {included_applications, []},
    {applications, [kernel, stdlib, sasl]},
+   {mod, {eipmi, []}},
    {env, []},
    {start_phases, []}]}.

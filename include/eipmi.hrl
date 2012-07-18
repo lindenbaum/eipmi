@@ -22,6 +22,11 @@
 %%%=============================================================================
 
 %%------------------------------------------------------------------------------
+%% The default RMCP port.
+%%------------------------------------------------------------------------------
+-define(RMCP_PORT_NUMBER, 623).
+
+%%------------------------------------------------------------------------------
 %% The currently supported RMCP version (length is 8bits).
 %%------------------------------------------------------------------------------
 -define(RMCP_VERSION, 16#06).
@@ -126,11 +131,15 @@
 %% The RMCP ASF PONG Message.
 %%------------------------------------------------------------------------------
 -record(rmcp_pong, {
-          seq_nr = 255     :: 0..255,
-          asf_tag = 255    :: 0..255,
-          iana = 4542      :: non_neg_integer(), %% the reported IANA enterprise number
-          oem = 0          :: non_neg_integer(), %% OEM defined values
-          entities = 16#81 :: 0..255,            %% supported entities
-          interactions = 0 :: 0..255}).          %% supported interactions
+          seq_nr = 255      :: 0..255,
+          asf_tag = 255     :: 0..255,
+          %% the IANA enterprise number
+          iana = 4542       :: non_neg_integer(),
+          %% OEM defined values
+          oem = 0           :: non_neg_integer(),
+          %% supported entities
+          entities = []     :: [ipmi],
+          %% suppotred interactions
+          interactions = [] :: [rmcp_security_extensions | dtmf_dash]}).
 
 -endif. %% eipmi_hrl_
