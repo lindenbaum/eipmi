@@ -23,7 +23,8 @@
 -behaviour(supervisor).
 
 %% API
--export([ping/1]).
+-export([initiate/1,
+         ping/1]).
 
 %% Application callbacks
 -export([start/2,
@@ -45,34 +46,27 @@
 %% TODO
 %% @end
 %%------------------------------------------------------------------------------
-ping(Address) ->
-    {ok, Socket} = gen_udp:open(0, [binary]),
+initiate(IPAddress) ->
+    supervisor:start_child(?MODULE, [IPAddress]).
+
+%%------------------------------------------------------------------------------
+%% @doc
+%% TODO
+%% @end
+%%------------------------------------------------------------------------------
+ping(IPAddress) ->
     Timeout = 1000,
-    {ok, Ping} = eipmi_messages:encode(#rmcp_ping{seq_nr = 0, asf_tag = 0}),
-    ok = gen_udp:send(Socket, Address, ?RMCP_PORT_NUMBER, Ping),
-    Result = receive
-                 {udp, Socket, _, _, Bin1} ->
-                     case eipmi_messages:decode(Bin1) of
-                         {ok, #rmcp_ack{}} ->
-                             receive
-                                 {udp, Socket, _, _, Bin2} ->
-                                     case eipmi_messages:decode(Bin2) of
-                                         {ok, #rmcp_pong{}} ->
-                                             pong;
-                                         _ ->
-                                             pang
-                                     end
-                             after Timeout ->
-                                     pang
-                             end;
-                         _ ->
-                             pang
-                     end
-             after Timeout ->
-                     pang
-             end,
-    ok = gen_udp:close(Socket),
-    Result.
+    {ok, Session} = initiate(IPAddress),
+    Monitor = erlang:monitor(process, Session),
+    receive
+        {'DOWN', Monitor, process, Session, normal} ->
+            pong;
+
+        _ ->
+            pang
+    after Timeout ->
+            pang
+    end.
 
 %%%=============================================================================
 %%% Application callbacks
