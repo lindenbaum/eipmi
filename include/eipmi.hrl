@@ -109,6 +109,11 @@
 %%------------------------------------------------------------------------------
 -define(ASF_VERSION_1_0, 1).
 
+%%------------------------------------------------------------------------------
+%% The reserved part of the IPMI authentication type field (length is 4bits).
+%%------------------------------------------------------------------------------
+-define(IPMI_AUTH_RESERVED, 0).
+
 %%%=============================================================================
 %%% Messages
 %%%=============================================================================
@@ -117,29 +122,44 @@
 %% The RMCP ASF ACK Message.
 %%------------------------------------------------------------------------------
 -record(rmcp_ack, {
+          %% RMCP part
           seq_nr = 255             :: 0..255,
+          %% ASF part
           class  = ?RMCP_CLASS_ASF :: non_neg_integer()}).
 
 %%------------------------------------------------------------------------------
 %% The RMCP ASF PING Message.
 %%------------------------------------------------------------------------------
 -record(rmcp_ping, {
-         seq_nr = 255  :: 0..255,
-         asf_tag = 255 :: 0..255}).
+          %% RMCP part
+          seq_nr = 255  :: 0..255,
+          %% ASF part
+          asf_tag = 255 :: 0..255}).
 
 %%------------------------------------------------------------------------------
 %% The RMCP ASF PONG Message.
 %%------------------------------------------------------------------------------
 -record(rmcp_pong, {
+          %% RMCP part
           seq_nr = 255      :: 0..255,
+          %% ASF part
           asf_tag = 255     :: 0..255,
-          %% the IANA enterprise number
-          iana = 4542       :: non_neg_integer(),
-          %% OEM defined values
-          oem = 0           :: non_neg_integer(),
-          %% supported entities
-          entities = []     :: [ipmi],
-          %% suppotred interactions
-          interactions = [] :: [rmcp_security_extensions | dtmf_dash]}).
+          iana = 4542       :: non_neg_integer(), %% the IANA enterprise number
+          oem = 0           :: non_neg_integer(), %% OEM defined values
+          entities = []     :: [ipmi]}).          %% supported entities
+
+%%------------------------------------------------------------------------------
+%% The RMCP IPMI Message.
+%%------------------------------------------------------------------------------
+-record(rmcp_ipmi, {
+          %% RMCP part
+          seq_nr = 255       :: 0..255,
+          %% IPMI 1.5 Session Header part
+          auth_type = none   :: none | md2 | md5 | pwd,
+          auth_code          :: undefined | integer(),    %% omitted when undefined
+          session_id = 0     :: non_neg_integer(),
+          session_seq_nr = 0 :: non_neg_integer(),
+          %% IPMI 1.5 Payload part
+          payload            :: binary()}).               %% must not be empty
 
 -endif. %% eipmi_hrl_

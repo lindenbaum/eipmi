@@ -61,8 +61,31 @@ encode(Pong = #rmcp_pong{seq_nr = SeqNr, asf_tag = ASFTag}) ->
            (Pong#rmcp_pong.iana):32,
            (Pong#rmcp_pong.oem):32,
            (encode_supported_entities(Pong#rmcp_pong.entities)):8,
-           (encode_supported_interactions(Pong#rmcp_pong.interactions)):8,
+           0:8, %% no interaction supported
            0:48>>};
+
+encode(Ipmi = #rmcp_ipmi{seq_nr = SeqNr, auth_type = none, payload = Payload}) ->
+    {ok, <<?RMCP_VERSION:8,
+           ?RMCP_RESERVED:8,
+           SeqNr:8,
+           ?RMCP_CLASS_NORMAL:1,?RMCP_CLASS_RESERVED:2,?RMCP_CLASS_IPMI:5,
+           ?IPMI_AUTH_RESERVED:4,(encode_auth_type(none)):4,
+           (Ipmi#rmcp_ipmi.session_seq_nr):32,
+           (Ipmi#rmcp_ipmi.session_id):32,
+           (size(Payload)):8,
+           Payload/binary>>};
+
+encode(Ipmi = #rmcp_ipmi{seq_nr = SeqNr, auth_type = Type, payload = Payload}) ->
+    {ok, <<?RMCP_VERSION:8,
+           ?RMCP_RESERVED:8,
+           SeqNr:8,
+           ?RMCP_CLASS_NORMAL:1,?RMCP_CLASS_RESERVED:2,?RMCP_CLASS_IPMI:5,
+           ?IPMI_AUTH_RESERVED:4,(encode_auth_type(Type)):4,
+           (Ipmi#rmcp_ipmi.session_seq_nr):32,
+           (Ipmi#rmcp_ipmi.session_id):32,
+           (Ipmi#rmcp_ipmi.auth_code):128,
+           (size(Payload)):8,
+           Payload/binary>>};
 
 encode(Message) ->
     {error, {unsupported_message, Message}}.
@@ -118,15 +141,14 @@ rmcp_decode(SeqNr, ?ASF_PONG, <<ASFTag:8,
                                 IANAEnterprise:32,
                                 OEMDefined:32,
                                 Entities:8,
-                                Interactions:8,
+                                _:8,
                                 _:48>>) ->
     {ok, #rmcp_pong{
        seq_nr = SeqNr,
        asf_tag = ASFTag,
        iana = IANAEnterprise,
        oem = OEMDefined,
-       entities = decode_supported_entities(<<Entities:8>>),
-       interactions = decode_supported_interactions(<<Interactions:8>>)}};
+       entities = decode_supported_entities(<<Entities:8>>)}};
 
 rmcp_decode(_SeqNr, Type, _Binary) ->
     {error, {unsupported_asf_message, Type}}.
@@ -134,9 +156,33 @@ rmcp_decode(_SeqNr, Type, _Binary) ->
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-ipmi_decode(_SeqNr, _Binary) ->
-    {error, not_yet_implemented}.
+ipmi_decode(SeqNr, <<?IPMI_AUTH_RESERVED:4,0:4,
+                     SessionSeqNr:32,
+                     SessionId:32,
+                     Length:8,
+                     Payload:Length/binary>>) ->
+    {ok, #rmcp_ipmi{
+       seq_nr = SeqNr,
+       session_id = SessionId,
+       session_seq_nr = SessionSeqNr,
+       payload = Payload}};
 
+ipmi_decode(SeqNr, <<?IPMI_AUTH_RESERVED:4,AuthType:4,
+                     SessionSeqNr:32,
+                     SessionId:32,
+                     AuthCode:128,
+                     Length:8,
+                     Payload:Length/binary>>) ->
+    {ok, #rmcp_ipmi{
+       seq_nr = SeqNr,
+       auth_type = decode_auth_type(AuthType),
+       auth_code = AuthCode,
+       session_id = SessionId,
+       session_seq_nr = SessionSeqNr,
+       payload = Payload}};
+
+ipmi_decode(_SeqNr, _Binary) ->
+    {error, unsupported_ipmi_message}.
 
 %%------------------------------------------------------------------------------
 %% @private
@@ -161,31 +207,29 @@ decode_supported_entities(_) ->
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-encode_supported_interactions(Interactions) ->
-    lists:foldl(
-      fun(rmcp_security_extensions, Acc) ->
-              Acc bor 2#10000000;
+encode_auth_type(none) ->
+    0;
 
-         (dtmf_dash, Acc) ->
-              Acc bor 2#00100000
-      end,
-      2#00000000,
-      Interactions).
+encode_auth_type(md2) ->
+    1;
+
+encode_auth_type(md5) ->
+    2;
+
+encode_auth_type(pwd) ->
+    4.
 
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-decode_supported_interactions(<<Sec:1,0:1,Dtmf:1,_:5>>) ->
-    case {Sec, Dtmf} of
-        {1, 1} ->
-            [rmcp_security_extensions, dtmf_dash];
+decode_auth_type(0) ->
+    none;
 
-        {1, 0} ->
-            [rmcp_security_extensions];
+decode_auth_type(1) ->
+    md2;
 
-        {0, 1} ->
-            [dtmf_dash];
+decode_auth_type(2) ->
+    md5;
 
-        {0, 0} ->
-            []
-    end.
+decode_auth_type(4) ->
+    pwd.

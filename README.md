@@ -1,11 +1,11 @@
 EIPMI
 =====
 
-EIPMI is a native Erlang/OTP library application for IPMI/RMCP. The goal is to
-implement the remote console part of the IPMI LAN interface, as specified here
-[http://www.intel.com/design/servers/ipmi/spec.htm]. We would like to provide a
-low threshold for learning and using EIPMI, aiming to make it fit well with
-other Erlang/OTP concepts and solutions.
+EIPMI is a native Erlang/OTP library application for RMCP/IPMI 1.5. The goal is
+to implement the remote console part of the IPMI LAN interface, as specified
+here [http://www.intel.com/design/servers/ipmi/spec.htm]. We would like to
+provide a low threshold for learning and using EIPMI, aiming to make it fit well
+with other Erlang/OTP concepts and solutions.
 
 Initial planned features
 ------------------------
