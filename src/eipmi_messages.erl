@@ -12,6 +12,10 @@
 %%% WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
 %%% ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 %%% OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+%%%
+%%% @doc
+%%% A module providing encoding/decoding functionality for RMCP/IPMI packets.
+%%% @end
 %%%=============================================================================
 
 -module(eipmi_messages).
@@ -27,36 +31,37 @@
 
 %%------------------------------------------------------------------------------
 %% @doc
+%% Encodes an erlang IPMI/RMCP structure into a binary packet.
 %% @end
 %%------------------------------------------------------------------------------
--spec encode(#rmcp_ack{} | #rmcp_ping{} | #rmcp_pong{}) ->
+-spec encode(#rmcp_ack{} | #rmcp_ping{} | #rmcp_pong{} | #rmcp_ipmi{}) ->
                     {ok, binary()} | {error, term()}.
-encode(#rmcp_ack{seq_nr = SeqNr, class = Class}) ->
+encode(Ack = #rmcp_ack{}) ->
     {ok, <<?RMCP_VERSION:8,
-           ?RMCP_RESERVED:8,
-           SeqNr:8,
-           ?RMCP_CLASS_ACK:1,?RMCP_CLASS_RESERVED:2,Class:5>>};
+           ?EIPMI_RESERVED:8,
+           (Ack#rmcp_ack.seq_nr):8,
+           ?RMCP_ACK:1,?EIPMI_RESERVED:2,(Ack#rmcp_ack.class):5>>};
 
-encode(#rmcp_ping{seq_nr = SeqNr, asf_tag = ASFTag}) ->
+encode(Ping = #rmcp_ping{}) ->
     {ok, <<?RMCP_VERSION:8,
-           ?RMCP_RESERVED:8,
-           SeqNr:8,
-           ?RMCP_CLASS_NORMAL:1,?RMCP_CLASS_RESERVED:2,?RMCP_CLASS_ASF:5,
+           ?EIPMI_RESERVED:8,
+           (Ping#rmcp_ping.seq_nr):8,
+           ?RMCP_NORMAL:1,?EIPMI_RESERVED:2,?RMCP_ASF:5,
            ?ASF_IANA:32,
            ?ASF_PING:8,
-           ASFTag:8,
-           ?ASF_RESERVED:8,
+           (Ping#rmcp_ping.asf_tag):8,
+           ?EIPMI_RESERVED:8,
            0:8>>};
 
-encode(Pong = #rmcp_pong{seq_nr = SeqNr, asf_tag = ASFTag}) ->
+encode(Pong = #rmcp_pong{}) ->
     {ok, <<?RMCP_VERSION:8,
-           ?RMCP_RESERVED:8,
-           SeqNr:8,
-           ?RMCP_CLASS_NORMAL:1,?RMCP_CLASS_RESERVED:2,?RMCP_CLASS_ASF:5,
+           ?EIPMI_RESERVED:8,
+           (Pong#rmcp_pong.seq_nr):8,
+           ?RMCP_NORMAL:1,?EIPMI_RESERVED:2,?RMCP_ASF:5,
            ?ASF_IANA:32,
            ?ASF_PONG:8,
-           ASFTag:8,
-           ?ASF_RESERVED:8,
+           (Pong#rmcp_pong.asf_tag):8,
+           ?EIPMI_RESERVED:8,
            16:8,
            (Pong#rmcp_pong.iana):32,
            (Pong#rmcp_pong.oem):32,
@@ -64,23 +69,23 @@ encode(Pong = #rmcp_pong{seq_nr = SeqNr, asf_tag = ASFTag}) ->
            0:8, %% no interaction supported
            0:48>>};
 
-encode(Ipmi = #rmcp_ipmi{seq_nr = SeqNr, auth_type = none, payload = Payload}) ->
+encode(Ipmi = #rmcp_ipmi{auth_type = none, payload = Payload}) ->
     {ok, <<?RMCP_VERSION:8,
-           ?RMCP_RESERVED:8,
-           SeqNr:8,
-           ?RMCP_CLASS_NORMAL:1,?RMCP_CLASS_RESERVED:2,?RMCP_CLASS_IPMI:5,
-           ?IPMI_AUTH_RESERVED:4,(encode_auth_type(none)):4,
+           ?EIPMI_RESERVED:8,
+           (Ipmi#rmcp_ipmi.seq_nr):8,
+           ?RMCP_NORMAL:1,?EIPMI_RESERVED:2,?RMCP_IPMI:5,
+           ?EIPMI_RESERVED:4,(encode_auth_type(none)):4,
            (Ipmi#rmcp_ipmi.session_seq_nr):32,
            (Ipmi#rmcp_ipmi.session_id):32,
            (size(Payload)):8,
            Payload/binary>>};
 
-encode(Ipmi = #rmcp_ipmi{seq_nr = SeqNr, auth_type = Type, payload = Payload}) ->
+encode(Ipmi = #rmcp_ipmi{auth_type = Type, payload = Payload}) ->
     {ok, <<?RMCP_VERSION:8,
-           ?RMCP_RESERVED:8,
-           SeqNr:8,
-           ?RMCP_CLASS_NORMAL:1,?RMCP_CLASS_RESERVED:2,?RMCP_CLASS_IPMI:5,
-           ?IPMI_AUTH_RESERVED:4,(encode_auth_type(Type)):4,
+           ?EIPMI_RESERVED:8,
+           (Ipmi#rmcp_ipmi.seq_nr):8,
+           ?RMCP_NORMAL:1,?EIPMI_RESERVED:2,?RMCP_IPMI:5,
+           ?EIPMI_RESERVED:4,(encode_auth_type(Type)):4,
            (Ipmi#rmcp_ipmi.session_seq_nr):32,
            (Ipmi#rmcp_ipmi.session_id):32,
            (Ipmi#rmcp_ipmi.auth_code):128,
@@ -92,16 +97,18 @@ encode(Message) ->
 
 %%------------------------------------------------------------------------------
 %% @doc
+%% Decodes a binary representing an IPMI/RMCP packet into the corresponding
+%% erlang structure.
 %% @end
 %%------------------------------------------------------------------------------
 -spec decode(binary()) ->
-                    {ok, #rmcp_pong{} | #rmcp_pong{} | #rmcp_ack{}} |
+                    {ok, #rmcp_pong{} | #rmcp_ping{} | #rmcp_ack{} | #rmcp_ipmi{}} |
                     {error, term()}.
-decode(<<?RMCP_VERSION:8,?RMCP_RESERVED:8,SeqNr:8,Rest/binary>>) ->
-    decode(SeqNr, Rest);
+decode(<<?RMCP_VERSION:8,?EIPMI_RESERVED:8,SeqNr:8,Rest/binary>>) ->
+    decode_class(SeqNr, Rest);
 
 decode(_) ->
-    {error, no_rmcp_message}.
+    {error, unsupported_rmcp_message}.
 
 %%%=============================================================================
 %%% internal functions
@@ -110,79 +117,91 @@ decode(_) ->
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-decode(SeqNr, <<?RMCP_CLASS_NORMAL:1,
-                ?RMCP_CLASS_RESERVED:2,
-                ?RMCP_CLASS_ASF:5,
-                ?ASF_IANA:32,
-                MessageType:8,
-                Rest/binary>>) ->
-    rmcp_decode(SeqNr, MessageType, Rest);
+decode_class(SeqNr, <<?RMCP_NORMAL:1,?EIPMI_RESERVED:2,?RMCP_ASF:5,Rest/binary>>) ->
+    decode_asf(SeqNr, Rest);
 
-decode(SeqNr, <<?RMCP_CLASS_NORMAL:1,
-                ?RMCP_CLASS_RESERVED:2,
-                ?RMCP_CLASS_IPMI:5,
-                Rest/binary>>) ->
-    ipmi_decode(SeqNr, Rest);
+decode_class(SeqNr, <<?RMCP_NORMAL:1,?EIPMI_RESERVED:2,?RMCP_IPMI:5,Rest/binary>>) ->
+    decode_ipmi(SeqNr, Rest);
 
-decode(SeqNr, <<?RMCP_CLASS_ACK:1,?RMCP_CLASS_RESERVED:2,Class:5>>) ->
+decode_class(SeqNr, <<?RMCP_ACK:1,?EIPMI_RESERVED:2,Class:5>>) ->
     {ok, #rmcp_ack{seq_nr = SeqNr, class = Class}};
 
-decode(_SeqNr, _Binary) ->
-    {error, no_asf_message}.
+decode_class(_SeqNr, _Binary) ->
+    {error, unsupported_rmcp_class}.
 
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-rmcp_decode(SeqNr, ?ASF_PING, <<ASFTag:8,?ASF_RESERVED:8,0:8>>) ->
-    {ok, #rmcp_ping{seq_nr = SeqNr, asf_tag = ASFTag}};
+decode_asf(SeqNr, <<?ASF_IANA:32,Type:8,Tag:8,?EIPMI_RESERVED:8,Rest/binary>>) ->
+    case Type of
+        ?ASF_PONG ->
+            decode_asf_packet(#rmcp_pong{seq_nr = SeqNr, asf_tag = Tag}, Rest);
 
-rmcp_decode(SeqNr, ?ASF_PONG, <<ASFTag:8,
-                                ?ASF_RESERVED:8,16:8,
-                                IANAEnterprise:32,
-                                OEMDefined:32,
-                                Entities:8,
-                                _:8,
-                                _:48>>) ->
-    {ok, #rmcp_pong{
-       seq_nr = SeqNr,
-       asf_tag = ASFTag,
-       iana = IANAEnterprise,
-       oem = OEMDefined,
-       entities = decode_supported_entities(<<Entities:8>>)}};
+        ?ASF_PING ->
+            decode_asf_packet(#rmcp_ping{seq_nr = SeqNr, asf_tag = Tag}, Rest);
 
-rmcp_decode(_SeqNr, Type, _Binary) ->
-    {error, {unsupported_asf_message, Type}}.
+        _ ->
+            {error, unsupported_asf_message}
+    end.
 
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-ipmi_decode(SeqNr, <<?IPMI_AUTH_RESERVED:4,0:4,
-                     SessionSeqNr:32,
-                     SessionId:32,
-                     Length:8,
-                     Payload:Length/binary>>) ->
-    {ok, #rmcp_ipmi{
-       seq_nr = SeqNr,
-       session_id = SessionId,
-       session_seq_nr = SessionSeqNr,
-       payload = Payload}};
+decode_asf_packet(Ping = #rmcp_ping{}, _Binary) ->
+    {ok, Ping};
 
-ipmi_decode(SeqNr, <<?IPMI_AUTH_RESERVED:4,AuthType:4,
-                     SessionSeqNr:32,
-                     SessionId:32,
-                     AuthCode:128,
-                     Length:8,
-                     Payload:Length/binary>>) ->
-    {ok, #rmcp_ipmi{
-       seq_nr = SeqNr,
-       auth_type = decode_auth_type(AuthType),
-       auth_code = AuthCode,
-       session_id = SessionId,
-       session_seq_nr = SessionSeqNr,
-       payload = Payload}};
+decode_asf_packet(Pong = #rmcp_pong{}, <<16:8,IANA:32,OEM:32,1:1,1:7,_:8,_:48>>) ->
+    {ok, Pong#rmcp_pong{iana = IANA, oem = OEM, entities = [ipmi]}};
 
-ipmi_decode(_SeqNr, _Binary) ->
+decode_asf_packet(Pong = #rmcp_pong{}, <<16:8,IANA:32,OEM:32,_:8,_:8,_:48>>) ->
+    {ok, Pong#rmcp_pong{iana = IANA, oem = OEM, entities = []}}.
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+decode_ipmi(SeqNr, <<?EIPMI_RESERVED:4,0:4,SSeqNr:32,SId:32,Rest/binary>>) ->
+    Ipmi = #rmcp_ipmi{
+      seq_nr = SeqNr,
+      auth_type = none,
+      session_id = SId,
+      session_seq_nr = SSeqNr},
+    decode_ipmi_payload(Ipmi, Rest);
+
+decode_ipmi(SeqNr, <<?EIPMI_RESERVED:4,1:4,SSeqNr:32,SId:32,Code:128,Rest/binary>>) ->
+    Ipmi = #rmcp_ipmi{
+      seq_nr = SeqNr,
+      auth_type = md2,
+      auth_code = Code,
+      session_id = SId,
+      session_seq_nr = SSeqNr},
+    decode_ipmi_payload(Ipmi, Rest);
+
+decode_ipmi(SeqNr, <<?EIPMI_RESERVED:4,2:4,SSeqNr:32,SId:32,Code:128,Rest/binary>>) ->
+    Ipmi = #rmcp_ipmi{
+      seq_nr = SeqNr,
+      auth_type = md5,
+      auth_code = Code,
+      session_id = SId,
+      session_seq_nr = SSeqNr},
+    decode_ipmi_payload(Ipmi, Rest);
+
+decode_ipmi(SeqNr, <<?EIPMI_RESERVED:4,4:4,SSeqNr:32,SId:32,Code:128,Rest/binary>>) ->
+    Ipmi = #rmcp_ipmi{
+      seq_nr = SeqNr,
+      auth_type = pwd,
+      auth_code = Code,
+      session_id = SId,
+      session_seq_nr = SSeqNr},
+    decode_ipmi_payload(Ipmi, Rest);
+
+decode_ipmi(_SeqNr, _Binary) ->
     {error, unsupported_ipmi_message}.
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+decode_ipmi_payload(Ipmi, <<Len:8,Payload:Len/binary>>) ->
+    {ok, Ipmi#rmcp_ipmi{payload = Payload}}.
 
 %%------------------------------------------------------------------------------
 %% @private
@@ -198,15 +217,6 @@ encode_supported_entities(Entities) ->
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-decode_supported_entities(<<1:1,1:7>>) ->
-    [ipmi];
-
-decode_supported_entities(_) ->
-    [].
-
-%%------------------------------------------------------------------------------
-%% @private
-%%------------------------------------------------------------------------------
 encode_auth_type(none) ->
     0;
 
@@ -218,18 +228,3 @@ encode_auth_type(md5) ->
 
 encode_auth_type(pwd) ->
     4.
-
-%%------------------------------------------------------------------------------
-%% @private
-%%------------------------------------------------------------------------------
-decode_auth_type(0) ->
-    none;
-
-decode_auth_type(1) ->
-    md2;
-
-decode_auth_type(2) ->
-    md5;
-
-decode_auth_type(4) ->
-    pwd.

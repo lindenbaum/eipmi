@@ -35,6 +35,8 @@
 
 -include("eipmi.hrl").
 
+-define(TIMEOUT, 5000).
+
 %%%=============================================================================
 %%% API
 %%%=============================================================================
@@ -64,7 +66,7 @@ init([IPAddress]) ->
     State = #state{address = IPAddress, socket = Socket},
     {ok, Ping} = eipmi_messages:encode(#rmcp_ping{seq_nr = 0, asf_tag = 0}),
     udp_send(Ping, State),
-    {ok, expect_pong, State}.
+    {ok, expect_pong, State, ?TIMEOUT}.
 
 %%------------------------------------------------------------------------------
 %% @private
@@ -81,7 +83,7 @@ handle_event(_Event, StateName, State) ->
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-handle_info({udp, _, _, _, Bin}, StateName, State) ->
+handle_info({udp, S, _, _, Bin}, StateName, State = #state{socket = S}) ->
     {ok, Message} = eipmi_messages:decode(Bin),
     ?MODULE:StateName(Message, State);
 
@@ -105,7 +107,7 @@ code_change(_OldVsn, StateName, State, _Extra) ->
 %% @private
 %%------------------------------------------------------------------------------
 expect_pong(#rmcp_ack{}, State) ->
-    {next_state, expect_pong, State};
+    {next_state, expect_pong, State, ?TIMEOUT};
 
 expect_pong(#rmcp_pong{seq_nr = SeqNr}, State) ->
     {ok, Ack} = eipmi_messages:encode(#rmcp_ack{seq_nr = SeqNr}),
