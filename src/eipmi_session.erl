@@ -22,7 +22,7 @@
 -behaviour(gen_fsm).
 
 %% API
--export([start_link/1]).
+-export([start_link/2]).
 
 %% gen_fsm callbacks
 -export([init/1,
@@ -46,7 +46,7 @@
 %% Start the server.
 %% @end
 %%------------------------------------------------------------------------------
-start_link(IPAddress) ->
+start_link(IPAddress, _Options) ->
     gen_fsm:start_link(?MODULE, [IPAddress], []).
 
 %%%=============================================================================
