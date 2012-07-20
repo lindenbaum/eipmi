@@ -48,6 +48,8 @@
 %% TODO
 %% @end
 %%------------------------------------------------------------------------------
+-spec open(string()) ->
+                  {ok, pid()} | {error, term()}.
 open(IPAddress) ->
     open(IPAddress, []).
 
@@ -56,6 +58,8 @@ open(IPAddress) ->
 %% TODO
 %% @end
 %%------------------------------------------------------------------------------
+-spec open(string(), proplists:proplist()) ->
+                  {ok, pid()} | {error, term()}.
 open(IPAddress, Options) ->
     Spec = {{remote_console, IPAddress},
             {eipmi_session, start_link, [IPAddress, Options]},
@@ -86,9 +90,13 @@ ping(IPAddress) ->
                   pang | pong.
 ping(IPAddress, Timeout) when is_integer(Timeout) andalso Timeout > 0 ->
     {ok, Socket} = gen_udp:open(0, [binary, {active, false}]),
-    {ok, Ping} = eipmi_messages:encode(#rmcp_ping{seq_nr = 0, asf_tag = 0}),
-    ok = gen_udp:send(Socket, IPAddress, ?RMCP_PORT_NUMBER, Ping),
-    ping(IPAddress, Timeout, Socket).
+    try do_ping(IPAddress, Timeout div 2, Socket) of
+        _ -> pong
+    catch
+        _:_ -> pang
+    after
+        gen_udp:close(Socket)
+    end.
 
 %%%=============================================================================
 %%% Application callbacks
@@ -123,22 +131,22 @@ init([]) ->
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-ping(IPAddress, Timeout, Socket) ->
-    case gen_udp:recv(Socket, 8192, Timeout) of
-        {ok, {_, _, Packet}} ->
-            case eipmi_messages:decode(Packet) of
-                {ok, #rmcp_ack{}} ->
-                    ping(IPAddress, Timeout, Socket);
+do_ping(IPAddress, Timeout, Socket) ->
+    {ok, Ping} = eipmi_messages:encode(#rmcp_ping{seq_nr = 0, asf_tag = 0}),
+    ok = gen_udp:send(Socket, IPAddress, ?RMCP_PORT_NUMBER, Ping),
+    do_ping_receive(IPAddress, Timeout, Socket).
 
-                {ok, #rmcp_pong{entities = Entities}} ->
-                    {ok, Ack} = eipmi_messages:encode(#rmcp_ack{seq_nr = 0}),
-                    ok = gen_udp:send(Socket, IPAddress, ?RMCP_PORT_NUMBER, Ack),
-                    case Entities of [ipmi] -> pong; _ -> pang end;
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+do_ping_receive(IPAddress, Timeout, Socket) ->
+    {ok, {_, _, Packet}} = gen_udp:recv(Socket, 8192, Timeout),
+    case eipmi_messages:decode(Packet) of
+        {ok, #rmcp_ack{}} ->
+            do_ping_receive(IPAddress, Timeout, Socket);
 
-                _ ->
-                    pang
-            end;
-
-        _ ->
-            pang
+        {ok, #rmcp_pong{entities = [ipmi]}} ->
+            {ok, Ack} = eipmi_messages:encode(#rmcp_ack{seq_nr = 0}),
+            gen_udp:send(Socket, IPAddress, ?RMCP_PORT_NUMBER, Ack),
+            ok
     end.
