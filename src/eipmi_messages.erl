@@ -97,6 +97,18 @@ encode(Message) ->
 
 %%------------------------------------------------------------------------------
 %% @doc
+%% TODO
+%% @end
+%%------------------------------------------------------------------------------
+encode_ipmi_lan(NetFn, Lun, RqAddr, RqSeqNr, Cmd, Data) ->
+    Header = <<16#20:8,NetFn:6,Lun:2>>,
+    Checksum1 = ipmi_checksum(Header),
+    Body = <<RqAddr:8,RqSeqNr:6,0:2,Cmd:8,Data/binary>>,
+    Checksum2 = ipmi_checksum(Body),
+    <<Header/binary, Checksum1:8/signed,Body/binary,Checksum2:8/signed>>.
+
+%%------------------------------------------------------------------------------
+%% @doc
 %% Decodes a binary representing an IPMI/RMCP packet into the corresponding
 %% erlang structure.
 %% @end
@@ -228,3 +240,11 @@ encode_auth_type(md5) ->
 
 encode_auth_type(pwd) ->
     4.
+
+%%------------------------------------------------------------------------------
+%% @private
+%% two's complement of the 8-bit checksum of the input binary
+%%------------------------------------------------------------------------------
+ipmi_checksum(Binary) ->
+    List = binary_to_list(Binary),
+    bnot lists:foldl(fun(Byte, Acc) -> (Acc + Byte) rem 256 end, 0, List) + 1.

@@ -112,6 +112,9 @@ expect_pong(#rmcp_ack{}, State) ->
 expect_pong(#rmcp_pong{seq_nr = SeqNr}, State) ->
     {ok, Ack} = eipmi_messages:encode(#rmcp_ack{seq_nr = SeqNr}),
     udp_send(Ack, State),
+    %% AuthCommand = <<>>,
+    %% {ok, AuthCaps} = eipmi_messages:encode(#rmcp_ipmi{payload = AuthCommand}),
+    %% udp_send(AuthCaps, State),
     {stop, normal, State}.
 
 %%------------------------------------------------------------------------------

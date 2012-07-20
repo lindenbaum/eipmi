@@ -39,6 +39,17 @@
 
 -registered([?MODULE]).
 
+-type auth_type() :: none | md2 | md5 | pwd.
+-type privilege_level() :: callback | user | operator | administrator | oem.
+
+-type options() :: [{user, string()} | %% omitted means null user (User 1)
+                    {requestor_lun, 0..14} |
+                    {requestor_addr, 16#81..16#8d} |
+                    {initial_outbound_session_seq_nr, 0..255} |
+                    {preferred_auth_type, auth_type()} |
+                    {pwd, string()} |
+                    {privilege_level, privilege_level()}].
+
 %%%=============================================================================
 %%% API
 %%%=============================================================================
@@ -58,11 +69,16 @@ open(IPAddress) ->
 %% TODO
 %% @end
 %%------------------------------------------------------------------------------
--spec open(string(), proplists:proplist()) ->
+-spec open(string(), options()) ->
                   {ok, pid()} | {error, term()}.
 open(IPAddress, Options) ->
+    DefaultOpts = [{requestor_lun, 0},
+                   {requestor_addr, 16#81},
+                   {initial_outbound_session_seq_nr, 0},
+                   {preferred_auth_type, none},
+                   {privilege_level, administrator}],
     Spec = {{remote_console, IPAddress},
-            {eipmi_session, start_link, [IPAddress, Options]},
+            {eipmi_session, start_link, [IPAddress, Options ++ DefaultOpts]},
             temporary, 2000, worker, [eipmi_session]},
     supervisor:start_child(?MODULE, Spec).
 
