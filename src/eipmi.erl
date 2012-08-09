@@ -35,20 +35,24 @@
 %% supervisor callbacks
 -export([init/1]).
 
--include("eipmi.hrl").
-
 -registered([?MODULE]).
 
 -type auth_type() :: none | md2 | md5 | pwd.
--type privilege_level() :: callback | user | operator | administrator | oem.
+
+-type privilege_level() :: callback | user | operator | administrator.
+
+-type requestor() :: 16#81..16#8d.
 
 -type options() :: [{user, string()} | %% omitted means null user (User 1)
-                    {requestor_lun, 0..14} |
-                    {requestor_addr, 16#81..16#8d} |
+                    {requestor_addr, requestor()} |
                     {initial_outbound_session_seq_nr, 0..255} |
                     {preferred_auth_type, auth_type()} |
                     {pwd, string()} |
                     {privilege_level, privilege_level()}].
+
+-export_type([auth_type/0, privilege_level/0, requestor/0, options/0]).
+
+-include("eipmi.hrl").
 
 %%%=============================================================================
 %%% API
@@ -72,8 +76,7 @@ open(IPAddress) ->
 -spec open(string(), options()) ->
                   {ok, pid()} | {error, term()}.
 open(IPAddress, Options) ->
-    DefaultOpts = [{requestor_lun, 0},
-                   {requestor_addr, 16#81},
+    DefaultOpts = [{requestor_addr, 16#81},
                    {initial_outbound_session_seq_nr, 0},
                    {preferred_auth_type, none},
                    {privilege_level, administrator}],
@@ -148,7 +151,7 @@ init([]) ->
 %% @private
 %%------------------------------------------------------------------------------
 do_ping(IPAddress, Timeout, Socket) ->
-    {ok, Ping} = eipmi_messages:encode(#rmcp_ping{seq_nr = 0, asf_tag = 0}),
+    {ok, Ping} = eipmi_messages:encode_packet(#rmcp_ping{seq_nr = 0, asf_tag = 0}),
     ok = gen_udp:send(Socket, IPAddress, ?RMCP_PORT_NUMBER, Ping),
     do_ping_receive(IPAddress, Timeout, Socket).
 
@@ -157,12 +160,12 @@ do_ping(IPAddress, Timeout, Socket) ->
 %%------------------------------------------------------------------------------
 do_ping_receive(IPAddress, Timeout, Socket) ->
     {ok, {_, _, Packet}} = gen_udp:recv(Socket, 8192, Timeout),
-    case eipmi_messages:decode(Packet) of
+    case eipmi_messages:decode_packet(Packet) of
         {ok, #rmcp_ack{}} ->
             do_ping_receive(IPAddress, Timeout, Socket);
 
         {ok, #rmcp_pong{entities = [ipmi]}} ->
-            {ok, Ack} = eipmi_messages:encode(#rmcp_ack{seq_nr = 0}),
+            {ok, Ack} = eipmi_messages:encode_packet(#rmcp_ack{seq_nr = 0}),
             gen_udp:send(Socket, IPAddress, ?RMCP_PORT_NUMBER, Ack),
             ok
     end.

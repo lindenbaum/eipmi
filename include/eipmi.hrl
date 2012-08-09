@@ -99,6 +99,56 @@
 %%------------------------------------------------------------------------------
 -define(ASF_VERSION_1_0, 1).
 
+%%------------------------------------------------------------------------------
+%% The IPMI net function for application requests (length is 6bits).
+%%------------------------------------------------------------------------------
+-define(IPMI_NETFN_APPLICATION_REQUEST, 16#06).
+
+%%------------------------------------------------------------------------------
+%% The IPMI net function for application responses (length is 6bits).
+%%------------------------------------------------------------------------------
+-define(IPMI_NETFN_APPLICATION_RESPONSE, 16#07).
+
+%%------------------------------------------------------------------------------
+%% The default reponder address sent in all IPMI requests, currently this is
+%% directly the BMC.
+%%------------------------------------------------------------------------------
+-define(IPMI_RESPONDER_ADDR, 16#20).
+
+%%------------------------------------------------------------------------------
+%% The default reponder logical unit (the BMC's event receiver function).
+%%------------------------------------------------------------------------------
+-define(IPMI_RESPONDER_LUN, 2#00).
+
+%%------------------------------------------------------------------------------
+%% The default requestor logical unit.
+%%------------------------------------------------------------------------------
+-define(IPMI_REQUESTOR_LUN, 2#00).
+
+%%------------------------------------------------------------------------------
+%% The channel number a session is requested for (default is the current channel).
+%%------------------------------------------------------------------------------
+-define(IPMI_REQUESTED_CHANNEL, 16#e).
+
+%%------------------------------------------------------------------------------
+%% Supported IPMI command/response codes (length is 8bits).
+%%------------------------------------------------------------------------------
+-define(IPMI_GET_CHANNEL_AUTHENTICATION_CAPABILITIES, 16#38).
+
+%%%=============================================================================
+%%% Requests
+%%%=============================================================================
+
+%%------------------------------------------------------------------------------
+%% The IPMI GetChannelAuthenticationCapabilities request.
+%%------------------------------------------------------------------------------
+-record(ipmi_get_channel_authentication_capabilities, {
+          privilege :: eipmi:privilege_level()}).
+
+%%%=============================================================================
+%%% Responses
+%%%=============================================================================
+
 %%%=============================================================================
 %%% Messages
 %%%=============================================================================
@@ -138,13 +188,15 @@
 %%------------------------------------------------------------------------------
 -record(rmcp_ipmi, {
           %% RMCP part
-          seq_nr = 255       :: 0..255,
+          seq_nr = 255         :: 0..255,
           %% IPMI 1.5 Session Header part
-          auth_type = none   :: none | md2 | md5 | pwd,
-          auth_code          :: undefined | integer(),    %% omitted when undefined
-          session_id = 0     :: non_neg_integer(),
-          session_seq_nr = 0 :: non_neg_integer(),
+          auth_type = none     :: none | md2 | md5 | pwd,
+          auth_code            :: undefined | integer(),    %% omitted for auth_type == none
+          session_id = 0       :: non_neg_integer(),
+          session_seq_nr = 0   :: non_neg_integer(),
           %% IPMI 1.5 Payload part
-          payload            :: binary()}).               %% must not be empty
+          requestor_addr       :: eipmi:requestor(),
+          requestor_seq_nr = 0 :: non_neg_integer(),
+          data                 :: #ipmi_get_channel_authentication_capabilities{}}).
 
 -endif. %% eipmi_hrl_
