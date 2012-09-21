@@ -206,7 +206,7 @@
           rq_seq_nr                                 :: 0..63,
           rs_addr = ?IPMI_RESPONDER_ADDR            :: 0..255,
           rs_lun = ?IPMI_RESPONDER_LUN              :: 0..3,
-          completion_code                           :: eipmi:completion_code()}).
+          code                                      :: eipmi:completion_code()}).
 
 %%------------------------------------------------------------------------------
 %% An RMCP IPMI Message.

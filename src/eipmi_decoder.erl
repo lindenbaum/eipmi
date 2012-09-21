@@ -75,13 +75,12 @@ asf(_Asf, _Binary) ->
 %% @private
 %%------------------------------------------------------------------------------
 ipmi(Ipmi, Binary) ->
-    {Session, <<Size:8, Rest/binary>>} = session(Binary),
-    Len = Size - (1 + 2 + 1 + 1) * 8,
-    <<Head:16/binary, Sum1:8/signed, Tail:Len/binary, Sum2:8/signed>> = Rest,
+    {Session, <<Size:8, Rest:Size/binary>>} = session(Binary),
+    Len = (Size - 4),
+    <<Head:2/binary, Sum1:8/signed, Tail:Len/binary, Sum2:8/signed>> = Rest,
     case has_integrity(Head, Sum1) andalso has_integrity(Tail, Sum2) of
         true ->
             lan(Ipmi#rmcp_ipmi{session = Session}, Head, Tail);
-
         false ->
             {error, corrupted_ipmi_message}
     end.
@@ -111,7 +110,7 @@ lan(Ipmi,
                   rq_seq_nr = RqSeqNr,
                   rs_addr = RsAddr,
                   rs_lun = RsLun,
-                  completion_code = from_completion_code(Code)},
+                  code = from_completion_code(Code)},
     {ok, Ipmi#rmcp_ipmi{type = Response, cmd = Cmd, data = Data}};
 lan(_Ipmi, _Head, _Tail) ->
     {error, unsupported_ipmi_message}.
@@ -120,16 +119,15 @@ lan(_Ipmi, _Head, _Tail) ->
 %% @private
 %%------------------------------------------------------------------------------
 has_integrity(Binary, Checksum) ->
-    Checksum == calc_checksum(Binary).
+    (Checksum + sum(Binary, 0)) rem 256 =:= 0.
 
 %%------------------------------------------------------------------------------
-%% @doc
-%% Calculates the two's complement of the 8-bit checksum of the input binary.
-%% @end
+%% @private
 %%------------------------------------------------------------------------------
-calc_checksum(Binary) ->
-    List = binary_to_list(Binary),
-    bnot lists:foldl(fun(Byte, Acc) -> (Acc + Byte) rem 256 end, 0, List) + 1.
+sum(<<>>, Sum) ->
+    Sum;
+sum(<<Byte:8, Rest/binary>>, Sum) ->
+    sum(Rest, Sum + Byte).
 
 %%------------------------------------------------------------------------------
 %% @private
