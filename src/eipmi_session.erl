@@ -30,8 +30,7 @@
          handle_sync_event/4,
          handle_info/3,
          terminate/3,
-         code_change/4,
-         expect_pong/2]).
+         code_change/4]).
 
 -include("eipmi.hrl").
 
@@ -64,9 +63,7 @@ init([IPAddress]) ->
     process_flag(trap_exit, true),
     {ok, Socket} = gen_udp:open(0, [binary]),
     State = #state{address = IPAddress, socket = Socket},
-    {ok, Ping} = eipmi_messages:encode_packet(#rmcp_ping{seq_nr = 0, asf_tag = 0}),
-    udp_send(Ping, State),
-    {ok, expect_pong, State, ?TIMEOUT}.
+    {ok, initial, State, ?TIMEOUT}.
 
 %%------------------------------------------------------------------------------
 %% @private
@@ -84,8 +81,12 @@ handle_event(_Event, StateName, State) ->
 %% @private
 %%------------------------------------------------------------------------------
 handle_info({udp, S, _, _, Bin}, StateName, State = #state{socket = S}) ->
-    {ok, Message} = eipmi_messages:decode_packet(Bin),
-    ?MODULE:StateName(Message, State);
+    case eipmi_decoder:packet(Bin) of
+        {ok, Message} ->
+            {next_state, StateName, State};
+        {error, Reason} ->
+            {next_state, StateName, State}
+    end;
 
 handle_info(_Event, StateName, State) ->
     {next_state, StateName, State}.
@@ -103,19 +104,9 @@ terminate(_Reason, _StateName, #state{socket = Socket}) ->
 code_change(_OldVsn, StateName, State, _Extra) ->
     {ok, StateName, State}.
 
-%%------------------------------------------------------------------------------
-%% @private
-%%------------------------------------------------------------------------------
-expect_pong(#rmcp_ack{}, State) ->
-    {next_state, expect_pong, State, ?TIMEOUT};
-
-expect_pong(#rmcp_pong{seq_nr = SeqNr}, State) ->
-    {ok, Ack} = eipmi_messages:encode_packet(#rmcp_ack{seq_nr = SeqNr}),
-    udp_send(Ack, State),
-    %% AuthCommand = <<>>,
-    %% {ok, AuthCaps} = eipmi_messages:encode(#rmcp_ipmi{payload = AuthCommand}),
-    %% udp_send(AuthCaps, State),
-    {stop, normal, State}.
+%%%=============================================================================
+%%% Internal functions
+%%%=============================================================================
 
 %%------------------------------------------------------------------------------
 %% @private

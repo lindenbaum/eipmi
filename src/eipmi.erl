@@ -43,6 +43,32 @@
 
 -type requestor() :: 16#81..16#8d.
 
+-type completion_code() :: command_completed_normally |
+                           node_busy |
+                           invalid_command |
+                           invalid_command_for_lun |
+                           timeout |
+                           out_of_space |
+                           reservation_canceled |
+                           data_truncated |
+                           data_length_invalid |
+                           data_length_limit_exceeded |
+                           parameter_out_of_range |
+                           cannot_return_number_of_requested_data_bytes |
+                           requested_sensor_not_present |
+                           invalid_data_field |
+                           command_illegal_for_sensor |
+                           response_not_provided |
+                           duplicated_request |
+                           sdr_repository_in_update_mode |
+                           device_in_firmware_update_mode |
+                           bmc_initialization_in_progress |
+                           destination_unavailable |
+                           insufficient_privilege_level |
+                           command_not_supported |
+                           command_disabled |
+                           unspecified_error.
+
 -type options() :: [{user, string()} | %% omitted means null user (User 1)
                     {requestor_addr, requestor()} |
                     {initial_outbound_session_seq_nr, 0..255} |
@@ -50,7 +76,11 @@
                     {pwd, string()} |
                     {privilege_level, privilege_level()}].
 
--export_type([auth_type/0, privilege_level/0, requestor/0, options/0]).
+-export_type([auth_type/0,
+              privilege_level/0,
+              requestor/0,
+              completion_code/0,
+              options/0]).
 
 -include("eipmi.hrl").
 
@@ -109,8 +139,9 @@ ping(IPAddress) ->
                   pang | pong.
 ping(IPAddress, Timeout) when is_integer(Timeout) andalso Timeout > 0 ->
     {ok, Socket} = gen_udp:open(0, [binary, {active, false}]),
-    try do_ping(IPAddress, Timeout div 2, Socket) of
-        _ -> pong
+    try do_ping(IPAddress, Timeout, Socket) of
+        true -> pong;
+        false -> pang
     catch
         _:_ -> pang
     after
@@ -151,7 +182,7 @@ init([]) ->
 %% @private
 %%------------------------------------------------------------------------------
 do_ping(IPAddress, Timeout, Socket) ->
-    {ok, Ping} = eipmi_messages:encode_packet(#rmcp_ping{seq_nr = 0, asf_tag = 0}),
+    Ping = eipmi_encoder:ping(#rmcp_header{seq_nr = 0}, #asf_ping{}),
     ok = gen_udp:send(Socket, IPAddress, ?RMCP_PORT_NUMBER, Ping),
     do_ping_receive(IPAddress, Timeout, Socket).
 
@@ -160,12 +191,11 @@ do_ping(IPAddress, Timeout, Socket) ->
 %%------------------------------------------------------------------------------
 do_ping_receive(IPAddress, Timeout, Socket) ->
     {ok, {_, _, Packet}} = gen_udp:recv(Socket, 8192, Timeout),
-    case eipmi_messages:decode_packet(Packet) of
+    case eipmi_decoder:packet(Packet) of
         {ok, #rmcp_ack{}} ->
             do_ping_receive(IPAddress, Timeout, Socket);
-
-        {ok, #rmcp_pong{entities = [ipmi]}} ->
-            {ok, Ack} = eipmi_messages:encode_packet(#rmcp_ack{seq_nr = 0}),
+        {ok, #rmcp_asf{header = H, payload = #asf_pong{entities = Es}}} ->
+            Ack = eipmi_encoder:ack(H),
             gen_udp:send(Socket, IPAddress, ?RMCP_PORT_NUMBER, Ack),
-            ok
+            Es =:= [ipmi]
     end.

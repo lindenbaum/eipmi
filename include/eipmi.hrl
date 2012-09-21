@@ -136,67 +136,94 @@
 -define(IPMI_GET_CHANNEL_AUTHENTICATION_CAPABILITIES, 16#38).
 
 %%%=============================================================================
-%%% Requests
-%%%=============================================================================
-
-%%------------------------------------------------------------------------------
-%% The IPMI GetChannelAuthenticationCapabilities request.
-%%------------------------------------------------------------------------------
--record(ipmi_get_channel_authentication_capabilities, {
-          privilege :: eipmi:privilege_level()}).
-
-%%%=============================================================================
-%%% Responses
-%%%=============================================================================
-
-%%%=============================================================================
 %%% Messages
 %%%=============================================================================
 
 %%------------------------------------------------------------------------------
-%% The RMCP ASF ACK Message.
+%% The RMCP message header.
+%%------------------------------------------------------------------------------
+-record(rmcp_header, {
+          version = ?RMCP_VERSION :: 0..255,
+          seq_nr  = 255           :: 0..255,
+          class   = ?RMCP_ASF     :: 0..255}).
+
+%%------------------------------------------------------------------------------
+%% The RMCP ACK Message.
 %%------------------------------------------------------------------------------
 -record(rmcp_ack, {
-          %% RMCP part
-          seq_nr = 255       :: 0..255,
-          %% ASF part
-          class  = ?RMCP_ASF :: non_neg_integer()}).
+          header :: #rmcp_header{}}).
 
 %%------------------------------------------------------------------------------
-%% The RMCP ASF PING Message.
+%% The ASF Ping payload.
 %%------------------------------------------------------------------------------
--record(rmcp_ping, {
-          %% RMCP part
-          seq_nr = 255  :: 0..255,
-          %% ASF part
-          asf_tag = 255 :: 0..255}).
+-record(asf_ping, {
+          iana = ?ASF_IANA :: non_neg_integer(), %% the IANA enterprise number
+          tag = 0          :: 0..255}).
 
 %%------------------------------------------------------------------------------
-%% The RMCP ASF PONG Message.
+%% The ASF Pong payload.
 %%------------------------------------------------------------------------------
--record(rmcp_pong, {
-          %% RMCP part
-          seq_nr = 255  :: 0..255,
-          %% ASF part
-          asf_tag = 255 :: 0..255,
-          iana = 4542   :: non_neg_integer(), %% the IANA enterprise number
-          oem = 0       :: non_neg_integer(), %% OEM defined values
-          entities = [] :: [ipmi]}).          %% supported entities
+-record(asf_pong, {
+          iana = ?ASF_IANA :: non_neg_integer(), %% the IANA enterprise number
+          tag = 0          :: 0..255,
+          oem = 0          :: non_neg_integer(), %% OEM defined values
+          entities = []    :: [ipmi]}).          %% supported entities
 
 %%------------------------------------------------------------------------------
-%% The RMCP IPMI Message.
+%% An RMCP ASF Message.
+%%------------------------------------------------------------------------------
+-record(rmcp_asf, {
+          header  :: #rmcp_header{},
+          payload :: #asf_ping{} | #asf_pong{}}).
+
+%%------------------------------------------------------------------------------
+%% The IPMI v1.5 session header.
+%%------------------------------------------------------------------------------
+-record(ipmi_session, {
+          type = none :: none | md2 | md5 | pwd,
+          seq_nr = 0  :: non_neg_integer(),
+          id = 0      :: non_neg_integer(),
+          code        :: undefined | integer()}). %% omitted for auth_type == none
+
+%%------------------------------------------------------------------------------
+%% An IPMI over LAN request.
+%%------------------------------------------------------------------------------
+-record(ipmi_request, {
+          net_fn = ?IPMI_NETFN_APPLICATION_REQUEST :: 0..63,
+          rq_addr                                  :: eipmi:requestor(),
+          rq_lun = ?IPMI_REQUESTOR_LUN             :: 0..3,
+          rq_seq_nr                                :: 0..63,
+          rs_addr = ?IPMI_RESPONDER_ADDR           :: 0..255,
+          rs_lun = ?IPMI_RESPONDER_LUN}).
+
+%%------------------------------------------------------------------------------
+%% An IPMI over LAN response.
+%%------------------------------------------------------------------------------
+-record(ipmi_response, {
+          net_fn = ?IPMI_NETFN_APPLICATION_RESPONSE :: 0..63,
+          rq_addr                                   :: eipmi:requestor(),
+          rq_lun = ?IPMI_REQUESTOR_LUN              :: 0..3,
+          rq_seq_nr                                 :: 0..63,
+          rs_addr = ?IPMI_RESPONDER_ADDR            :: 0..255,
+          rs_lun = ?IPMI_RESPONDER_LUN              :: 0..3,
+          completion_code                           :: eipmi:completion_code()}).
+
+%%------------------------------------------------------------------------------
+%% An RMCP IPMI Message.
 %%------------------------------------------------------------------------------
 -record(rmcp_ipmi, {
-          %% RMCP part
-          seq_nr = 255         :: 0..255,
-          %% IPMI 1.5 Session Header part
-          auth_type = none     :: none | md2 | md5 | pwd,
-          auth_code            :: undefined | integer(),    %% omitted for auth_type == none
-          session_id = 0       :: non_neg_integer(),
-          session_seq_nr = 0   :: non_neg_integer(),
-          %% IPMI 1.5 Payload part
-          requestor_addr       :: eipmi:requestor(),
-          requestor_seq_nr = 0 :: non_neg_integer(),
-          data                 :: #ipmi_get_channel_authentication_capabilities{}}).
+          header  :: #rmcp_header{},
+          session :: #ipmi_session{},
+          type    :: #ipmi_request{} | #ipmi_response{},
+          cmd     :: 0..255,
+          data    :: binary()}).
+
+%%%=============================================================================
+%%% Requests
+%%%=============================================================================
+
+%%%=============================================================================
+%%% Responses
+%%%=============================================================================
 
 -endif. %% eipmi_hrl_

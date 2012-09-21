@@ -1,0 +1,8 @@
+{application, eipmi,
+  [{description, "A native Erlang IMPI library."},
+   {id, "eu.lindenbaum.ims"},
+   {vsn, "1.0.0"},
+   {registered, [eipmi]},
+   {applications, [kernel, stdlib, sasl]},
+   {mod, {eipmi, []}},
+   {env, []}]}.
