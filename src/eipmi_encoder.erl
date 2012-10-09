@@ -24,7 +24,7 @@
          ping/2,
          ipmi/5]).
 
--include("eipmi.hrl").
+-include("eipmi_internal.hrl").
 
 %%%=============================================================================
 %%% API
@@ -58,15 +58,15 @@ ping(Header = #rmcp_header{class = ?RMCP_ASF}, #asf_ping{iana = I, tag = T}) ->
 
 %%------------------------------------------------------------------------------
 %% @doc
-%% Encodes a RMCP IPMI packet. This encapsulates the logic binary packet
-%% construction and checksum calculation.
+%% Encodes a RMCP IPMI packet. This encapsulates the logic of binary packet
+%% construction with authentication and checksum calculation.
 %% @end
 %%------------------------------------------------------------------------------
 -spec ipmi(#rmcp_header{}, #ipmi_session{}, #ipmi_request{}, 0..255, binary()) ->
                   binary().
 ipmi(Header = #rmcp_header{class = ?RMCP_IPMI}, Session, Request, Cmd, Data) ->
     HeaderBin = header(Header, ?RMCP_NORMAL),
-    SessionBin = session(Session),
+    SessionBin = session(Session, Data),
     RequestBin = request(Request, Cmd, Data),
     Length = size(RequestBin),
     <<HeaderBin/binary, SessionBin/binary, Length:8, RequestBin/binary>>.
@@ -84,10 +84,24 @@ header(#rmcp_header{version = V, seq_nr = S, class = C}, Ack) ->
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-session(#ipmi_session{type = none, seq_nr = S, id = I}) ->
-    <<?EIPMI_RESERVED:4, (encode_auth_type(none)):4, S:32, I:32>>;
-session(#ipmi_session{type = T, seq_nr = S, id = I, code = C}) ->
-    <<?EIPMI_RESERVED:4, (encode_auth_type(T)):4, S:32, I:32, C:128>>.
+session(#ipmi_session{type = none, seq_nr = S, id = I}, _Data) ->
+    T = eipmi_auth:encode_type(none),
+    <<?EIPMI_RESERVED:4, T:4, S:32, I:32>>;
+session(Session = #ipmi_session{type = pwd, seq_nr = S, id = I}, _Data) ->
+    Type = eipmi_auth:encode_type(pwd),
+    Cipher = eipmi_auth:encrypt(pwd, Session#ipmi_session.code),
+    <<?EIPMI_RESERVED:4, Type:4, S:32, I:32, Cipher/binary>>;
+session(Session = #ipmi_session{challenge = <<>>, type = T, seq_nr = S, id = I}, Data) ->
+    Key = eipmi_util:normalize(16, Session#ipmi_session.code),
+    Type = eipmi_auth:encode_type(T),
+    Cipher = eipmi_auth:encrypt(T, <<Key/binary, I:32, Data/binary, S:32, Key/binary>>),
+    <<?EIPMI_RESERVED:4, Type:4, S:32, I:32, Cipher/binary>>;
+session(Session = #ipmi_session{type = T, seq_nr = S, id = I}, _Data) ->
+    Key = eipmi_util:normalize(16, Session#ipmi_session.code),
+    Challenge = eipmi_util:normalize(16, Session#ipmi_session.challenge),
+    Type = eipmi_auth:encode_type(T),
+    Cipher = eipmi_auth:encrypt(Type, <<Key/binary, I:32, Challenge/binary, Key/binary>>),
+    <<?EIPMI_RESERVED:4, Type:4, S:32, I:32, Cipher/binary>>.
 
 %%------------------------------------------------------------------------------
 %% @private
@@ -127,19 +141,3 @@ sum(<<>>, Sum) ->
     Sum;
 sum(<<Byte:8, Rest/binary>>, Sum) ->
     sum(Rest, (Sum + Byte) rem 256).
-
-%%------------------------------------------------------------------------------
-%% @private
-%%------------------------------------------------------------------------------
-encode_auth_type(none) -> 0;
-encode_auth_type(md2) -> 1;
-encode_auth_type(md5) -> 2;
-encode_auth_type(pwd) -> 4.
-
-%%------------------------------------------------------------------------------
-%% @private
-%%------------------------------------------------------------------------------
-%% encode_privilege_level(callback) -> 1;
-%% encode_privilege_level(user) -> 2;
-%% encode_privilege_level(operator) -> 3;
-%% encode_privilege_level(administrator) -> 4.

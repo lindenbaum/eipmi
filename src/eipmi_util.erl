@@ -12,37 +12,34 @@
 %%% WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
 %%% ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 %%% OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+%%%
+%%% @doc
+%%% A module providing common utility functions.
+%%% @end
 %%%=============================================================================
 
--module(eipmi_encoder_test).
+-module(eipmi_util).
 
--include_lib("eunit/include/eunit.hrl").
-
--include("eipmi_internal.hrl").
+-export([normalize/2]).
 
 %%%=============================================================================
-%%% TESTS
+%%% API
 %%%=============================================================================
 
-ack_test() ->
-    ?assertEqual(
-       <<16#06, 16#00, 16#01, 16#86>>,
-       eipmi_encoder:ack(#rmcp_header{seq_nr = 1})).
-
-ping_test() ->
-    ?assertEqual(
-       <<16#06, 16#00, 16#01, 16#06, 16#00, 16#00, 16#11, 16#be,
-         16#80, 16#00, 16#00, 16#00>>,
-       eipmi_encoder:ping(#rmcp_header{seq_nr = 1}, #asf_ping{})).
-
-ipmi_test() ->
-    ?assertEqual(
-       <<16#06, 16#00, 16#ff, 16#07, 16#00, 16#00, 16#00, 16#00,
-         16#00, 16#00, 16#00, 16#00, 16#00, 16#09, 16#20, 16#18,
-         16#c8, 16#81, 16#00, 16#38, 16#0e, 16#04, 16#35>>,
-       eipmi_encoder:ipmi(
-         #rmcp_header{class = ?RMCP_IPMI},
-         #ipmi_session{},
-         #ipmi_request{rq_addr = 16#81, rq_seq_nr = 0},
-         16#38,
-         <<16#0e, 16#04>>)).
+%%------------------------------------------------------------------------------
+%% @doc
+%% Normalizes a string or a binary to a binary with the specified length
+%% (in bytes).
+%% @end
+%%------------------------------------------------------------------------------
+normalize(Length, String) when is_list(String) ->
+    normalize(Length, list_to_binary(String));
+normalize(Length, Binary) when is_binary(Binary) ->
+    case Length - byte_size(Binary) of
+        0 ->
+            Binary;
+        PadSize when PadSize < 0 ->
+            erlang:binary_part(Binary, 0, Length);
+        PadSize ->
+            <<Binary/binary, 0:(PadSize * 8)>>
+    end.

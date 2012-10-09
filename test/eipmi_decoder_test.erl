@@ -12,17 +12,13 @@
 %%% WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
 %%% ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 %%% OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
-%%%
-%%% @doc
-%%% A module providing decoding functionality for RMCP packets.
-%%% @end
 %%%=============================================================================
 
 -module(eipmi_decoder_test).
 
 -include_lib("eunit/include/eunit.hrl").
 
--include("eipmi.hrl").
+-include("eipmi_internal.hrl").
 
 %%%=============================================================================
 %%% TESTS
@@ -67,7 +63,7 @@ ipmi_response_test() ->
                type = #ipmi_response{
                          rq_addr = 16#81,
                          rq_seq_nr = 0,
-                         code = command_completed_normally},
+                         code = normal},
                cmd = 16#38,
                data = <<16#00, 16#01, 16#19, 16#00, 16#00, 16#00, 16#00, 16#00>>}},
        eipmi_decoder:packet(

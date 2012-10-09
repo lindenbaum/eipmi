@@ -22,7 +22,7 @@
 
 -export([packet/1]).
 
--include("eipmi.hrl").
+-include("eipmi_internal.hrl").
 
 %%%=============================================================================
 %%% API
@@ -30,7 +30,8 @@
 
 %%------------------------------------------------------------------------------
 %% @doc
-%% Decodes a binary representing a RMCP message erlang record representation.
+%% Decodes a binary representing a RMCP message in its erlang record
+%% representation.
 %% @end
 %%------------------------------------------------------------------------------
 -spec packet(binary()) ->
@@ -110,7 +111,7 @@ lan(Ipmi,
                   rq_seq_nr = RqSeqNr,
                   rs_addr = RsAddr,
                   rs_lun = RsLun,
-                  code = from_completion_code(Code)},
+                  code = completion_code(Code)},
     {ok, Ipmi#rmcp_ipmi{type = Response, cmd = Cmd, data = Data}};
 lan(_Ipmi, _Head, _Tail) ->
     {error, unsupported_ipmi_message}.
@@ -132,28 +133,28 @@ sum(<<Byte:8, Rest/binary>>, Sum) ->
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-from_completion_code(16#00) -> command_completed_normally;
-from_completion_code(16#c0) -> node_busy;
-from_completion_code(16#c1) -> invalid_command;
-from_completion_code(16#c2) -> invalid_command_for_lun;
-from_completion_code(16#c3) -> timeout;
-from_completion_code(16#c4) -> out_of_space;
-from_completion_code(16#c5) -> reservation_canceled;
-from_completion_code(16#c6) -> data_truncated;
-from_completion_code(16#c7) -> data_length_invalid;
-from_completion_code(16#c8) -> data_length_limit_exceeded;
-from_completion_code(16#c9) -> parameter_out_of_range;
-from_completion_code(16#ca) -> cannot_return_number_of_requested_data_bytes;
-from_completion_code(16#cb) -> requested_sensor_not_present;
-from_completion_code(16#cc) -> invalid_data_field;
-from_completion_code(16#cd) -> command_illegal_for_sensor;
-from_completion_code(16#ce) -> response_not_provided;
-from_completion_code(16#cf) -> duplicated_request;
-from_completion_code(16#d0) -> sdr_repository_in_update_mode;
-from_completion_code(16#d1) -> device_in_firmware_update_mode;
-from_completion_code(16#d2) -> bmc_initialization_in_progress;
-from_completion_code(16#d3) -> destination_unavailable;
-from_completion_code(16#d4) -> insufficient_privilege_level;
-from_completion_code(16#d5) -> command_not_supported;
-from_completion_code(16#d6) -> command_disabled;
-from_completion_code(_) -> unspecified_error.
+completion_code(16#00) -> normal;
+completion_code(16#c0) -> node_busy;
+completion_code(16#c1) -> invalid_command;
+completion_code(16#c2) -> invalid_command_for_lun;
+completion_code(16#c3) -> timeout;
+completion_code(16#c4) -> out_of_space;
+completion_code(16#c5) -> reservation_canceled;
+completion_code(16#c6) -> data_truncated;
+completion_code(16#c7) -> data_length_invalid;
+completion_code(16#c8) -> data_length_limit_exceeded;
+completion_code(16#c9) -> parameter_out_of_range;
+completion_code(16#ca) -> cannot_return_number_of_requested_data_bytes;
+completion_code(16#cb) -> requested_sensor_not_present;
+completion_code(16#cc) -> invalid_data_field;
+completion_code(16#cd) -> command_illegal_for_sensor;
+completion_code(16#ce) -> response_not_provided;
+completion_code(16#cf) -> duplicated_request;
+completion_code(16#d0) -> sdr_repository_in_update_mode;
+completion_code(16#d1) -> device_in_firmware_update_mode;
+completion_code(16#d2) -> bmc_initialization_in_progress;
+completion_code(16#d3) -> destination_unavailable;
+completion_code(16#d4) -> insufficient_privilege_level;
+completion_code(16#d5) -> command_not_supported;
+completion_code(16#d6) -> command_disabled;
+completion_code(_) -> unspecified_error.

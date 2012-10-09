@@ -32,7 +32,7 @@
          terminate/3,
          code_change/4]).
 
--include("eipmi.hrl").
+-include("eipmi_internal.hrl").
 
 -define(TIMEOUT, 5000).
 

@@ -21,20 +21,6 @@ We really want to provide a simple enough basic implementation, that is open
 for extension, and not going for a complete coverage of the specification right
 away - that should be added by the community as the needs appear.
 
-Project structure
------------------
-
-This is a simple Erlang/OTP-compliant project using a simple structure that
-should be trivially buildable using Maven, Rebar or a simple Makefile. We
-are preferring Maven at the moment, making it easy to also build deploy and
-manage EIPMI as a dependency-package, using the Maven-Erlang-Plugin
-[http://erlang-plugin.sourceforge.net/].
-
-To build, test, package and verify EIPMI with Maven, simply do:
-```
-  mvn verify
-'''
-
 Contributing
 ------------
 

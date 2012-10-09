@@ -3,6 +3,6 @@
    {id, "eu.lindenbaum.ims"},
    {vsn, "1.0.0"},
    {registered, [eipmi]},
-   {applications, [kernel, stdlib, sasl]},
+   {applications, [kernel, stdlib, sasl, crypto, md2]},
    {mod, {eipmi, []}},
    {env, []}]}.

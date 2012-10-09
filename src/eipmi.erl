@@ -37,52 +37,11 @@
 
 -registered([?MODULE]).
 
--type auth_type() :: none | md2 | md5 | pwd.
-
--type privilege_level() :: callback | user | operator | administrator.
-
 -type requestor() :: 16#81..16#8d.
 
--type completion_code() :: command_completed_normally |
-                           node_busy |
-                           invalid_command |
-                           invalid_command_for_lun |
-                           timeout |
-                           out_of_space |
-                           reservation_canceled |
-                           data_truncated |
-                           data_length_invalid |
-                           data_length_limit_exceeded |
-                           parameter_out_of_range |
-                           cannot_return_number_of_requested_data_bytes |
-                           requested_sensor_not_present |
-                           invalid_data_field |
-                           command_illegal_for_sensor |
-                           response_not_provided |
-                           duplicated_request |
-                           sdr_repository_in_update_mode |
-                           device_in_firmware_update_mode |
-                           bmc_initialization_in_progress |
-                           destination_unavailable |
-                           insufficient_privilege_level |
-                           command_not_supported |
-                           command_disabled |
-                           unspecified_error.
+-export_type([requestor/0]).
 
--type options() :: [{user, string()} | %% omitted means null user (User 1)
-                    {requestor_addr, requestor()} |
-                    {initial_outbound_session_seq_nr, 0..255} |
-                    {preferred_auth_type, auth_type()} |
-                    {pwd, string()} |
-                    {privilege_level, privilege_level()}].
-
--export_type([auth_type/0,
-              privilege_level/0,
-              requestor/0,
-              completion_code/0,
-              options/0]).
-
--include("eipmi.hrl").
+-include("eipmi_internal.hrl").
 
 %%%=============================================================================
 %%% API
@@ -103,7 +62,7 @@ open(IPAddress) ->
 %% TODO
 %% @end
 %%------------------------------------------------------------------------------
--spec open(string(), options()) ->
+-spec open(string(), proplists:proplist()) ->
                   {ok, pid()} | {error, term()}.
 open(IPAddress, Options) ->
     DefaultOpts = [{requestor_addr, 16#81},

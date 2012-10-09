@@ -14,35 +14,24 @@
 %%% OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 %%%=============================================================================
 
--module(eipmi_encoder_test).
+-module(eipmi_util_test).
 
 -include_lib("eunit/include/eunit.hrl").
-
--include("eipmi_internal.hrl").
 
 %%%=============================================================================
 %%% TESTS
 %%%=============================================================================
 
-ack_test() ->
-    ?assertEqual(
-       <<16#06, 16#00, 16#01, 16#86>>,
-       eipmi_encoder:ack(#rmcp_header{seq_nr = 1})).
-
-ping_test() ->
-    ?assertEqual(
-       <<16#06, 16#00, 16#01, 16#06, 16#00, 16#00, 16#11, 16#be,
-         16#80, 16#00, 16#00, 16#00>>,
-       eipmi_encoder:ping(#rmcp_header{seq_nr = 1}, #asf_ping{})).
-
-ipmi_test() ->
-    ?assertEqual(
-       <<16#06, 16#00, 16#ff, 16#07, 16#00, 16#00, 16#00, 16#00,
-         16#00, 16#00, 16#00, 16#00, 16#00, 16#09, 16#20, 16#18,
-         16#c8, 16#81, 16#00, 16#38, 16#0e, 16#04, 16#35>>,
-       eipmi_encoder:ipmi(
-         #rmcp_header{class = ?RMCP_IPMI},
-         #ipmi_session{},
-         #ipmi_request{rq_addr = 16#81, rq_seq_nr = 0},
-         16#38,
-         <<16#0e, 16#04>>)).
+normalize_test() ->
+    ?assertEqual(<<"1234">>, eipmi_util:normalize(4, "12345")),
+    ?assertEqual(<<"1234">>, eipmi_util:normalize(4, "1234")),
+    ?assertEqual(<<"123", 0>>, eipmi_util:normalize(4, "123")),
+    ?assertEqual(<<"12", 0, 0>>, eipmi_util:normalize(4, "12")),
+    ?assertEqual(<<"1", 0, 0, 0>>, eipmi_util:normalize(4, "1")),
+    ?assertEqual(<<0, 0, 0, 0>>, eipmi_util:normalize(4, "")),
+    ?assertEqual(<<"1234">>, eipmi_util:normalize(4, <<"12345">>)),
+    ?assertEqual(<<"1234">>, eipmi_util:normalize(4, <<"1234">>)),
+    ?assertEqual(<<"123", 0>>, eipmi_util:normalize(4, <<"123">>)),
+    ?assertEqual(<<"12", 0, 0>>, eipmi_util:normalize(4, <<"12">>)),
+    ?assertEqual(<<"1", 0, 0, 0>>, eipmi_util:normalize(4, <<"1">>)),
+    ?assertEqual(<<0, 0, 0, 0>>, eipmi_util:normalize(4, <<>>)).
