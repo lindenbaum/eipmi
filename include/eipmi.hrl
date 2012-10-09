@@ -44,4 +44,29 @@
 %%% Responses
 %%%=============================================================================
 
+%%------------------------------------------------------------------------------
+%% The GetChannelAuthenticationCapabilities response.
+%%------------------------------------------------------------------------------
+-record(channel_authentication_capabilities, {
+          auth_types = []                   :: [none | md2 | md5 | pwd],
+          per_msg_auth_enabled = false      :: boolean(),
+          user_level_auth_enabled = false   :: boolean(),
+          anonymous_login_status = []       :: [null | non_null | anonymous]}).
+
+%%------------------------------------------------------------------------------
+%% The GetSessionChallenge response.
+%%------------------------------------------------------------------------------
+-record(get_session_challenge, {
+          temp_id   :: non_neg_integer(),
+          challenge :: binary()}).
+
+%%------------------------------------------------------------------------------
+%% The ActivateSession response.
+%%------------------------------------------------------------------------------
+-record(activate_session, {
+          auth_type = none       :: eipmi_auth:type(),
+          session_id             :: non_neg_integer(),
+          initial_inbound_seq_nr :: non_neg_integer(),
+          privilege_level        :: callback | user | operator | administrator}).
+
 -endif. %% eipmi_hrl_

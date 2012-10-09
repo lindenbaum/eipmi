@@ -22,7 +22,8 @@
 -module(eipmi_auth).
 
 -export([encrypt/2,
-         encode_type/1]).
+         encode_type/1,
+         decode_type/1]).
 
 -type type() :: none | md2 | md5 | pwd.
 
@@ -58,3 +59,13 @@ encode_type(none) -> 0;
 encode_type(md2) -> 1;
 encode_type(md5) -> 2;
 encode_type(pwd) -> 4.
+
+%%------------------------------------------------------------------------------
+%% @doc
+%% Decodes an authentication type integer into human readable format.
+%% @end
+%%------------------------------------------------------------------------------
+decode_type(0) -> none;
+decode_type(1) -> md2;
+decode_type(2) -> md5;
+decode_type(4) -> pwd.

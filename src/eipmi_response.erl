@@ -21,19 +21,11 @@
 
 -module(eipmi_response).
 
--export([get_channel_authentication_capabilities/1]).
+-export([get_channel_authentication_capabilities/1,
+         get_session_challenge/1,
+         activate_session/1]).
 
 -include("eipmi.hrl").
-
--record(channel_authentication_capabilities, {
-          auth_types = []                   :: [none | md2 | md5 | pwd],
-          per_msg_auth_enabled = false      :: boolean(),
-          user_level_auth_enabled = false   :: boolean(),
-          anonymous_login_status = []       :: [null | non_null | anonymous]}).
-
--record(get_session_challenge, {
-         temp_id   :: non_neg_integer(),
-         challenge :: binary()}).
 
 %%%=============================================================================
 %%% API
@@ -61,6 +53,21 @@ get_channel_authentication_capabilities(
 %%------------------------------------------------------------------------------
 get_session_challenge(<<TempId:32/little, Challenge/binary>>) ->
     #get_session_challenge{temp_id = TempId, challenge = Challenge}.
+
+%%------------------------------------------------------------------------------
+%% @doc
+%% TODO
+%% @end
+%%------------------------------------------------------------------------------
+activate_session(<<?EIPMI_RESERVED:4, AuthType:4,
+                   SessionId:32,
+                   InitialInboundSeqNr:32,
+                   ?EIPMI_RESERVED:4, GrantedPrivilege:4>>) ->
+    #activate_session{
+       auth_type = eipmi_auth:decode_type(AuthType),
+       session_id = SessionId,
+       initial_inbound_seq_nr = InitialInboundSeqNr,
+       privilege_level = decode_privilege(GrantedPrivilege)}.
 
 %%%=============================================================================
 %%% internal functions
@@ -90,3 +97,11 @@ get_login_status(LoginStatus) ->
     B = case LoginStatus band 2#10 of 1 -> [null]; _ -> [] end,
     C = case LoginStatus band 2#1 of 1 -> [anonymous]; _ -> [] end,
     A ++ B ++ C.
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+decode_privilege(1) -> callback;
+decode_privilege(2) -> user;
+decode_privilege(3) -> operator;
+decode_privilege(4) -> administrator.
