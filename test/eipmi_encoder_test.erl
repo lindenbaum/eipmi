@@ -18,7 +18,7 @@
 
 -include_lib("eunit/include/eunit.hrl").
 
--include("eipmi_internal.hrl").
+-include("eipmi.hrl").
 
 %%%=============================================================================
 %%% TESTS
@@ -42,7 +42,6 @@ ipmi_test() ->
          16#c8, 16#81, 16#00, 16#38, 16#0e, 16#04, 16#35>>,
        eipmi_encoder:ipmi(
          #rmcp_header{class = ?RMCP_IPMI},
-         #ipmi_session{},
-         #ipmi_request{rq_addr = 16#81, rq_seq_nr = 0},
+         ?MSG_DEFAULTS ++ [?RQ_ADDR(16#81), ?RQ_SEQ_NR(0)],
          16#38,
          <<16#0e, 16#04>>)).

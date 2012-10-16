@@ -22,9 +22,9 @@
 
 -export([ack/1,
          ping/2,
-         ipmi/5]).
+         ipmi/4]).
 
--include("eipmi_internal.hrl").
+-include("eipmi.hrl").
 
 %%%=============================================================================
 %%% API
@@ -59,15 +59,16 @@ ping(Header = #rmcp_header{class = ?RMCP_ASF}, #asf_ping{iana = I, tag = T}) ->
 %%------------------------------------------------------------------------------
 %% @doc
 %% Encodes a RMCP IPMI packet. This encapsulates the logic of binary packet
-%% construction with authentication and checksum calculation.
+%% construction with authentication and checksum calculation. Please note that
+%% currently only IPMI requests are supported.
 %% @end
 %%------------------------------------------------------------------------------
--spec ipmi(#rmcp_header{}, #ipmi_session{}, #ipmi_request{}, 0..255, binary()) ->
+-spec ipmi(#rmcp_header{}, proplists:proplist(), 0..255, binary()) ->
                   binary().
-ipmi(Header = #rmcp_header{class = ?RMCP_IPMI}, Session, Request, Cmd, Data) ->
+ipmi(Header = #rmcp_header{class = ?RMCP_IPMI}, Properties, Cmd, Data) ->
     HeaderBin = header(Header, ?RMCP_NORMAL),
-    SessionBin = session(Session, Data),
-    RequestBin = request(Request, Cmd, Data),
+    SessionBin = session(Properties, Data),
+    RequestBin = request(Properties, Cmd, Data),
     Length = size(RequestBin),
     <<HeaderBin/binary, SessionBin/binary, Length:8, RequestBin/binary>>.
 
@@ -83,43 +84,59 @@ header(#rmcp_header{version = V, seq_nr = S, class = C}, Ack) ->
 
 %%------------------------------------------------------------------------------
 %% @private
+%%------------------------------------------------------------------------------
+session(Properties, Data) ->
+    S = eipmi_util:get_val(?INBOUND_SEQ_NR, Properties),
+    I = eipmi_util:get_val(?SESSION_ID, Properties),
+    P = eipmi_util:get_val(?PASSWORD, Properties),
+    AuthType = eipmi_util:get_val(?AUTH_TYPE, Properties),
+    session(AuthType, S, I, P, Data).
+
+%%------------------------------------------------------------------------------
+%% @private
 %% This will also do the authentication according to the multi session
 %% authentication.
 %%------------------------------------------------------------------------------
-session(#ipmi_session{type = none, seq_nr = S, id = I}, _Data) ->
+session(none, S, I, _P, _Data) ->
     Type = eipmi_auth:encode_type(none),
     <<?EIPMI_RESERVED:4, Type:4, S:32, I:32>>;
-session(#ipmi_session{type = pwd, key = K, seq_nr = S, id = I}, _Data) ->
+session(pwd, S, I, P, _Data) ->
     Type = eipmi_auth:encode_type(pwd),
-    C = eipmi_auth:encrypt(pwd, K),
+    C = eipmi_auth:encrypt(pwd, P),
     <<?EIPMI_RESERVED:4, Type:4, S:32, I:32, C/binary>>;
-session(#ipmi_session{type = T, key = K, seq_nr = S, id = I}, Data) ->
+session(T, S, I, P, Data) ->
     Type = eipmi_auth:encode_type(T),
-    C = eipmi_util:normalize(16, K),
+    C = eipmi_util:normalize(16, P),
     Ci = eipmi_auth:encrypt(T, <<C/binary, I:32, Data/binary, S:32, C/binary>>),
     <<?EIPMI_RESERVED:4, Type:4, S:32, I:32, Ci/binary>>.
 
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-request(Request, Cmd, Data) ->
-    Head = request_head(Request),
+request(Properties, Cmd, Data) ->
+    Head = request_head(Properties),
     HeadSum = checksum(Head),
-    Tail = request_tail(Request, Cmd, Data),
+    Tail = request_tail(Properties, Cmd, Data),
     TailSum = checksum(Tail),
     <<Head/binary, HeadSum:8/signed, Tail/binary, TailSum:8/signed>>.
 
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-request_head(#ipmi_request{rs_addr = A, net_fn = N, rs_lun = L}) ->
+request_head(Properties) ->
+    A = eipmi_util:get_val(rs_addr, Properties),
+    N = eipmi_util:get_val(net_fn, Properties),
+    L = eipmi_util:get_val(rs_lun, Properties),
     <<A:8, N:6, L:2>>.
 
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-request_tail(#ipmi_request{rq_addr = A, rq_seq_nr = S, rq_lun = L}, C, D) ->
-    <<A:8, S:6, L:2, C:8, D/binary>>.
+request_tail(Properties, Cmd, Data) ->
+    A = eipmi_util:get_val(?RQ_ADDR, Properties),
+    S = eipmi_util:get_val(?RQ_SEQ_NR, Properties),
+    L = eipmi_util:get_val(rq_lun, Properties),
+    <<A:8, S:6, L:2, Cmd:8, Data/binary>>.
 
 %%------------------------------------------------------------------------------
 %% @doc

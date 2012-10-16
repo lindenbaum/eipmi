@@ -22,7 +22,7 @@
 
 -export([packet/1]).
 
--include("eipmi_internal.hrl").
+-include("eipmi.hrl").
 
 %%%=============================================================================
 %%% API
@@ -76,12 +76,12 @@ asf(_Asf, _Binary) ->
 %% @private
 %%------------------------------------------------------------------------------
 ipmi(Ipmi, Binary) ->
-    {Session, <<Size:8, Rest:Size/binary>>} = session(Binary),
+    {SessionProps, <<Size:8, Rest:Size/binary>>} = session(Binary),
     Len = (Size - 4),
     <<Head:2/binary, Sum1:8/signed, Tail:Len/binary, Sum2:8/signed>> = Rest,
     case has_integrity(Head, Sum1) andalso has_integrity(Tail, Sum2) of
         true ->
-            lan(Ipmi#rmcp_ipmi{session = Session}, Head, Tail);
+            lan(Ipmi#rmcp_ipmi{properties = SessionProps}, Head, Tail);
         false ->
             {error, corrupted_ipmi_message}
     end.
@@ -90,29 +90,32 @@ ipmi(Ipmi, Binary) ->
 %% @private
 %%------------------------------------------------------------------------------
 session(<<?EIPMI_RESERVED:4, 0:4, SeqNr:32, Id:32, Rest/binary>>) ->
-    {#ipmi_session{type = none, seq_nr = SeqNr, id = Id}, Rest};
+    {[?AUTH_TYPE(none), {?OUTBOUND_SEQ_NR(SeqNr), ?SESSION_ID(Id)}], Rest};
 session(<<?EIPMI_RESERVED:4, 1:4, SeqNr:32, Id:32, _Cipher:128, Rest/binary>>) ->
-    {#ipmi_session{type = md2, seq_nr = SeqNr, id = Id}, Rest};
+    {[?AUTH_TYPE(md2), {?OUTBOUND_SEQ_NR(SeqNr), ?SESSION_ID(Id)}], Rest};
 session(<<?EIPMI_RESERVED:4, 2:4, SeqNr:32, Id:32, _Cipher:128, Rest/binary>>) ->
-    {#ipmi_session{type = md5, seq_nr = SeqNr, id = Id}, Rest};
+    {[?AUTH_TYPE(md5), {?OUTBOUND_SEQ_NR(SeqNr), ?SESSION_ID(Id)}], Rest};
 session(<<?EIPMI_RESERVED:4, 3:4, SeqNr:32, Id:32, _Cipher:128, Rest/binary>>) ->
-    {#ipmi_session{type = pwd, seq_nr = SeqNr, id = Id}, Rest}.
+    {[?AUTH_TYPE(pwd), {?OUTBOUND_SEQ_NR(SeqNr), ?SESSION_ID(Id)}], Rest}.
 
 %%------------------------------------------------------------------------------
 %% @private
 %% Note: Currently only application responses are supported.
 %%------------------------------------------------------------------------------
-lan(Ipmi,
+lan(Ipmi = #rmcp_ipmi{properties = Ps},
     <<RqAddr:8, ?IPMI_NETFN_APPLICATION_RESPONSE:6, RqLun:2>>,
     <<RsAddr:8, RqSeqNr:6, RsLun:2, Cmd:8, Code:8, Data/binary>>) ->
-    Response = #ipmi_response{
-                  rq_addr = RqAddr,
-                  rq_lun = RqLun,
-                  rq_seq_nr = RqSeqNr,
-                  rs_addr = RsAddr,
-                  rs_lun = RsLun,
-                  code = completion_code(Code)},
-    {ok, Ipmi#rmcp_ipmi{type = Response, cmd = Cmd, data = Data}};
+    {ok, Ipmi#rmcp_ipmi{
+           type = response,
+           properties =
+               Ps ++ [?RQ_ADDR(RqAddr),
+                      {rq_lun, RqLun},
+                      ?RQ_SEQ_NR(RqSeqNr),
+                      {rs_addr, RsAddr},
+                      {rs_lun, RsLun},
+                      ?COMPLETION(completion_code(Code))],
+           cmd = Cmd,
+           data = Data}};
 lan(_Ipmi, _Head, _Tail) ->
     {error, unsupported_ipmi_message}.
 

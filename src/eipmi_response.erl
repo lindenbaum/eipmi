@@ -52,6 +52,9 @@ decode(?ACTIVATE_SESSION,
      ?PRIVILEGE(decode_privilege(P))];
 
 decode(?CLOSE_SESSION, <<>>) ->
+    [];
+
+decode(_Cmd, _Binary) ->
     [].
 
 %%%=============================================================================

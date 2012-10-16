@@ -18,7 +18,7 @@
 
 -include_lib("eunit/include/eunit.hrl").
 
--include("eipmi_internal.hrl").
+-include("eipmi.hrl").
 
 %%%=============================================================================
 %%% TESTS
@@ -56,19 +56,21 @@ pong_test() ->
            16#00, 16#00, 16#00, 16#00, 16#00, 16#00, 16#00>>)).
 
 ipmi_response_test() ->
-    ?assertEqual(
-       {ok, #rmcp_ipmi{
-               header = #rmcp_header{class = ?RMCP_IPMI},
-               session = #ipmi_session{},
-               type = #ipmi_response{
-                         rq_addr = 16#81,
-                         rq_seq_nr = 0,
-                         code = normal},
-               cmd = 16#38,
-               data = <<16#00, 16#01, 16#19, 16#00, 16#00, 16#00, 16#00, 16#00>>}},
-       eipmi_decoder:packet(
-         <<16#06, 16#00, 16#ff, 16#07, 16#00, 16#00, 16#00,
-           16#00, 16#00, 16#00, 16#00, 16#00, 16#00, 16#10,
-           16#81, 16#1c, 16#63, 16#20, 16#00, 16#38, 16#00,
-           16#00, 16#01, 16#19, 16#00, 16#00, 16#00, 16#00,
-           16#00, 16#8e>>)).
+    {ok, Ipmi} =
+        eipmi_decoder:packet(
+          <<16#06, 16#00, 16#ff, 16#07, 16#00, 16#00, 16#00,
+            16#00, 16#00, 16#00, 16#00, 16#00, 16#00, 16#10,
+            16#81, 16#1c, 16#63, 16#20, 16#00, 16#38, 16#00,
+            16#00, 16#01, 16#19, 16#00, 16#00, 16#00, 16#00,
+            16#00, 16#8e>>),
+    ?assertMatch(
+       #rmcp_ipmi{
+          header = #rmcp_header{class = ?RMCP_IPMI},
+          type = response,
+          cmd = 16#38,
+          data = <<16#00, 16#01, 16#19, 16#00, 16#00, 16#00, 16#00, 16#00>>},
+       Ipmi),
+    Ps = Ipmi#rmcp_ipmi.properties,
+    ?assertEqual(16#81, eipmi_util:get_val(?RQ_ADDR, Ps)),
+    ?assertEqual(0, eipmi_util:get_val(?RQ_SEQ_NR, Ps)),
+    ?assertEqual(normal, eipmi_util:get_val(?COMPLETION, Ps)).

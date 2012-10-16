@@ -41,7 +41,7 @@
 
 -export_type([requestor/0]).
 
--include("eipmi_internal.hrl").
+-include("eipmi.hrl").
 
 %%%=============================================================================
 %%% API
