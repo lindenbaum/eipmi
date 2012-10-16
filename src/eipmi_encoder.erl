@@ -83,25 +83,21 @@ header(#rmcp_header{version = V, seq_nr = S, class = C}, Ack) ->
 
 %%------------------------------------------------------------------------------
 %% @private
+%% This will also do the authentication according to the multi session
+%% authentication.
 %%------------------------------------------------------------------------------
 session(#ipmi_session{type = none, seq_nr = S, id = I}, _Data) ->
-    T = eipmi_auth:encode_type(none),
-    <<?EIPMI_RESERVED:4, T:4, S:32, I:32>>;
-session(Session = #ipmi_session{type = pwd, seq_nr = S, id = I}, _Data) ->
+    Type = eipmi_auth:encode_type(none),
+    <<?EIPMI_RESERVED:4, Type:4, S:32, I:32>>;
+session(#ipmi_session{type = pwd, key = K, seq_nr = S, id = I}, _Data) ->
     Type = eipmi_auth:encode_type(pwd),
-    Cipher = eipmi_auth:encrypt(pwd, Session#ipmi_session.code),
-    <<?EIPMI_RESERVED:4, Type:4, S:32, I:32, Cipher/binary>>;
-session(Session = #ipmi_session{challenge = <<>>, type = T, seq_nr = S, id = I}, Data) ->
-    Key = eipmi_util:normalize(16, Session#ipmi_session.code),
+    C = eipmi_auth:encrypt(pwd, K),
+    <<?EIPMI_RESERVED:4, Type:4, S:32, I:32, C/binary>>;
+session(#ipmi_session{type = T, key = K, seq_nr = S, id = I}, Data) ->
     Type = eipmi_auth:encode_type(T),
-    Cipher = eipmi_auth:encrypt(T, <<Key/binary, I:32, Data/binary, S:32, Key/binary>>),
-    <<?EIPMI_RESERVED:4, Type:4, S:32, I:32, Cipher/binary>>;
-session(Session = #ipmi_session{type = T, seq_nr = S, id = I}, _Data) ->
-    Key = eipmi_util:normalize(16, Session#ipmi_session.code),
-    Challenge = eipmi_util:normalize(16, Session#ipmi_session.challenge),
-    Type = eipmi_auth:encode_type(T),
-    Cipher = eipmi_auth:encrypt(Type, <<Key/binary, I:32, Challenge/binary, Key/binary>>),
-    <<?EIPMI_RESERVED:4, Type:4, S:32, I:32, Cipher/binary>>.
+    C = eipmi_util:normalize(16, K),
+    Ci = eipmi_auth:encrypt(T, <<C/binary, I:32, Data/binary, S:32, C/binary>>),
+    <<?EIPMI_RESERVED:4, Type:4, S:32, I:32, Ci/binary>>.
 
 %%------------------------------------------------------------------------------
 %% @private

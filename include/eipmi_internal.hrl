@@ -151,12 +151,8 @@
           type = none       :: none | md2 | md5 | pwd,
           seq_nr = 0        :: non_neg_integer(),
           id = 0            :: non_neg_integer(),
-          %% the challenge must always be set to <<>> when doing multi session
-          %% authentication, for single session authentication this field must
-          %% contain the received challenge
-          challenge = <<>>  :: string() | binary(),
-          %% ignored when type == none
-          code              :: string() | binary()}).
+          %% will contain the user pwd/key if present, ignored when type == none
+          key = <<>>        :: string() | binary()}).
 
 %%------------------------------------------------------------------------------
 %% An IPMI over LAN request.

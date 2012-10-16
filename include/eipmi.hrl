@@ -37,36 +37,40 @@
 -define(IPMI_REQUESTED_CHANNEL, 16#e).
 
 %%%=============================================================================
-%%% Requests
+%%% IPMI Commands
 %%%=============================================================================
 
+-define(GET_CHANNEL_AUTHENTICATION_CAPABILITIES, 16#38).
+-define(GET_SESSION_CHALLENGE, 16#39).
+-define(ACTIVATE_SESSION, 16#3a).
+-define(CLOSE_SESSION, 16#3c).
+
 %%%=============================================================================
-%%% Responses
+%%% Properties
 %%%=============================================================================
 
-%%------------------------------------------------------------------------------
-%% The GetChannelAuthenticationCapabilities response.
-%%------------------------------------------------------------------------------
--record(channel_authentication_capabilities, {
-          auth_types = []                   :: [none | md2 | md5 | pwd],
-          per_msg_auth_enabled = false      :: boolean(),
-          user_level_auth_enabled = false   :: boolean(),
-          anonymous_login_status = []       :: [null | non_null | anonymous]}).
+-define(AUTH_TYPE, auth_type).
+-define(AUTH_TYPES, auth_types).
+-define(CHALLENGE, challenge).
+-define(INBOUND_SEQ_NR, inbound_seq_nr).
+-define(LOGIN_STATUS, login_status).
+-define(OUTBOUND_SEQ_NR, outbound_seq_nr).
+-define(PER_MSG_ENABLED, per_msg_enabled).
+-define(PASSWORD, password).
+-define(PRIVILEGE, privilege).
+-define(SESSION_ID, session_id).
+-define(USER, user).
 
-%%------------------------------------------------------------------------------
-%% The GetSessionChallenge response.
-%%------------------------------------------------------------------------------
--record(get_session_challenge, {
-          temp_id   :: non_neg_integer(),
-          challenge :: binary()}).
-
-%%------------------------------------------------------------------------------
-%% The ActivateSession response.
-%%------------------------------------------------------------------------------
--record(activate_session, {
-          auth_type = none       :: eipmi_auth:type(),
-          session_id             :: non_neg_integer(),
-          initial_inbound_seq_nr :: non_neg_integer(),
-          privilege_level        :: callback | user | operator | administrator}).
+-define(AUTH_TYPE(Value), {?AUTH_TYPE, Value}).
+-define(AUTH_TYPES(Value), {?AUTH_TYPES, Value}).
+-define(CHALLENGE(Value), {?CHALLENGE, Value}).
+-define(INBOUND_SEQ_NR(Value), {?INBOUND_SEQ_NR, Value}).
+-define(LOGIN_STATUS(Value), {?LOGIN_STATUS, Value}).
+-define(OUTBOUND_SEQ_NR(Value), {?OUTBOUND_SEQ_NR, Value}).
+-define(PER_MSG_ENABLED(Value), {?PER_MSG_ENABLED, Value}).
+-define(PASSWORD(Value), {?PASSWORD, Value}).
+-define(PRIVILEGE(Value), {?PRIVILEGE, Value}).
+-define(SESSION_ID(Value), {?SESSION_ID, Value}).
+-define(USER(Value), {?USER, Value}).
 
 -endif. %% eipmi_hrl_

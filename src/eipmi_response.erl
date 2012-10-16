@@ -21,9 +21,7 @@
 
 -module(eipmi_response).
 
--export([get_channel_authentication_capabilities/1,
-         get_session_challenge/1,
-         activate_session/1]).
+-export([decode/2]).
 
 -include("eipmi.hrl").
 
@@ -33,41 +31,28 @@
 
 %%------------------------------------------------------------------------------
 %% @doc
-%% TODO
+%% Decodes IPMI responses according to the concrete command code, returning a
+%% property list with the decoded values.
 %% @end
 %%------------------------------------------------------------------------------
-get_channel_authentication_capabilities(
-  <<_:8, _:2, AuthTypes:6,
-    ?EIPMI_RESERVED:3, PerMsg:1, UserLevel:1, LoginStatus:3,
-    ?EIPMI_RESERVED:40>>) ->
-    #channel_authentication_capabilities{
-       auth_types = get_auth_types(AuthTypes),
-       per_msg_auth_enabled = to_bool(PerMsg),
-       user_level_auth_enabled = to_bool(UserLevel),
-       anonymous_login_status = get_login_status(LoginStatus)}.
+decode(?GET_CHANNEL_AUTHENTICATION_CAPABILITIES,
+       <<_:8, _:2, A:6, ?EIPMI_RESERVED:3, P:1, _:1, L:3, ?EIPMI_RESERVED:40>>) ->
+    [?AUTH_TYPES(get_auth_types(A)),
+     ?PER_MSG_ENABLED(to_bool(P)),
+     ?LOGIN_STATUS(get_login_status(L))];
 
-%%------------------------------------------------------------------------------
-%% @doc
-%% TODO
-%% @end
-%%------------------------------------------------------------------------------
-get_session_challenge(<<TempId:32/little, Challenge/binary>>) ->
-    #get_session_challenge{temp_id = TempId, challenge = Challenge}.
+decode(?GET_SESSION_CHALLENGE, <<I:32/little, C/binary>>) ->
+    [?SESSION_ID(I), ?CHALLENGE(C)];
 
-%%------------------------------------------------------------------------------
-%% @doc
-%% TODO
-%% @end
-%%------------------------------------------------------------------------------
-activate_session(<<?EIPMI_RESERVED:4, AuthType:4,
-                   SessionId:32,
-                   InitialInboundSeqNr:32,
-                   ?EIPMI_RESERVED:4, GrantedPrivilege:4>>) ->
-    #activate_session{
-       auth_type = eipmi_auth:decode_type(AuthType),
-       session_id = SessionId,
-       initial_inbound_seq_nr = InitialInboundSeqNr,
-       privilege_level = decode_privilege(GrantedPrivilege)}.
+decode(?ACTIVATE_SESSION,
+       <<?EIPMI_RESERVED:4, A:4, I:32, S:32, ?EIPMI_RESERVED:4, P:4>>) ->
+    [?AUTH_TYPE(eipmi_auth:decode_type(A)),
+     ?SESSION_ID(I),
+     ?INBOUND_SEQ_NR(S),
+     ?PRIVILEGE(decode_privilege(P))];
+
+decode(?CLOSE_SESSION, <<>>) ->
+    [].
 
 %%%=============================================================================
 %%% internal functions

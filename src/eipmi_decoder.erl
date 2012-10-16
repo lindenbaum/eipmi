@@ -91,12 +91,12 @@ ipmi(Ipmi, Binary) ->
 %%------------------------------------------------------------------------------
 session(<<?EIPMI_RESERVED:4, 0:4, SeqNr:32, Id:32, Rest/binary>>) ->
     {#ipmi_session{type = none, seq_nr = SeqNr, id = Id}, Rest};
-session(<<?EIPMI_RESERVED:4, 1:4, SeqNr:32, Id:32, Code:128, Rest/binary>>) ->
-    {#ipmi_session{type = md2, seq_nr = SeqNr, id = Id, code = Code}, Rest};
-session(<<?EIPMI_RESERVED:4, 2:4, SeqNr:32, Id:32, Code:128, Rest/binary>>) ->
-    {#ipmi_session{type = md5, seq_nr = SeqNr, id = Id, code = Code}, Rest};
-session(<<?EIPMI_RESERVED:4, 3:4, SeqNr:32, Id:32, Code:128, Rest/binary>>) ->
-    {#ipmi_session{type = pwd, seq_nr = SeqNr, id = Id, code = Code}, Rest}.
+session(<<?EIPMI_RESERVED:4, 1:4, SeqNr:32, Id:32, _Cipher:128, Rest/binary>>) ->
+    {#ipmi_session{type = md2, seq_nr = SeqNr, id = Id}, Rest};
+session(<<?EIPMI_RESERVED:4, 2:4, SeqNr:32, Id:32, _Cipher:128, Rest/binary>>) ->
+    {#ipmi_session{type = md5, seq_nr = SeqNr, id = Id}, Rest};
+session(<<?EIPMI_RESERVED:4, 3:4, SeqNr:32, Id:32, _Cipher:128, Rest/binary>>) ->
+    {#ipmi_session{type = pwd, seq_nr = SeqNr, id = Id}, Rest}.
 
 %%------------------------------------------------------------------------------
 %% @private

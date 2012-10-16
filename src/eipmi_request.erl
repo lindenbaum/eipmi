@@ -21,9 +21,7 @@
 
 -module(eipmi_request).
 
--export([get_channel_authentication_capabilities/1,
-         get_session_challenge/2,
-         activate_session/4]).
+-export([encode/2]).
 
 -include("eipmi.hrl").
 
@@ -33,47 +31,38 @@
 
 %%------------------------------------------------------------------------------
 %% @doc
-%% Encodes a "Get Channel Authentication Capabilites" request. The privilege
-%% level is the maximum level requested during the session.
+%% Encodes IPMI requests according to the concrete request type. All needed
+%% values will be retrieved from the provided property list.
 %% @end
 %%------------------------------------------------------------------------------
-get_channel_authentication_capabilities(Privilege) ->
-    <<0:1, ?EIPMI_RESERVED:3, ?IPMI_REQUESTED_CHANNEL:4,
-      ?EIPMI_RESERVED:4,(encode_privilege(Privilege)):4>>.
+encode(?GET_CHANNEL_AUTHENTICATION_CAPABILITIES, Properties) ->
+    P = encode_privilege(get_val(?PRIVILEGE, Properties)),
+    <<0:1, ?EIPMI_RESERVED:3, ?IPMI_REQUESTED_CHANNEL:4, ?EIPMI_RESERVED:4,P:4>>;
 
-%%------------------------------------------------------------------------------
-%% @doc
-%% Encodes a "Get Session Challenge" request. The authentication type must be
-%% one of the types provided in the "Get Channel Authentication Capabilites"
-%% response. User name may be specified as string or as undefined when the
-%% null user (User 1) is requested. The user name will be trimmed/padded to
-%% 16bytes.
-%% @end
-%%------------------------------------------------------------------------------
-get_session_challenge(AuthType, undefined) ->
-    <<?EIPMI_RESERVED:4, (eipmi_auth:encode_type(AuthType)):4, 0:128>>;
-get_session_challenge(AuthType, UserName) ->
-    User = eipmi_util:normalize(16, UserName),
-    <<?EIPMI_RESERVED:4, (eipmi_auth:encode_type(AuthType)):4, User/binary>>.
+encode(?GET_SESSION_CHALLENGE, Properties) ->
+    A = eipmi_auth:encode_type(get_val(?AUTH_TYPE, Properties)),
+    U = eipmi_util:normalize(16, get_val(?USER, Properties)),
+    <<?EIPMI_RESERVED:4, A:4, U/binary>>;
 
-%%------------------------------------------------------------------------------
-%% @doc
-%% Encodes an "Activate Session" request. The authentication type must match the
-%% type requested in the corresponding "Get Session Challenge" request. The
-%% privilege level must be less or equal to the privilege level requested in the
-%% "Get Session Challenge" request. Authentication code has to be a binary
-%% containing the encrypted secret (16bytes). The initial outbound sequence
-%% number must be greater than zero.
-%% @end
-%%------------------------------------------------------------------------------
-activate_session(AuthType, Privilege, AuthCode, InitialOutboundSeqNr) ->
-    <<?EIPMI_RESERVED:4, (eipmi_auth:encode_type(AuthType)):4,
-      ?EIPMI_RESERVED:4, (encode_privilege(Privilege)):4,
-      AuthCode/binary, InitialOutboundSeqNr:32/little>>.
+encode(?ACTIVATE_SESSION, Properties) ->
+    A = eipmi_auth:encode_type(get_val(?AUTH_TYPE, Properties)),
+    P = encode_privilege(get_val(?PRIVILEGE, Properties)),
+    C = eipmi_util:normalize(16, get_val(?CHALLENGE, Properties)),
+    S = get_val(?OUTBOUND_SEQ_NR, Properties),
+    <<?EIPMI_RESERVED:4, A:4, ?EIPMI_RESERVED:4, P:4, C/binary, S:32/little>>;
+
+encode(?CLOSE_SESSION, Properties) ->
+    <<(get_val(?SESSION_ID, Properties)):32>>.
 
 %%%=============================================================================
 %%% Internal functions
 %%%=============================================================================
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+get_val(Property, Properties) ->
+    proplists:get_value(Property, Properties).
 
 %%------------------------------------------------------------------------------
 %% @private
