@@ -39,8 +39,9 @@
         [?USER(""),
          ?PASSWORD(""),
          ?SESSION_ID(0),
-         ?OUTBOUND_SEQ_NR(16#10),
+         ?OUTBOUND_SEQ_NR(1337),
          ?PRIVILEGE(administrator),
+         ?RQ_SEQ_NR(0),
          ?RQ_ADDR(16#81),
          ?AUTH_TYPE(none)]).
 
@@ -105,8 +106,8 @@ handle_event(Event, StateName, State) ->
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-handle_info({udp, S, Addr, _, Binary}, StateName, State)
-  when State#state.socket =:= S andalso State#state.address =:= Addr ->
+handle_info({udp, S, _, _, Binary}, StateName, State)
+  when State#state.socket =:= S ->
     case eipmi_decoder:packet(Binary) of
         {ok, Ack} = {ok, #rmcp_ack{}} ->
             error_logger:info_msg("unhandled ACK message ~p", [Ack]),

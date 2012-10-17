@@ -36,7 +36,7 @@
 %% @end
 %%------------------------------------------------------------------------------
 decode(?GET_CHANNEL_AUTHENTICATION_CAPABILITIES,
-       <<_:8, _:2, A:6, ?EIPMI_RESERVED:3, P:1, _:1, L:3, ?EIPMI_RESERVED:40>>) ->
+       <<_:8, 0:1, _:1, A:6, ?EIPMI_RESERVED:3, P:1, _:1, L:3, ?EIPMI_RESERVED:40>>) ->
     [?AUTH_TYPES(get_auth_types(A)),
      ?PER_MSG_ENABLED(to_bool(P)),
      ?LOGIN_STATUS(get_login_status(L))];
@@ -45,7 +45,7 @@ decode(?GET_SESSION_CHALLENGE, <<I:32/little, C/binary>>) ->
     [?SESSION_ID(I), ?CHALLENGE(C)];
 
 decode(?ACTIVATE_SESSION,
-       <<?EIPMI_RESERVED:4, A:4, I:32, S:32, ?EIPMI_RESERVED:4, P:4>>) ->
+       <<?EIPMI_RESERVED:4, A:4, I:32/little, S:32/little, ?EIPMI_RESERVED:4, P:4>>) ->
     [?AUTH_TYPE(eipmi_auth:decode_type(A)),
      ?SESSION_ID(I),
      ?INBOUND_SEQ_NR(S),
@@ -71,19 +71,19 @@ to_bool(1) -> false.
 %% @private
 %%------------------------------------------------------------------------------
 get_auth_types(AuthTypes) ->
-    A = case AuthTypes band 2#10000 of 1 -> [pwd]; _ -> [] end,
-    B = case AuthTypes band 2#100 of 1 -> [md5]; _ -> [] end,
-    C = case AuthTypes band 2#10 of 1 -> [md2]; _ -> [] end,
-    D = case AuthTypes band 2#1 of 1 -> [none]; _ -> [] end,
+    A = case AuthTypes band 2#10000 of 2#10000 -> [pwd]; _ -> [] end,
+    B = case AuthTypes band 2#100 of 2#100 -> [md5]; _ -> [] end,
+    C = case AuthTypes band 2#10 of 2#10 -> [md2]; _ -> [] end,
+    D = case AuthTypes band 2#1 of 2#1 -> [none]; _ -> [] end,
     A ++ B ++ C ++ D.
 
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
 get_login_status(LoginStatus) ->
-    A = case LoginStatus band 2#100 of 1 -> [non_null]; _ -> [] end,
-    B = case LoginStatus band 2#10 of 1 -> [null]; _ -> [] end,
-    C = case LoginStatus band 2#1 of 1 -> [anonymous]; _ -> [] end,
+    A = case LoginStatus band 2#100 of 2#100 -> [non_null]; _ -> [] end,
+    B = case LoginStatus band 2#10 of 2#10 -> [null]; _ -> [] end,
+    C = case LoginStatus band 2#1 of 2#1 -> [anonymous]; _ -> [] end,
     A ++ B ++ C.
 
 %%------------------------------------------------------------------------------

@@ -37,10 +37,6 @@
 
 -registered([?MODULE]).
 
--type requestor() :: 16#81..16#8d.
-
--export_type([requestor/0]).
-
 -include("eipmi.hrl").
 
 %%%=============================================================================
@@ -65,12 +61,8 @@ open(IPAddress) ->
 -spec open(string(), proplists:proplist()) ->
                   {ok, pid()} | {error, term()}.
 open(IPAddress, Options) ->
-    DefaultOpts = [{requestor_addr, 16#81},
-                   {initial_outbound_session_seq_nr, 0},
-                   {preferred_auth_type, none},
-                   {privilege_level, administrator}],
     Spec = {{remote_console, IPAddress},
-            {eipmi_session, start_link, [IPAddress, Options ++ DefaultOpts]},
+            {eipmi_session, start_link, [IPAddress, Options]},
             temporary, 2000, worker, [eipmi_session]},
     supervisor:start_child(?MODULE, Spec).
 
@@ -78,8 +70,8 @@ open(IPAddress, Options) ->
 %% @doc
 %% Pings a given host using RMCP ping. This can be done to check a device for
 %% the IPMI capability before opening a session to it. Default timeout is 5000
-%% milliseconds. Returns `pong' if the pinged host supports IPMI, `pang'
-%% otherwise.
+%% milliseconds (applied to each receive operation). Returns `pong' if the
+%% pinged host supports IPMI, `pang' otherwise.
 %% @see ping/2
 %% @end
 %%------------------------------------------------------------------------------
@@ -91,7 +83,8 @@ ping(IPAddress) ->
 %%------------------------------------------------------------------------------
 %% @doc
 %% Same as {@link ping/1} but allows the specification of a custom timeout value
-%% in milliseconds.
+%% in milliseconds. Please note that the timeout is applied to each receive
+%% operation.
 %% @end
 %%------------------------------------------------------------------------------
 -spec ping(string(), timeout()) ->

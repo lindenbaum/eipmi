@@ -52,7 +52,7 @@ encode(?ACTIVATE_SESSION, Properties) ->
     <<?EIPMI_RESERVED:4, A:4, ?EIPMI_RESERVED:4, P:4, C/binary, S:32/little>>;
 
 encode(?CLOSE_SESSION, Properties) ->
-    <<(get_val(?SESSION_ID, Properties)):32>>.
+    <<(get_val(?SESSION_ID, Properties)):32/little>>.
 
 %%%=============================================================================
 %%% Internal functions

@@ -99,16 +99,17 @@ session(Properties, Data) ->
 %%------------------------------------------------------------------------------
 session(none, S, I, _P, _Data) ->
     Type = eipmi_auth:encode_type(none),
-    <<?EIPMI_RESERVED:4, Type:4, S:32, I:32>>;
+    <<?EIPMI_RESERVED:4, Type:4, S:32/little, I:32/little>>;
 session(pwd, S, I, P, _Data) ->
     Type = eipmi_auth:encode_type(pwd),
     C = eipmi_auth:encrypt(pwd, P),
-    <<?EIPMI_RESERVED:4, Type:4, S:32, I:32, C/binary>>;
+    <<?EIPMI_RESERVED:4, Type:4, S:32/little, I:32/little, C/binary>>;
 session(T, S, I, P, Data) ->
     Type = eipmi_auth:encode_type(T),
     C = eipmi_util:normalize(16, P),
-    Ci = eipmi_auth:encrypt(T, <<C/binary, I:32, Data/binary, S:32, C/binary>>),
-    <<?EIPMI_RESERVED:4, Type:4, S:32, I:32, Ci/binary>>.
+    ToEncrypt = <<C/binary, I:32/little, Data/binary, S:32/little, C/binary>>,
+    Ci = eipmi_auth:encrypt(T, ToEncrypt),
+    <<?EIPMI_RESERVED:4, Type:4, S:32/little, I:32/little, Ci/binary>>.
 
 %%------------------------------------------------------------------------------
 %% @private
