@@ -54,7 +54,7 @@
 -define(SESSION_DEFAULTS,
         [?AUTH_TYPE(none),          %% initial packets are not authenticated
          ?INBOUND_SEQ_NR(0),        %% initial packets have the null seqnr
-         ?OUTBOUND_SEQ_NR(0),
+         ?OUTBOUND_SEQ_NR(8),
          ?PASSWORD(""),
          ?PRIVILEGE(administrator),
          ?RQ_ADDR(16#81),
@@ -258,7 +258,9 @@ check_seq_nr({ok, Fields, State = #state{properties = Ps}}) ->
         StateSeqNr when SeqNr >= StateSeqNr ->
             {ok, Fields, update_state_val(?OUTBOUND_SEQ_NR, SeqNr, State)};
         StateSeqNr when SeqNr + 8 < StateSeqNr ->
-            {error, {seq_nr_too_old, SeqNr}}
+            {error, {seq_nr_too_old, SeqNr}};
+        _ ->
+            {ok, Fields, State};
     end.
 
 %%------------------------------------------------------------------------------
