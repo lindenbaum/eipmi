@@ -42,6 +42,14 @@ ipmi_test() ->
          16#c8, 16#81, 16#00, 16#38, 16#0e, 16#04, 16#35>>,
        eipmi_encoder:ipmi(
          #rmcp_header{class = ?RMCP_IPMI},
-         ?MSG_DEFAULTS ++ [?RQ_ADDR(16#81), ?RQ_SEQ_NR(0)],
+         [?AUTH_TYPE(none),
+          ?INBOUND_SEQ_NR(0),
+          ?RQ_ADDR(16#81),
+          ?RQ_SEQ_NR(0),
+          ?SESSION_ID(0),
+          {net_fn, ?IPMI_NETFN_APPLICATION_REQUEST},
+          {rq_lun, ?IPMI_REQUESTOR_LUN},
+          {rs_addr, ?IPMI_RESPONDER_ADDR},
+          {rs_lun, ?IPMI_RESPONDER_LUN}],
          16#38,
          <<16#0e, 16#04>>)).

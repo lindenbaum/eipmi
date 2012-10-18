@@ -23,10 +23,11 @@
 -behaviour(supervisor).
 
 %% API
--export([open/1,
+-export([ping/1,
+         ping/2,
+         open/1,
          open/2,
-         ping/1,
-         ping/2]).
+         close/1]).
 
 %% Application callbacks
 -export([start/2,
@@ -39,32 +40,13 @@
 
 -include("eipmi.hrl").
 
+-opaque session() :: {inet:ip_address() | inet:hostname(), reference()}.
+
+-export_type([session/0]).
+
 %%%=============================================================================
 %%% API
 %%%=============================================================================
-
-%%------------------------------------------------------------------------------
-%% @doc
-%% TODO
-%% @end
-%%------------------------------------------------------------------------------
--spec open(string()) ->
-                  {ok, pid()} | {error, term()}.
-open(IPAddress) ->
-    open(IPAddress, []).
-
-%%------------------------------------------------------------------------------
-%% @doc
-%% TODO
-%% @end
-%%------------------------------------------------------------------------------
--spec open(string(), proplists:proplist()) ->
-                  {ok, pid()} | {error, term()}.
-open(IPAddress, Options) ->
-    Spec = {{remote_console, IPAddress},
-            {eipmi_session, start_link, [IPAddress, Options]},
-            temporary, 2000, worker, [eipmi_session]},
-    supervisor:start_child(?MODULE, Spec).
 
 %%------------------------------------------------------------------------------
 %% @doc
@@ -75,7 +57,7 @@ open(IPAddress, Options) ->
 %% @see ping/2
 %% @end
 %%------------------------------------------------------------------------------
--spec ping(string()) ->
+-spec ping(inet:ip_address() | inet:hostname()) ->
                   pang | pong.
 ping(IPAddress) ->
     ping(IPAddress, 5000).
@@ -87,7 +69,7 @@ ping(IPAddress) ->
 %% operation.
 %% @end
 %%------------------------------------------------------------------------------
--spec ping(string(), timeout()) ->
+-spec ping(inet:ip_address() | inet:hostname(), timeout()) ->
                   pang | pong.
 ping(IPAddress, Timeout) when is_integer(Timeout) andalso Timeout > 0 ->
     {ok, Socket} = gen_udp:open(0, [binary, {active, false}]),
@@ -98,6 +80,55 @@ ping(IPAddress, Timeout) when is_integer(Timeout) andalso Timeout > 0 ->
         _:_ -> pang
     after
         gen_udp:close(Socket)
+    end.
+
+%%------------------------------------------------------------------------------
+%% @doc
+%% Opens an IPMI session to a given host. With default parameters. Please note
+%% that this will only work for IPMI targets supporting anonymous login. The
+%% returned handle can be used to send requests to the target...
+%% TODO
+%% @see open/2
+%% @end
+%%------------------------------------------------------------------------------
+-spec open(inet:ip_address() | inet:hostname()) ->
+                  {ok, session()} | {error, term()}.
+open(IPAddress) ->
+    open(IPAddress, []).
+
+%%------------------------------------------------------------------------------
+%% @doc
+%% TODO
+%% @end
+%%------------------------------------------------------------------------------
+-spec open(inet:ip_address() | inet:hostname(), proplists:proplist()) ->
+                  {ok, session()} | {error, term()}.
+open(IPAddress, Options) ->
+    Session = {IPAddress, erlang:make_ref()},
+    Start = {eipmi_session, start_link, [Session, IPAddress, Options]},
+    Spec = {Session, Start, temporary, 2000, worker, [eipmi_session]},
+    case supervisor:start_child(?MODULE, Spec) of
+        {ok, _} ->
+            {ok, Session};
+        Error ->
+            Error
+    end.
+
+%%------------------------------------------------------------------------------
+%% @doc
+%% Closes an IPMI session previously opened with {@link open/1} or
+%% {@link open/2}. This will return `{error, not_active}' when the given
+%% session is not active any more.
+%% @end
+%%------------------------------------------------------------------------------
+-spec close(session()) ->
+                   ok | {error, not_active}.
+close(Session = {_, Ref}) when is_reference(Ref) ->
+    case get_session(Session, supervisor:which_children(?MODULE)) of
+        {ok, Pid} ->
+            eipmi_session:stop(Pid);
+        Error ->
+            Error
     end.
 
 %%%=============================================================================
@@ -129,6 +160,17 @@ init([]) ->
 %%%=============================================================================
 %%% internal functions
 %%%=============================================================================
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+get_session(S, Cs) ->
+    case [P || {I, P, worker, _} <- Cs, I =:= S andalso is_pid(P)] of
+        [] ->
+            {error, not_active};
+        [P] ->
+            {ok, P}
+    end.
 
 %%------------------------------------------------------------------------------
 %% @private

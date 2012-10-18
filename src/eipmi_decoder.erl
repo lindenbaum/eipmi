@@ -90,13 +90,13 @@ ipmi(Ipmi, Binary) ->
 %% @private
 %%------------------------------------------------------------------------------
 session(<<?EIPMI_RESERVED:4, 0:4, S:32/little, I:32/little, Rest/binary>>) ->
-    {[?AUTH_TYPE(none), {?OUTBOUND_SEQ_NR(S), ?SESSION_ID(I)}], Rest};
+    {[?AUTH_TYPE(none), ?OUTBOUND_SEQ_NR(S), ?SESSION_ID(I)], Rest};
 session(<<?EIPMI_RESERVED:4, 1:4, S:32/little, I:32/little, _:128, Rest/binary>>) ->
-    {[?AUTH_TYPE(md2), {?OUTBOUND_SEQ_NR(S), ?SESSION_ID(I)}], Rest};
+    {[?AUTH_TYPE(md2), ?OUTBOUND_SEQ_NR(S), ?SESSION_ID(I)], Rest};
 session(<<?EIPMI_RESERVED:4, 2:4, S:32/little, I:32/little, _:128, Rest/binary>>) ->
-    {[?AUTH_TYPE(md5), {?OUTBOUND_SEQ_NR(S), ?SESSION_ID(I)}], Rest};
+    {[?AUTH_TYPE(md5), ?OUTBOUND_SEQ_NR(S), ?SESSION_ID(I)], Rest};
 session(<<?EIPMI_RESERVED:4, 3:4, S:32/little, I:32/little, _:128, Rest/binary>>) ->
-    {[?AUTH_TYPE(pwd), {?OUTBOUND_SEQ_NR(S), ?SESSION_ID(I)}], Rest}.
+    {[?AUTH_TYPE(pwd), ?OUTBOUND_SEQ_NR(S), ?SESSION_ID(I)], Rest}.
 
 %%------------------------------------------------------------------------------
 %% @private

@@ -164,22 +164,6 @@
 -define(SESSION_ID(Value), {?SESSION_ID, Value}).
 -define(USER(Value), {?USER, Value}).
 
-%%------------------------------------------------------------------------------
-%% Message defaults used to fill not provided session and request fields in
-%% IPMI messages.
-%%------------------------------------------------------------------------------
--define(MSG_DEFAULTS,
-        [?AUTH_TYPE(none),
-         ?INBOUND_SEQ_NR(0),
-         ?OUTBOUND_SEQ_NR(0),
-         ?SESSION_ID(0),
-         ?PASSWORD(<<>>),
-         ?COMPLETION(normal),
-         {net_fn, ?IPMI_NETFN_APPLICATION_REQUEST},
-         {rq_lun, ?IPMI_REQUESTOR_LUN},
-         {rs_addr, ?IPMI_RESPONDER_ADDR},
-         {rs_lun, ?IPMI_RESPONDER_LUN}]).
-
 %%%=============================================================================
 %%% Messages
 %%%=============================================================================
@@ -225,10 +209,10 @@
 %% An RMCP IPMI Message.
 %%------------------------------------------------------------------------------
 -record(rmcp_ipmi, {
-          header                     :: #rmcp_header{},
-          properties = ?MSG_DEFAULTS :: proplists:proplist(),
-          cmd                        :: 0..255,
-          type = request             :: request | response,
-          data                       :: binary()}).
+          header          :: #rmcp_header{},
+          properties = [] :: proplists:proplist(),
+          cmd             :: 0..255,
+          type = request  :: request | response,
+          data = <<>>     :: binary()}).
 
 -endif. %% eipmi_hrl_
