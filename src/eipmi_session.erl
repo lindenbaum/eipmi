@@ -54,7 +54,7 @@
 -define(SESSION_DEFAULTS,
         [?AUTH_TYPE(none),          %% initial packets are not authenticated
          ?INBOUND_SEQ_NR(0),        %% initial packets have the null seqnr
-         ?OUTBOUND_SEQ_NR(8),
+         ?OUTBOUND_SEQ_NR(16#1337),
          ?PASSWORD(""),
          ?PRIVILEGE(administrator),
          ?RQ_ADDR(16#81),
@@ -196,12 +196,12 @@ activation0({?GET_SESSION_CHALLENGE, Fields}, State) ->
 %% @private
 %% The only expected message while in activation1 is the answer to the activate
 %% session request.
-%% TODO change user privilege, assign proper rq_seq_nr
+%% TODO change user privilege
 %%------------------------------------------------------------------------------
 activation1({?ACTIVATE_SESSION, Fields}, State) ->
     {ok, Fields, NewState} =
         copy_state_vals(
-          [?AUTH_TYPE, ?SESSION_ID, ?PRIVILEGE, ?INBOUND_SEQ_NR],
+          [?AUTH_TYPE, ?SESSION_ID, ?INBOUND_SEQ_NR],
           assert_completion(
             check_seq_nr({ok, Fields, State}))),
     {next_state, active, NewState}.
@@ -221,8 +221,9 @@ closing({?CLOSE_SESSION, _Fields}, State) ->
 %%------------------------------------------------------------------------------
 handle_packet({ok, I = #rmcp_ipmi{cmd = C, type = response}}, StateName, State) ->
     maybe_send_ack(I#rmcp_ipmi.header, State),
-    Fields = eipmi_response:decode(C, I#rmcp_ipmi.data),
-    ?MODULE:StateName({C, I#rmcp_ipmi.properties ++ Fields}, State);
+    ResponseFields = eipmi_response:decode(C, I#rmcp_ipmi.data),
+    Fields = eipmi_util:merge_vals(ResponseFields, I#rmcp_ipmi.properties),
+    ?MODULE:StateName({C, Fields}, State);
 handle_packet({ok, Ack = #rmcp_ack{}}, StateName, State) ->
     error_logger:info_msg("unhandled ACK message ~p", [Ack]),
     {next_state, StateName, State};
@@ -260,7 +261,7 @@ check_seq_nr({ok, Fields, State = #state{properties = Ps}}) ->
         StateSeqNr when SeqNr + 8 < StateSeqNr ->
             {error, {seq_nr_too_old, SeqNr}};
         _ ->
-            {ok, Fields, State};
+            {ok, Fields, State}
     end.
 
 %%------------------------------------------------------------------------------
@@ -339,7 +340,7 @@ maybe_send_ack(Header, State) ->
 
 %%------------------------------------------------------------------------------
 %% @private
-%% This function will not update any sequence numbers.
+%% This function will not update the inbound sequence number.
 %%------------------------------------------------------------------------------
 send_prior_session_request(Cmd, State = #state{properties = Ps}) ->
     Data = eipmi_request:encode(Cmd, Ps),
@@ -350,7 +351,7 @@ send_prior_session_request(Cmd, State = #state{properties = Ps}) ->
 %%------------------------------------------------------------------------------
 send_request(Cmd, RqProperties, State = #state{properties = Ps}) ->
     Data = eipmi_request:encode(Cmd, RqProperties ++ Ps),
-    incr_rq_seq_nr(incr_inbound_seq_nr(send_ipmi(Cmd, Data, State))).
+    incr_inbound_seq_nr(send_ipmi(Cmd, Data, State)).
 
 %%------------------------------------------------------------------------------
 %% @private
@@ -362,17 +363,17 @@ incr_inbound_seq_nr(State = #state{properties = Ps}) ->
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-incr_rq_seq_nr(State = #state{properties = Ps}) ->
-    Current = eipmi_util:get_val(?RQ_SEQ_NR, Ps),
-    update_state_val(?RQ_SEQ_NR, (Current + 1) rem 64, State).
+send_ipmi(Cmd, Data, State = #state{properties = Ps}) ->
+    Header = #rmcp_header{seq_nr = ?RMCP_NOREPLY, class = ?RMCP_IPMI},
+    udp_send(eipmi_encoder:ipmi(Header, Ps ++ ?MSG_DEFAULTS, Cmd, Data), State),
+    incr_rq_seq_nr(State).
 
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-send_ipmi(Cmd, Data, State = #state{properties = Ps}) ->
-    Header = #rmcp_header{seq_nr = ?RMCP_NOREPLY, class = ?RMCP_IPMI},
-    udp_send(eipmi_encoder:ipmi(Header, Ps ++ ?MSG_DEFAULTS, Cmd, Data), State),
-    State.
+incr_rq_seq_nr(State = #state{properties = Ps}) ->
+    Current = eipmi_util:get_val(?RQ_SEQ_NR, Ps),
+    update_state_val(?RQ_SEQ_NR, (Current + 1) rem 64, State).
 
 %%------------------------------------------------------------------------------
 %% @private
