@@ -123,7 +123,6 @@
 -define(GET_DEVICE_ID, 16#01).
 -define(COLD_RESET, 16#02).
 -define(WARM_RESET, 16#03).
--define(GET_SELF_TEST_RESULTS, 16#04).
 -define(GET_DEVICE_GUID, 16#08).
 
 %% Messaging Support

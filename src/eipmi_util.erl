@@ -21,6 +21,7 @@
 -module(eipmi_util).
 
 -export([normalize/2,
+         format/2,
          get_val/2,
          update_val/3,
          copy_val/3,
@@ -47,6 +48,14 @@ normalize(Length, Binary) when is_binary(Binary) ->
         PadSize ->
             <<Binary/binary, 0:(PadSize * 8)>>
     end.
+
+%%------------------------------------------------------------------------------
+%% @doc
+%% A flattening wrapper for {@link io_lib:format/2}.
+%% @end
+%%------------------------------------------------------------------------------
+format(Format, Args) ->
+    lists:flatten(io_lib:format(Format, Args)).
 
 %%------------------------------------------------------------------------------
 %% @doc

@@ -62,7 +62,6 @@ encode(Cmd, _Properties)
   when Cmd =:= ?GET_DEVICE_ID orelse
        Cmd =:= ?COLD_RESET orelse
        Cmd =:= ?WARM_RESET orelse
-       Cmd =:= ?GET_SELF_TEST_RESULTS orelse
        Cmd =:= ?GET_DEVICE_GUID orelse
        Cmd =:= ?GET_SYSTEM_GUID ->
     <<>>.

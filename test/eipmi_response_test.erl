@@ -24,6 +24,21 @@
 %%% TESTS
 %%%=============================================================================
 
+decode_get_device_id_test() ->
+    Cmd = ?GET_DEVICE_ID,
+    Bin = <<16#00, 16#82, 16#02, 16#0d, 16#51, 16#3e, 16#78, 16#6c, 16#00,
+            16#03, 16#0b, 16#00, 16#00, 16#00, 16#00>>,
+    Properties = eipmi_response:decode(Cmd, Bin),
+    ?assertEqual(0, eipmi_util:get_val(device_id, Properties)),
+    ?assertEqual(2, eipmi_util:get_val(device_revision, Properties)),
+    ?assertEqual(normal, eipmi_util:get_val(operation, Properties)),
+    ?assertEqual("2.13", eipmi_util:get_val(firmware_version, Properties)),
+    ?assertEqual("1.5", eipmi_util:get_val(ipmi_version, Properties)),
+    ?assertEqual([event_generator, event_receiver, fru_inventory, sel, sdr],
+                 eipmi_util:get_val(device_support, Properties)),
+    ?assertEqual(27768, eipmi_util:get_val(manufacturer_id, Properties)),
+    ?assertEqual(2819, eipmi_util:get_val(product_id, Properties)).
+
 decode_get_device_guid_test() ->
     Cmd = ?GET_DEVICE_GUID,
     Bin = <<$h, $e, $l, $l, $o>>,

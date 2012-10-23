@@ -35,6 +35,20 @@
 %% property list with the decoded values.
 %% @end
 %%------------------------------------------------------------------------------
+decode(?GET_DEVICE_ID,
+       <<Id:8, _:1, ?EIPMI_RESERVED:3, Revision:4,
+         Operation:1, Major:7, Minor:8,
+         IPMILeast:4, IPMIMost:4, Support:8, Manufacterer:24/little,
+         Product:16/little, _/binary>>) ->
+    [{device_id, Id},
+     {device_revision, Revision},
+     {operation, case Operation of 0 -> normal; 1 -> progress end},
+     {firmware_version, eipmi_util:format("~B.~B", [Major, Minor])},
+     {ipmi_version, eipmi_util:format("~B.~B", [IPMIMost, IPMILeast])},
+     {device_support, get_device_support(Support)},
+     {manufacturer_id, Manufacterer},
+     {product_id, Product}];
+
 decode(?GET_DEVICE_GUID, <<GUID/binary>>) ->
     [{guid, binary_to_list(GUID)}];
 
@@ -55,7 +69,10 @@ decode(?ACTIVATE_SESSION,
 decode(?SET_SESSION_PRIVILEGE_LEVEL, <<?EIPMI_RESERVED:4, P:4>>) ->
     [{privilege, decode_privilege(P)}];
 
-decode(?CLOSE_SESSION, <<>>) ->
+decode(Cmd, <<>>)
+  when Cmd =:= ?CLOSE_SESSION orelse
+       Cmd =:= ?COLD_RESET orelse
+       Cmd =:= ?WARM_RESET ->
     [];
 
 decode(_Cmd, _Binary) ->
@@ -64,6 +81,20 @@ decode(_Cmd, _Binary) ->
 %%%=============================================================================
 %%% internal functions
 %%%=============================================================================
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+get_device_support(Support) ->
+    A = case Support band 2#10000000 of 2#10000000 -> [chassis]; _ -> [] end,
+    B = case Support band 2#1000000 of 2#1000000 -> [bridge]; _ -> [] end,
+    C = case Support band 2#100000 of 2#100000 -> [event_generator]; _ -> [] end,
+    D = case Support band 2#10000 of 2#10000 -> [event_receiver]; _ -> [] end,
+    E = case Support band 2#1000 of 2#1000 -> [fru_inventory]; _ -> [] end,
+    F = case Support band 2#100 of 2#100 -> [sel]; _ -> [] end,
+    G = case Support band 2#10 of 2#10 -> [sdr]; _ -> [] end,
+    H = case Support band 2#1 of 2#1 -> [sensor]; _ -> [] end,
+    A ++ B ++ C ++ D ++ E ++ F ++ G ++ H.
 
 %%------------------------------------------------------------------------------
 %% @private
