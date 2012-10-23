@@ -79,6 +79,7 @@
          %% default values modifyable through eipmi:open/2
          {initial_outbound_seq_nr, 16#1337},
          {password, ""},
+         {port, ?RMCP_PORT_NUMBER},
          {privilege, administrator},
          {rq_addr, 16#81},
          {timeout, 1000},
@@ -286,8 +287,8 @@ send_request(Cmd, Properties, State = #state{properties = Ps}) ->
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-udp_send(Binary, #state{socket = Socket, address = IPAddress}) ->
-    ok = gen_udp:send(Socket, IPAddress, ?RMCP_PORT_NUMBER, Binary).
+udp_send(Binary, S = #state{socket = Socket, address = IPAddress}) ->
+    ok = gen_udp:send(Socket, IPAddress, get_state_val(port, S), Binary).
 
 %%------------------------------------------------------------------------------
 %% @private

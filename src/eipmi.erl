@@ -45,6 +45,7 @@
 -type option() ::
         {initial_outbound_seq_nr, non_neg_integer()} |
         {password, string()} |
+        {port, inet:port_number()} |
         {privilege, callback | user | operator | administrator} |
         {rq_addr, 16#81..16#8d} |
         {timeout, non_neg_integer()} |
@@ -53,6 +54,7 @@
 -type option_name() ::
         initial_outbound_seq_nr |
         password |
+        port |
         privilege |
         rq_addr |
         timeout |
@@ -120,11 +122,13 @@ open(IPAddress) ->
 -spec open(inet:ip_address() | inet:hostname(), [option()]) ->
                   {ok, session()} | {error, term()}.
 open(IPAddress, Options) ->
-    Session = {IPAddress, erlang:make_ref()},
+    Session = {IPAddress, eipmi_util:get_val(port, Options, ?RMCP_PORT_NUMBER)},
     Start = {eipmi_session, start_link, [Session, IPAddress, Options]},
     Spec = {Session, Start, temporary, 2000, worker, [eipmi_session]},
     case supervisor:start_child(?MODULE, Spec) of
         {ok, _} ->
+            {ok, Session};
+        {error, {already_started, _}} ->
             {ok, Session};
         Error ->
             Error
@@ -133,12 +137,12 @@ open(IPAddress, Options) ->
 %%------------------------------------------------------------------------------
 %% @doc
 %% Closes an IPMI session previously opened with {@link open/1} or
-%% {@link open/2}. This will return `{error, not_active}' when the given
+%% {@link open/2}. This will return `{error, no_session}' when the given
 %% session is not active any more.
 %% @end
 %%------------------------------------------------------------------------------
 -spec close(session()) ->
-                   ok | {error, not_active}.
+                   ok | {error, no_session}.
 close(Session = {_, Ref}) when is_reference(Ref) ->
     case get_session(Session, supervisor:which_children(?MODULE)) of
         {ok, Pid} ->
@@ -183,7 +187,7 @@ init([]) ->
 get_session(S, Cs) ->
     case [P || {I, P, worker, _} <- Cs, I =:= S andalso is_pid(P)] of
         [] ->
-            {error, not_active};
+            {error, no_session};
         [P] ->
             {ok, P}
     end.
