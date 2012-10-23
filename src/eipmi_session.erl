@@ -15,13 +15,8 @@
 %%%
 %%% @doc
 %%% TODO
-%%% Commands that can be sent prior to a session being established:
-%%% * Get System GUID
-%%% * Get Channel Authentication Capabilities
-%%% * Get Session Challenge
-%%% * Activate Session
-%%% * Get Channel Cipher Suites
-%%% * PET Acknowledge
+%%% * keep_alive
+%%% * remove pending and queued requests on terminate
 %%% @end
 %%%=============================================================================
 -module(eipmi_session).
@@ -30,6 +25,7 @@
 
 %% API
 -export([start_link/3,
+         request/3,
          stop/1]).
 
 %% gen_fsm callbacks
@@ -38,39 +34,66 @@
          handle_sync_event/4,
          handle_info/3,
          terminate/3,
-         code_change/4]).
-
-%% gen_fsm states
--export([discovery/2,
-         activation0/2,
-         activation1/2,
-         closing/2]).
+         code_change/4,
+         activating/2,
+         active/2]).
 
 -include("eipmi.hrl").
 
-%%------------------------------------------------------------------------------
-%% Session defaults in case the user does not provide these.
-%%------------------------------------------------------------------------------
--define(SESSION_DEFAULTS,
-        [?AUTH_TYPE(none),          %% initial packets are not authenticated
-         ?INBOUND_SEQ_NR(0),        %% initial packets have the null seqnr
-         ?OUTBOUND_SEQ_NR(16#1337),
-         ?PASSWORD(""),
-         ?PRIVILEGE(administrator),
-         ?RQ_ADDR(16#81),
-         ?RQ_SEQ_NR(0),             %% initial requests have the null seqnr
-         ?SESSION_ID(0),            %% initial have the null session id
-         ?USER("")]).
+-type property() ::
+        eipmi:option() |
+        {auth_type, none | pwd | md5 | md2} |
+        {auth_types, [none | pwd | md5 | md2]} |
+        {challenge, binary()} |
+        {completion, atom()} |
+        {inbound_seq_nr, non_neg_integer()} |
+        {login_status, [anonymous | null | non_null]} |
+        {outbound_seq_nr, non_neg_integer()} |
+        {rq_seq_nr, 0..16#40} |
+        {session_id, non_neg_integer()}.
+
+-type property_name() ::
+        eipmi:option_name() |
+        auth_type |
+        auth_types |
+        challenge |
+        completion |
+        inbound_seq_nr |
+        login_status |
+        outbound_seq_nr |
+        rq_seq_nr |
+        session_id.
+
+-type handler(State) :: fun(({error, term()} | {ok, #rmcp_ipmi{}},
+                             activating | active,
+                             State) ->
+                                   {activating | active, State}).
+
+-export_type([property/0, property_name/0]).
 
 %%------------------------------------------------------------------------------
-%% Message defaults used to fill not provided session and request fields in
-%% IPMI messages.
+%% Session defaults, partially modifyable by the user.
 %%------------------------------------------------------------------------------
--define(MSG_DEFAULTS,
-        [{net_fn, ?IPMI_NETFN_APPLICATION_REQUEST},
+-define(DEFAULTS,
+        [
+         %% default values modifyable through eipmi:open/2
+         {initial_outbound_seq_nr, 16#1337},
+         {password, ""},
+         {privilege, administrator},
+         {rq_addr, 16#81},
+         {timeout, 1000},
+         {user, ""},
+         %% unmodifyable session defaults
+         {auth_type, none},    %% initial packets are not authenticated
+         {inbound_seq_nr, 0},  %% initial packets have the null seqnr
+         {net_fn, ?IPMI_NETFN_APPLICATION_REQUEST},
+         {outbound_seq_nr, 0}, %% initial packets have the null seqnr
          {rq_lun, ?IPMI_REQUESTOR_LUN},
+         {rq_seq_nr, 0},       %% initial requests have the null seqnr
          {rs_addr, ?IPMI_RESPONDER_ADDR},
-         {rs_lun, ?IPMI_RESPONDER_LUN}]).
+         {rs_lun, ?IPMI_RESPONDER_LUN},
+         {session_id, 0}       %% initial have the null session id
+        ]).
 
 %%%=============================================================================
 %%% API
@@ -78,11 +101,21 @@
 
 %%------------------------------------------------------------------------------
 %% @doc
-%% Start the server.
+%% Start a session state machine. This will also setup a session by sending the
+%% necessary IPMI protocol messages.
 %% @end
 %%------------------------------------------------------------------------------
 start_link(Session, IPAddress, Options) ->
     gen_fsm:start_link(?MODULE, [Session, IPAddress, Options], []).
+
+%%------------------------------------------------------------------------------
+%% @doc
+%% Send a synchronous IPMI request over this session. If the session is not yet
+%% established the request will be queued.
+%% @end
+%%------------------------------------------------------------------------------
+request(Pid, Cmd, Properties) ->
+    gen_fsm:sync_send_all_state_event(Pid, {request, Cmd, Properties}).
 
 %%------------------------------------------------------------------------------
 %% @doc
@@ -100,7 +133,9 @@ stop(Pid) ->
           session    :: eipmi:session(),
           address    :: string(),
           socket     :: gen_udp:socket(),
-          properties :: proplists:proplist()}).
+          queued     :: [{0..255, [property()], handler(#state{})}],
+          pending    :: [{0..63, reference(), handler(#state{})}],
+          properties :: [property()]}).
 
 %%------------------------------------------------------------------------------
 %% @private
@@ -108,27 +143,42 @@ stop(Pid) ->
 init([Session, IPAddress, Opts]) ->
     process_flag(trap_exit, true),
     {ok, Socket} = gen_udp:open(0, [binary]),
-    Options = eipmi_util:merge_vals(Opts, ?SESSION_DEFAULTS),
-    {ok, discovery,
-     send_prior_session_request(
-       ?GET_CHANNEL_AUTHENTICATION_CAPABILITIES,
+    Options = eipmi_util:merge_vals(Opts, ?DEFAULTS),
+    Queued = [{?GET_CHANNEL_AUTHENTICATION_CAPABILITIES, [],
+               get_channel_capabilities_handler()},
+              {?GET_SESSION_CHALLENGE, [],
+               get_session_challenge_handler()},
+              {?ACTIVATE_SESSION, [],
+               get_activate_session_handler()},
+              {?SET_SESSION_PRIVILEGE_LEVEL, [],
+               get_session_privilege_handler()}],
+    {ok, activating,
+     process_next_request(
+       false,
        #state{session = Session,
               address = IPAddress,
               socket = Socket,
+              queued = Queued,
+              pending = [],
               properties = Options})}.
 
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
+handle_sync_event({request, Cmd, Properties}, From, active, State) ->
+    Request = {Cmd, Properties, get_reply_handler(From)},
+    NewState = process_next_request(true, enqueue_request(Request, State)),
+    {next_state, active, NewState};
+handle_sync_event({request, Cmd, Properties}, From, StateName, State) ->
+    Request = {Cmd, Properties, get_reply_handler(From)},
+    {next_state, StateName, enqueue_request(Request, State)};
 handle_sync_event(Event, _From, StateName, State) ->
     {reply, {undef, Event}, StateName, State}.
 
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-handle_event(stop, active, State) ->
-    {next_state, closing, send_prior_session_request(?CLOSE_SESSION, State)};
-handle_event(stop, StateName, State) when StateName =/= closing ->
+handle_event(stop, _StateName, State) ->
     {stop, normal, State};
 handle_event(Event, StateName, State) ->
     error_logger:info_msg("unhandled event ~p in state ~p", [Event, StateName]),
@@ -146,6 +196,10 @@ handle_info(Info, StateName, State) ->
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
+terminate(_Reason, active, State = #state{socket = Socket}) ->
+    send_request(?CLOSE_SESSION, [], State),
+    gen_udp:close(Socket),
+    ok;
 terminate(_Reason, _StateName, #state{socket = Socket}) ->
     gen_udp:close(Socket),
     ok.
@@ -156,61 +210,19 @@ terminate(_Reason, _StateName, #state{socket = Socket}) ->
 code_change(_OldVsn, StateName, State, _Extra) ->
     {ok, StateName, State}.
 
-%%%=============================================================================
-%%% gen_fsm States
-%%%=============================================================================
-
 %%------------------------------------------------------------------------------
 %% @private
-%% The only expected message while in discovery is the answer to the channel
-%% capabilites request.
 %%------------------------------------------------------------------------------
-discovery({?GET_CHANNEL_AUTHENTICATION_CAPABILITIES, Fields}, State) ->
-    {ok, Fields, NewState} =
-        copy_state_val(
-          ?PER_MSG_ENABLED,
-          select_auth(
-            select_login(
-              assert_completion(
-                assert_seq_nr({ok, Fields, State}))))),
-    {next_state,
-     activation0,
-     send_prior_session_request(?GET_SESSION_CHALLENGE, NewState)}.
-
-%%------------------------------------------------------------------------------
-%% @private
-%% The only expected message while in activation0 is the answer to the session
-%% challenge request.
-%%------------------------------------------------------------------------------
-activation0({?GET_SESSION_CHALLENGE, Fields}, State) ->
-    {ok, Fields, NewState} =
-        copy_state_vals(
-          [?CHALLENGE, ?SESSION_ID],
-          assert_completion(
-            assert_seq_nr({ok, Fields, State}))),
-    {next_state,
-     activation1,
-     send_prior_session_request(?ACTIVATE_SESSION, NewState)}.
-
-%%------------------------------------------------------------------------------
-%% @private
-%% The only expected message while in activation1 is the answer to the activate
-%% session request.
-%% TODO change user privilege
-%%------------------------------------------------------------------------------
-activation1({?ACTIVATE_SESSION, Fields}, State) ->
-    {ok, Fields, NewState} =
-        copy_state_vals(
-          [?AUTH_TYPE, ?SESSION_ID, ?INBOUND_SEQ_NR],
-          assert_completion(
-            check_seq_nr({ok, Fields, State}))),
-    {next_state, active, NewState}.
+activating({timeout, RqSeqNr}, State) ->
+    {NewStateName, NewState} = handle_request_timeout(RqSeqNr, activating, State),
+    {next_state, NewStateName, NewState}.
 
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-closing({?CLOSE_SESSION, _Fields}, State) ->
-    {stop, normal, State}.
+active({timeout, RqSeqNr}, State) ->
+    {NewStateName, NewState} = handle_request_timeout(RqSeqNr, active, State),
+    {next_state, NewStateName, NewState}.
 
 %%%=============================================================================
 %%% Internal functions
@@ -219,11 +231,11 @@ closing({?CLOSE_SESSION, _Fields}, State) ->
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-handle_packet({ok, I = #rmcp_ipmi{cmd = C, type = response}}, StateName, State) ->
+handle_packet({ok, I = #rmcp_ipmi{type = response}}, StateName, State) ->
     maybe_send_ack(I#rmcp_ipmi.header, State),
-    ResponseFields = eipmi_response:decode(C, I#rmcp_ipmi.data),
-    Fields = eipmi_util:merge_vals(ResponseFields, I#rmcp_ipmi.properties),
-    ?MODULE:StateName({C, Fields}, State);
+    {NewStateName, NewState} = handle_request_response(I, StateName, State),
+    {next_state, NewStateName,
+     process_next_request(NewStateName =:= active, NewState)};
 handle_packet({ok, Ack = #rmcp_ack{}}, StateName, State) ->
     error_logger:info_msg("unhandled ACK message ~p", [Ack]),
     {next_state, StateName, State};
@@ -231,103 +243,9 @@ handle_packet({ok, Asf = #rmcp_asf{}}, StateName, State) ->
     maybe_send_ack(Asf#rmcp_asf.header, State),
     error_logger:info_msg("unhandled ASF message ~p", [Asf]),
     {next_state, StateName, State};
-handle_packet({error, Reason}, _StateName, State) ->
+handle_packet({error, Reason}, StateName, State) ->
     error_logger:info_msg("failed to decode packet ~p", [Reason]),
-    {stop, {decoder_error, Reason}, State}.
-
-%%------------------------------------------------------------------------------
-%% @private
-%%------------------------------------------------------------------------------
-check_completion(Error = {error, _}) ->
-    Error;
-check_completion({ok, Fields, State = #state{properties = Ps}}) ->
-    case eipmi_util:get_val(?COMPLETION, Ps) of
-        normal ->
-            {ok, Fields, State};
-        Completion ->
-            {error, {bmc_error, Completion}}
-    end.
-
-%%------------------------------------------------------------------------------
-%% @private
-%%------------------------------------------------------------------------------
-check_seq_nr(Error = {error, _}) ->
-    Error;
-check_seq_nr({ok, Fields, State = #state{properties = Ps}}) ->
-    SeqNr = eipmi_util:get_val(?OUTBOUND_SEQ_NR, Fields),
-    case eipmi_util:get_val(?OUTBOUND_SEQ_NR, Ps) of
-        StateSeqNr when SeqNr >= StateSeqNr ->
-            {ok, Fields, update_state_val(?OUTBOUND_SEQ_NR, SeqNr, State)};
-        StateSeqNr when SeqNr + 8 < StateSeqNr ->
-            {error, {seq_nr_too_old, SeqNr}};
-        _ ->
-            {ok, Fields, State}
-    end.
-
-%%------------------------------------------------------------------------------
-%% @private
-%% assert that request processing completed normally
-%%------------------------------------------------------------------------------
-assert_completion(Error = {error, _}) ->
-    Error;
-assert_completion({ok, Fields, State}) ->
-    normal = eipmi_util:get_val(?COMPLETION, Fields),
-    {ok, Fields, State}.
-
-%%------------------------------------------------------------------------------
-%% @private
-%% ssert that received sequence number is zero.
-%%------------------------------------------------------------------------------
-assert_seq_nr(Error = {error, _}) ->
-    Error;
-assert_seq_nr({ok, Fields, State}) ->
-    0 = eipmi_util:get_val(?OUTBOUND_SEQ_NR, Fields),
-    {ok, Fields, State}.
-
-%%------------------------------------------------------------------------------
-%% @private
-%% Selects an authentication method from the available methods. Preferred
-%% selection order is none, pwd, md5, md2.
-%%------------------------------------------------------------------------------
-select_auth({ok, Fields, State}) ->
-    AuthTypes = eipmi_util:get_val(?AUTH_TYPES, Fields),
-    None = lists:member(none, AuthTypes),
-    Pwd = lists:member(pwd, AuthTypes),
-    Md5 = lists:member(md5, AuthTypes),
-    Md2 = lists:member(md2, AuthTypes),
-    case {None, Pwd, Md5, Md2} of
-        {true, _, _, _} ->
-            {ok, Fields, update_state_val(?AUTH_TYPE, none, State)};
-        {false, true, _, _} ->
-            {ok, Fields, update_state_val(?AUTH_TYPE, pwd, State)};
-        {false, false, true, _} ->
-            {ok, Fields, update_state_val(?AUTH_TYPE, md5, State)};
-        {false, false, false, true} ->
-            {ok, Fields, update_state_val(?AUTH_TYPE, md2, State)}
-    end.
-
-%%------------------------------------------------------------------------------
-%% @private
-%% Selects a login method from the available methods. Preferred selection order
-%% is anonymous, null, non_null. In case anonymous is selected the user and
-%% password contained in the state will be reset, in case of null user only the
-%% state user will be reset, otherwise user and password must exist and must
-%% have sensible values in the state.
-%%------------------------------------------------------------------------------
-select_login({ok, Fields, State}) ->
-    Logins = eipmi_util:get_val(?LOGIN_STATUS, Fields),
-    case {lists:member(anonymous, Logins), lists:member(null, Logins)} of
-        {true, _} ->
-            {ok,
-             Fields,
-             update_state_val(
-               ?PASSWORD, "",
-               update_state_val(?USER, "", State))};
-        {false, true} ->
-            {ok, Fields, update_state_val(?USER, "", State)};
-        {false, false} ->
-            {ok, Fields, State}
-    end.
+    {next_state, StateName, State}.
 
 %%------------------------------------------------------------------------------
 %% @private
@@ -340,40 +258,30 @@ maybe_send_ack(Header, State) ->
 
 %%------------------------------------------------------------------------------
 %% @private
-%% This function will not update the inbound sequence number.
+%% if prior to a session the inbound seq nr will not be updated
 %%------------------------------------------------------------------------------
-send_prior_session_request(Cmd, State = #state{properties = Ps}) ->
-    Data = eipmi_request:encode(Cmd, Ps),
-    send_ipmi(Cmd, Data, State).
+process_next_request(_SessionActive, State = #state{queued = []}) ->
+    State;
+process_next_request(false, State = #state{queued = [Request | Rest]}) ->
+    process_request(Request, State#state{queued = Rest});
+process_next_request(true, State = #state{queued = [Request | Rest]}) ->
+    incr_inbound_seq_nr(process_request(Request, State#state{queued = Rest})).
 
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-send_request(Cmd, RqProperties, State = #state{properties = Ps}) ->
-    Data = eipmi_request:encode(Cmd, RqProperties ++ Ps),
-    incr_inbound_seq_nr(send_ipmi(Cmd, Data, State)).
+process_request({Cmd, Properties, Handler}, State) ->
+    {RqSeqNr, NewState} = send_request(Cmd, Properties, State),
+    register_request(RqSeqNr, Handler, NewState).
 
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-incr_inbound_seq_nr(State = #state{properties = Ps}) ->
-    Current = eipmi_util:get_val(?INBOUND_SEQ_NR, Ps),
-    update_state_val(?INBOUND_SEQ_NR, Current + 1, State).
-
-%%------------------------------------------------------------------------------
-%% @private
-%%------------------------------------------------------------------------------
-send_ipmi(Cmd, Data, State = #state{properties = Ps}) ->
+send_request(Cmd, Properties, State = #state{properties = Ps}) ->
+    Data = eipmi_request:encode(Cmd, eipmi_util:merge_vals(Properties, Ps)),
     Header = #rmcp_header{seq_nr = ?RMCP_NOREPLY, class = ?RMCP_IPMI},
-    udp_send(eipmi_encoder:ipmi(Header, Ps ++ ?MSG_DEFAULTS, Cmd, Data), State),
+    udp_send(eipmi_encoder:ipmi(Header, Ps, Cmd, Data), State),
     incr_rq_seq_nr(State).
-
-%%------------------------------------------------------------------------------
-%% @private
-%%------------------------------------------------------------------------------
-incr_rq_seq_nr(State = #state{properties = Ps}) ->
-    Current = eipmi_util:get_val(?RQ_SEQ_NR, Ps),
-    update_state_val(?RQ_SEQ_NR, (Current + 1) rem 64, State).
 
 %%------------------------------------------------------------------------------
 %% @private
@@ -384,8 +292,194 @@ udp_send(Binary, #state{socket = Socket, address = IPAddress}) ->
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-%% get_state_val(Property, #state{properties = Ps}) ->
-%%     eipmi_util:get_val(Property, Ps).
+handle_request_response(I = #rmcp_ipmi{properties = Ps}, StateName, State) ->
+    RqSeqNr = eipmi_util:get_val(rq_seq_nr, Ps),
+    {Response, NewState} = check_seq_nr(check_completion({{ok, I}, State})),
+    unregister_request(RqSeqNr, Response, StateName, NewState).
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+handle_request_timeout(RqSeqNr, StateName, State) ->
+    unregister_request(RqSeqNr, {error, timeout}, StateName, State).
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+unregister_request(RqSeqNr, Response, StateName, State = #state{pending = P}) ->
+    case lists:keyfind(RqSeqNr, 1, P) of
+        false ->
+            {StateName, State};
+        {RqSeqNr, TimerRef, Handler} ->
+            gen_fsm:cancel_timer(TimerRef),
+            Handler(
+              Response,
+              StateName,
+              State#state{pending = lists:keydelete(RqSeqNr, 1, P)})
+    end.
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+register_request(RqSeqNr, Handler, State = #state{pending = P}) ->
+    Timeout = get_state_val(timeout, State),
+    TimerRef = gen_fsm:send_event_after(Timeout, {timeout, RqSeqNr}),
+    State#state{pending = [{RqSeqNr, TimerRef, Handler} | P]}.
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+enqueue_request(Request, State = #state{queued = Q}) ->
+    State#state{queued = Q ++ [Request]}.
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+incr_inbound_seq_nr(State) ->
+    SeqNr = get_state_val(inbound_seq_nr, State),
+    update_state_val(inbound_seq_nr, (SeqNr + 1) rem (16#ffffffff + 1), State).
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+incr_rq_seq_nr(State) ->
+    SeqNr = get_state_val(rq_seq_nr, State),
+    {SeqNr, update_state_val(rq_seq_nr, (SeqNr + 1) rem 16#40, State)}.
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+get_reply_handler(From) ->
+    fun({error, Error}, StateName, State) ->
+            catch gen_fsm:reply(From, {error, Error}),
+            {StateName, State};
+       ({ok, #rmcp_ipmi{cmd = C, data = D}}, StateName, State) ->
+            Fields = eipmi_response:decode(C, D),
+            catch gen_fsm:reply(From, {ok, Fields}),
+            {StateName, State}
+    end.
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+get_channel_capabilities_handler() ->
+    fun({ok, #rmcp_ipmi{cmd = C, data = D}}, activating, State)
+          when C =:= ?GET_CHANNEL_AUTHENTICATION_CAPABILITIES ->
+            Fields = eipmi_response:decode(C, D),
+            {activating, select_auth(Fields, select_login(Fields, State))}
+    end.
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+get_session_challenge_handler() ->
+    fun({ok, #rmcp_ipmi{cmd = C, data = D}}, activating, State)
+          when C =:= ?GET_SESSION_CHALLENGE ->
+            {activating,
+             copy_state_vals(
+               [challenge, session_id],
+               eipmi_response:decode(C, D),
+               State)}
+    end.
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+get_activate_session_handler() ->
+    fun({ok, #rmcp_ipmi{cmd = C, data = D}}, activating, State)
+          when C =:= ?ACTIVATE_SESSION ->
+            {active,
+             copy_state_vals(
+               [auth_type, session_id, inbound_seq_nr],
+               eipmi_response:decode(C, D),
+               State)}
+    end.
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+get_session_privilege_handler() ->
+    fun({ok, #rmcp_ipmi{cmd = C, data = D}}, active, State)
+          when C =:= ?SET_SESSION_PRIVILEGE_LEVEL ->
+            Requested = get_state_val(privilege, State),
+            Actual = eipmi_util:get_val(privilege, eipmi_response:decode(C, D)),
+            Requested = Actual,
+            {active, State}
+    end.
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+check_completion(In = {{ok, #rmcp_ipmi{properties = Ps}}, State}) ->
+    case eipmi_util:get_val(completion, Ps) of
+        normal ->
+            In;
+        Completion ->
+            {{error, {bmc_error, Completion}}, State}
+    end.
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+check_seq_nr(In = {{error, _}, _}) ->
+    In;
+check_seq_nr(In = {Ok = {ok, #rmcp_ipmi{properties = Ps}}, State}) ->
+    SeqNr = eipmi_util:get_val(outbound_seq_nr, Ps),
+    case get_state_val(outbound_seq_nr, State) of
+        StateSeqNr when SeqNr >= StateSeqNr ->
+            {Ok, update_state_val(outbound_seq_nr, SeqNr, State)};
+        StateSeqNr when SeqNr + 8 < StateSeqNr ->
+            {{error, {seq_nr_too_old, SeqNr}}, State};
+        _ ->
+            In
+    end.
+
+%%------------------------------------------------------------------------------
+%% @private
+%% Selects an authentication method from the available methods. Preferred
+%% selection order is none, pwd, md5, md2.
+%%------------------------------------------------------------------------------
+select_auth(Fields, State) ->
+    AuthTypes = eipmi_util:get_val(auth_types, Fields),
+    None = lists:member(none, AuthTypes),
+    Pwd = lists:member(pwd, AuthTypes),
+    Md5 = lists:member(md5, AuthTypes),
+    Md2 = lists:member(md2, AuthTypes),
+    case {None, Pwd, Md5, Md2} of
+        {true, _, _, _} ->
+            update_state_val(auth_type, none, State);
+        {false, true, _, _} ->
+            update_state_val(auth_type, pwd, State);
+        {false, false, true, _} ->
+            update_state_val(auth_type, md5, State);
+        {false, false, false, true} ->
+            update_state_val(auth_type, md2, State)
+    end.
+
+%%------------------------------------------------------------------------------
+%% @private
+%% Selects a login method from the available methods. Preferred selection order
+%% is anonymous, null, non_null. In case anonymous is selected the user and
+%% password contained in the state will be reset, in case of null user only the
+%% state user will be reset, otherwise user and password must exist and must
+%% have sensible values in the state.
+%%------------------------------------------------------------------------------
+select_login(Fields, State) ->
+    Logins = eipmi_util:get_val(login_status, Fields),
+    case {lists:member(anonymous, Logins), lists:member(null, Logins)} of
+        {true, _} ->
+            update_state_val(password, "", update_state_val(user, "", State));
+        {false, true} ->
+            update_state_val(user, "", State);
+        {false, false} ->
+            State
+    end.
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+get_state_val(Property, #state{properties = Ps}) ->
+    eipmi_util:get_val(Property, Ps).
 
 %%------------------------------------------------------------------------------
 %% @private
@@ -396,19 +490,13 @@ update_state_val(Property, Value, State = #state{properties = Ps}) ->
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-copy_state_val(_Property, Error = {error, _}) ->
-    Error;
-copy_state_val(Property, {ok, Fields, S = #state{properties = Ps}}) ->
-    {ok,
-     Fields,
-     S#state{properties = eipmi_util:copy_val(Property, Ps, Fields)}}.
+copy_state_val(Property, Fields, S = #state{properties = Ps}) ->
+    S#state{properties = eipmi_util:copy_val(Property, Ps, Fields)}.
 
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-copy_state_vals(_PropertyList, Error = {error, _}) ->
-    Error;
-copy_state_vals(PropertyList, {ok, Fields, State}) ->
+copy_state_vals(PropertyList, Fields, State) ->
     lists:foldl(
-      fun(P, {ok, _, Acc}) -> copy_state_val(P, {ok, Fields, Acc}) end,
-      {ok, Fields, State}, PropertyList).
+      fun(P, Acc) -> copy_state_val(P, Fields, Acc) end,
+      State, PropertyList).

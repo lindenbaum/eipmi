@@ -42,7 +42,23 @@
 
 -opaque session() :: {inet:ip_address() | inet:hostname(), reference()}.
 
--export_type([session/0]).
+-type option() ::
+        {initial_outbound_seq_nr, non_neg_integer()} |
+        {password, string()} |
+        {privilege, callback | user | operator | administrator} |
+        {rq_addr, 16#81..16#8d} |
+        {timeout, non_neg_integer()} |
+        {user, string()}.
+
+-type option_name() ::
+        initial_outbound_seq_nr |
+        password |
+        privilege |
+        rq_addr |
+        timeout |
+        user.
+
+-export_type([session/0, option/0, option_name/0]).
 
 %%%=============================================================================
 %%% API
@@ -101,7 +117,7 @@ open(IPAddress) ->
 %% TODO
 %% @end
 %%------------------------------------------------------------------------------
--spec open(inet:ip_address() | inet:hostname(), proplists:proplist()) ->
+-spec open(inet:ip_address() | inet:hostname(), [option()]) ->
                   {ok, session()} | {error, term()}.
 open(IPAddress, Options) ->
     Session = {IPAddress, erlang:make_ref()},

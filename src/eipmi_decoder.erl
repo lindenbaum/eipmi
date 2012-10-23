@@ -90,13 +90,13 @@ ipmi(Ipmi, Binary) ->
 %% @private
 %%------------------------------------------------------------------------------
 session(<<?EIPMI_RESERVED:4, 0:4, S:32/little, I:32/little, Rest/binary>>) ->
-    {[?AUTH_TYPE(none), ?OUTBOUND_SEQ_NR(S), ?SESSION_ID(I)], Rest};
+    {[{auth_type, none}, {outbound_seq_nr, S}, {session_id, I}], Rest};
 session(<<?EIPMI_RESERVED:4, 1:4, S:32/little, I:32/little, _:128, Rest/binary>>) ->
-    {[?AUTH_TYPE(md2), ?OUTBOUND_SEQ_NR(S), ?SESSION_ID(I)], Rest};
+    {[{auth_type, md2}, {outbound_seq_nr, S}, {session_id, I}], Rest};
 session(<<?EIPMI_RESERVED:4, 2:4, S:32/little, I:32/little, _:128, Rest/binary>>) ->
-    {[?AUTH_TYPE(md5), ?OUTBOUND_SEQ_NR(S), ?SESSION_ID(I)], Rest};
+    {[{auth_type, md5}, {outbound_seq_nr, S}, {session_id, I}], Rest};
 session(<<?EIPMI_RESERVED:4, 3:4, S:32/little, I:32/little, _:128, Rest/binary>>) ->
-    {[?AUTH_TYPE(pwd), ?OUTBOUND_SEQ_NR(S), ?SESSION_ID(I)], Rest}.
+    {[{auth_type, pwd}, {outbound_seq_nr, S}, {session_id, I}], Rest}.
 
 %%------------------------------------------------------------------------------
 %% @private
@@ -108,12 +108,12 @@ lan(Ipmi = #rmcp_ipmi{properties = Ps},
     {ok, Ipmi#rmcp_ipmi{
            type = response,
            properties =
-               Ps ++ [?RQ_ADDR(RqAddr),
+               Ps ++ [{rq_addr, RqAddr},
                       {rq_lun, RqLun},
-                      ?RQ_SEQ_NR(RqSeqNr),
+                      {rq_seq_nr, RqSeqNr},
                       {rs_addr, RsAddr},
                       {rs_lun, RsLun},
-                      ?COMPLETION(completion_code(Code))],
+                      {completion, completion_code(Code)}],
            cmd = Cmd,
            data = Data}};
 lan(_Ipmi, _Head, _Tail) ->

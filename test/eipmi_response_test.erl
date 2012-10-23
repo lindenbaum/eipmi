@@ -24,34 +24,45 @@
 %%% TESTS
 %%%=============================================================================
 
+decode_get_device_guid_test() ->
+    Cmd = ?GET_DEVICE_GUID,
+    Bin = <<$h, $e, $l, $l, $o>>,
+    Properties = eipmi_response:decode(Cmd, Bin),
+    ?assertEqual("hello", eipmi_util:get_val(guid, Properties)).
+
 decode_get_channel_authentication_capabilities_test() ->
     Cmd = ?GET_CHANNEL_AUTHENTICATION_CAPABILITIES,
     Bin = <<16#00, 16#17, 16#1f, 16#00, 16#00, 16#00, 16#00, 16#00>>,
     Properties = eipmi_response:decode(Cmd, Bin),
-    ?assertEqual(false, eipmi_util:get_val(?PER_MSG_ENABLED, Properties)),
     ?assertEqual([pwd, md5, md2, none],
-                 eipmi_util:get_val(?AUTH_TYPES, Properties)),
+                 eipmi_util:get_val(auth_types, Properties)),
     ?assertEqual([non_null, null, anonymous],
-                 eipmi_util:get_val(?LOGIN_STATUS, Properties)).
+                 eipmi_util:get_val(login_status, Properties)).
 
 decode_get_session_challenge_test() ->
     Cmd = ?GET_SESSION_CHALLENGE,
     Bin = <<16#44, 16#33, 16#22, 16#11, $h, $e, $l, $l, $o, $_, $w, $o, $r,
             $l, $d, 16#00, 16#00, 16#00, 16#00, 16#00>>,
     Properties = eipmi_response:decode(Cmd, Bin),
-    ?assertEqual(16#11223344, eipmi_util:get_val(?SESSION_ID, Properties)),
+    ?assertEqual(16#11223344, eipmi_util:get_val(session_id, Properties)),
     ?assertEqual(<<$h, $e, $l, $l, $o, $_, $w, $o, $r, $l, $d,
                    16#00, 16#00, 16#00, 16#00, 16#00>>,
-                 eipmi_util:get_val(?CHALLENGE, Properties)).
+                 eipmi_util:get_val(challenge, Properties)).
 
 decode_activate_session_test() ->
     Cmd = ?ACTIVATE_SESSION,
     Bin = <<16#00, 16#44, 16#33, 16#22, 16#11, 16#88, 16#77, 16#66, 16#55, 16#04>>,
     Properties = eipmi_response:decode(Cmd, Bin),
-    ?assertEqual(none, eipmi_util:get_val(?AUTH_TYPE, Properties)),
-    ?assertEqual(16#11223344, eipmi_util:get_val(?SESSION_ID, Properties)),
-    ?assertEqual(16#55667788, eipmi_util:get_val(?INBOUND_SEQ_NR, Properties)),
-    ?assertEqual(administrator, eipmi_util:get_val(?PRIVILEGE, Properties)).
+    ?assertEqual(none, eipmi_util:get_val(auth_type, Properties)),
+    ?assertEqual(16#11223344, eipmi_util:get_val(session_id, Properties)),
+    ?assertEqual(16#55667788, eipmi_util:get_val(inbound_seq_nr, Properties)),
+    ?assertEqual(administrator, eipmi_util:get_val(privilege, Properties)).
+
+decode_set_session_privilege_level_test() ->
+    Cmd = ?SET_SESSION_PRIVILEGE_LEVEL,
+    Bin = <<16#04>>,
+    Properties = eipmi_response:decode(Cmd, Bin),
+    ?assertEqual(administrator, eipmi_util:get_val(privilege, Properties)).
 
 decode_close_session_test() ->
     Cmd = ?CLOSE_SESSION,

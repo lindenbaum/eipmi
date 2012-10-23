@@ -35,21 +35,25 @@
 %% property list with the decoded values.
 %% @end
 %%------------------------------------------------------------------------------
+decode(?GET_DEVICE_GUID, <<GUID/binary>>) ->
+    [{guid, binary_to_list(GUID)}];
+
 decode(?GET_CHANNEL_AUTHENTICATION_CAPABILITIES,
-       <<_:8, 0:1, _:1, A:6, ?EIPMI_RESERVED:3, P:1, _:1, L:3, ?EIPMI_RESERVED:40>>) ->
-    [?AUTH_TYPES(get_auth_types(A)),
-     ?PER_MSG_ENABLED(to_bool(P)),
-     ?LOGIN_STATUS(get_login_status(L))];
+       <<_:8, 0:1, _:1, A:6, ?EIPMI_RESERVED:3, _:1, _:1, L:3, ?EIPMI_RESERVED:40>>) ->
+    [{auth_types, get_auth_types(A)}, {login_status, get_login_status(L)}];
 
 decode(?GET_SESSION_CHALLENGE, <<I:32/little, C/binary>>) ->
-    [?SESSION_ID(I), ?CHALLENGE(C)];
+    [{session_id, I}, {challenge, C}];
 
 decode(?ACTIVATE_SESSION,
        <<?EIPMI_RESERVED:4, A:4, I:32/little, S:32/little, ?EIPMI_RESERVED:4, P:4>>) ->
-    [?AUTH_TYPE(eipmi_auth:decode_type(A)),
-     ?SESSION_ID(I),
-     ?INBOUND_SEQ_NR(S),
-     ?PRIVILEGE(decode_privilege(P))];
+    [{session_id, I},
+     {inbound_seq_nr, S},
+     {auth_type, eipmi_auth:decode_type(A)},
+     {privilege, decode_privilege(P)}];
+
+decode(?SET_SESSION_PRIVILEGE_LEVEL, <<?EIPMI_RESERVED:4, P:4>>) ->
+    [{privilege, decode_privilege(P)}];
 
 decode(?CLOSE_SESSION, <<>>) ->
     [];
@@ -60,12 +64,6 @@ decode(_Cmd, _Binary) ->
 %%%=============================================================================
 %%% internal functions
 %%%=============================================================================
-
-%%------------------------------------------------------------------------------
-%% @private
-%%------------------------------------------------------------------------------
-to_bool(0) -> true;
-to_bool(1) -> false.
 
 %%------------------------------------------------------------------------------
 %% @private

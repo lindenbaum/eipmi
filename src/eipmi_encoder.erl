@@ -86,10 +86,10 @@ header(#rmcp_header{version = V, seq_nr = S, class = C}, Ack) ->
 %% @private
 %%------------------------------------------------------------------------------
 session(Properties, Data) ->
-    S = eipmi_util:get_val(?INBOUND_SEQ_NR, Properties),
-    I = eipmi_util:get_val(?SESSION_ID, Properties),
-    P = eipmi_util:get_val(?PASSWORD, Properties),
-    AuthType = eipmi_util:get_val(?AUTH_TYPE, Properties),
+    S = eipmi_util:get_val(inbound_seq_nr, Properties),
+    I = eipmi_util:get_val(session_id, Properties),
+    P = eipmi_util:get_val(password, Properties),
+    AuthType = eipmi_util:get_val(auth_type, Properties),
     session(AuthType, S, I, P, Data).
 
 %%------------------------------------------------------------------------------
@@ -134,8 +134,8 @@ request_head(Properties) ->
 %% @private
 %%------------------------------------------------------------------------------
 request_tail(Properties, Cmd, Data) ->
-    A = eipmi_util:get_val(?RQ_ADDR, Properties),
-    S = eipmi_util:get_val(?RQ_SEQ_NR, Properties),
+    A = eipmi_util:get_val(rq_addr, Properties),
+    S = eipmi_util:get_val(rq_seq_nr, Properties),
     L = eipmi_util:get_val(rq_lun, Properties),
     <<A:8, S:6, L:2, Cmd:8, Data/binary>>.
 

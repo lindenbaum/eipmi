@@ -119,50 +119,20 @@
 %%% IPMI Commands
 %%%=============================================================================
 
+%% Global
+-define(GET_DEVICE_ID, 16#01).
+-define(COLD_RESET, 16#02).
+-define(WARM_RESET, 16#03).
+-define(GET_SELF_TEST_RESULTS, 16#04).
+-define(GET_DEVICE_GUID, 16#08).
+
+%% Messaging Support
 -define(GET_CHANNEL_AUTHENTICATION_CAPABILITIES, 16#38).
+-define(GET_SYSTEM_GUID, 16#37).
 -define(GET_SESSION_CHALLENGE, 16#39).
 -define(ACTIVATE_SESSION, 16#3a).
+-define(SET_SESSION_PRIVILEGE_LEVEL, 16#3b).
 -define(CLOSE_SESSION, 16#3c).
-
-%%%=============================================================================
-%%% Properties
-%%%=============================================================================
-
-%%------------------------------------------------------------------------------
-%% Valid property tags.
-%%------------------------------------------------------------------------------
--define(AUTH_TYPE, auth_type).
--define(AUTH_TYPES, auth_types).
--define(CHALLENGE, challenge).
--define(COMPLETION, completion).
--define(INBOUND_SEQ_NR, inbound_seq_nr).
--define(LOGIN_STATUS, login_status).
--define(OUTBOUND_SEQ_NR, outbound_seq_nr).
--define(PER_MSG_ENABLED, per_msg_enabled).
--define(PASSWORD, password).
--define(PRIVILEGE, privilege).
--define(RQ_ADDR, rq_addr).
--define(RQ_SEQ_NR, rq_seq_nr).
--define(SESSION_ID, session_id).
--define(USER, user).
-
-%%------------------------------------------------------------------------------
-%% Valid property tuple constructors.
-%%------------------------------------------------------------------------------
--define(AUTH_TYPE(Value), {?AUTH_TYPE, Value}).
--define(AUTH_TYPES(Value), {?AUTH_TYPES, Value}).
--define(CHALLENGE(Value), {?CHALLENGE, Value}).
--define(COMPLETION(Value), {?COMPLETION, Value}).
--define(INBOUND_SEQ_NR(Value), {?INBOUND_SEQ_NR, Value}).
--define(LOGIN_STATUS(Value), {?LOGIN_STATUS, Value}).
--define(OUTBOUND_SEQ_NR(Value), {?OUTBOUND_SEQ_NR, Value}).
--define(PER_MSG_ENABLED(Value), {?PER_MSG_ENABLED, Value}).
--define(PASSWORD(Value), {?PASSWORD, Value}).
--define(PRIVILEGE(Value), {?PRIVILEGE, Value}).
--define(RQ_ADDR(Value), {?RQ_ADDR, Value}).
--define(RQ_SEQ_NR(Value), {?RQ_SEQ_NR, Value}).
--define(SESSION_ID(Value), {?SESSION_ID, Value}).
--define(USER(Value), {?USER, Value}).
 
 %%%=============================================================================
 %%% Messages

@@ -36,23 +36,36 @@
 %% @end
 %%------------------------------------------------------------------------------
 encode(?GET_CHANNEL_AUTHENTICATION_CAPABILITIES, Properties) ->
-    P = encode_privilege(get_val(?PRIVILEGE, Properties)),
+    P = encode_privilege(get_val(privilege, Properties)),
     <<0:1, ?EIPMI_RESERVED:3, ?IPMI_REQUESTED_CHANNEL:4, ?EIPMI_RESERVED:4,P:4>>;
 
 encode(?GET_SESSION_CHALLENGE, Properties) ->
-    A = eipmi_auth:encode_type(get_val(?AUTH_TYPE, Properties)),
-    U = eipmi_util:normalize(16, get_val(?USER, Properties)),
+    A = eipmi_auth:encode_type(get_val(auth_type, Properties)),
+    U = eipmi_util:normalize(16, get_val(user, Properties)),
     <<?EIPMI_RESERVED:4, A:4, U/binary>>;
 
 encode(?ACTIVATE_SESSION, Properties) ->
-    A = eipmi_auth:encode_type(get_val(?AUTH_TYPE, Properties)),
-    P = encode_privilege(get_val(?PRIVILEGE, Properties)),
-    C = eipmi_util:normalize(16, get_val(?CHALLENGE, Properties)),
-    S = get_val(?OUTBOUND_SEQ_NR, Properties),
+    A = eipmi_auth:encode_type(get_val(auth_type, Properties)),
+    P = encode_privilege(get_val(privilege, Properties)),
+    C = eipmi_util:normalize(16, get_val(challenge, Properties)),
+    S = get_val(initial_outbound_seq_nr, Properties),
     <<?EIPMI_RESERVED:4, A:4, ?EIPMI_RESERVED:4, P:4, C/binary, S:32/little>>;
 
+encode(?SET_SESSION_PRIVILEGE_LEVEL, Properties) ->
+    P = encode_privilege(get_val(privilege, Properties)),
+    <<?EIPMI_RESERVED:4, P:4>>;
+
 encode(?CLOSE_SESSION, Properties) ->
-    <<(get_val(?SESSION_ID, Properties)):32/little>>.
+    <<(get_val(session_id, Properties)):32/little>>;
+
+encode(Cmd, _Properties)
+  when Cmd =:= ?GET_DEVICE_ID orelse
+       Cmd =:= ?COLD_RESET orelse
+       Cmd =:= ?WARM_RESET orelse
+       Cmd =:= ?GET_SELF_TEST_RESULTS orelse
+       Cmd =:= ?GET_DEVICE_GUID orelse
+       Cmd =:= ?GET_SYSTEM_GUID ->
+    <<>>.
 
 %%%=============================================================================
 %%% Internal functions
@@ -67,6 +80,7 @@ get_val(Property, Properties) ->
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
+encode_privilege(present) -> 0;
 encode_privilege(callback) -> 1;
 encode_privilege(user) -> 2;
 encode_privilege(operator) -> 3;
