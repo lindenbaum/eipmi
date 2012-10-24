@@ -14,7 +14,10 @@
 %%% OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 %%%
 %%% @doc
-%%% TODO
+%%% The main entry module of the `eipmi' application containing the application
+%%% callback as well as the top level supervisor.
+%%%
+%%% This module provides capabilities to discover and use IPMI-capable devices.
 %%% @end
 %%%=============================================================================
 -module(eipmi).
@@ -69,9 +72,9 @@
 %%------------------------------------------------------------------------------
 %% @doc
 %% Pings a given host using RMCP ping. This can be done to check a device for
-%% the IPMI capability before opening a session to it. Default timeout is 5000
-%% milliseconds (applied to each receive operation). Returns `pong' if the
-%% pinged host supports IPMI, `pang' otherwise.
+%% the IPMI capability before opening a session to it. Default receive timeout
+%% is 5000 milliseconds. Returns `pong' if the pinged host supports IPMI,
+%% `pang' otherwise.
 %% @see ping/2
 %% @end
 %%------------------------------------------------------------------------------
@@ -82,9 +85,8 @@ ping(IPAddress) ->
 
 %%------------------------------------------------------------------------------
 %% @doc
-%% Same as {@link ping/1} but allows the specification of a custom timeout value
-%% in milliseconds. Please note that the timeout is applied to each receive
-%% operation.
+%% Same as {@link ping/1} but allows the specification of a custom receive
+%% timeout value in milliseconds.
 %% @end
 %%------------------------------------------------------------------------------
 -spec ping(inet:ip_address() | inet:hostname(), timeout()) ->
@@ -103,10 +105,14 @@ ping(IPAddress, Timeout) when is_integer(Timeout) andalso Timeout > 0 ->
 %%------------------------------------------------------------------------------
 %% @doc
 %% Opens an IPMI session to a given host. With default parameters. Please note
-%% that this will only work for IPMI targets supporting anonymous login. The
-%% returned handle can be used to send requests to the target...
-%% TODO
+%% that this will only work for IPMI targets supporting anonymous login. For all
+%% other login types at least the `password' and maybe the `user' option will be
+%% required.
+%%
+%% The returned handle can be used to send requests to the target BMC using TODO
+%% or close the session using {@link close/1}.
 %% @see open/2
+%% @see close/1
 %% @end
 %%------------------------------------------------------------------------------
 -spec open(inet:ip_address() | inet:hostname()) ->
@@ -116,13 +122,63 @@ open(IPAddress) ->
 
 %%------------------------------------------------------------------------------
 %% @doc
-%% TODO
+%% Same as {@link open/1} but allows the specification of the following custom
+%% options:
+%% <dl>
+%%   <dt>`{initial_outbound_seq_nr, non_neg_integer()}'</dt>
+%%   <dd>
+%%     <p>
+%%     the initial outbound sequence number that will be requested on the BMC,
+%%     default is `16#1337'
+%%     </p>
+%%  </dd>
+%%   <dt>`{password, string() with length <= 16bytes}'</dt>
+%%   <dd>
+%%     <p>
+%%     a password string used for authentication when anonymous login is not
+%%     available, default is `""'
+%%     </p>
+%%   </dd>
+%%   <dt>`{port, inet:port_number()}'</dt>
+%%   <dd>
+%%     <p>
+%%     the RMCP port the far end is expecting incoming RMCP and IPMI packets,
+%%     default is `623'
+%%     </p>
+%%   </dd>
+%%   <dt>`{privilege, callback | user | operator | administrator}'</dt>
+%%   <dd>
+%%     <p>
+%%     the requested privilege level for this session, default is `administrator'
+%%     </p>
+%%   </dd>
+%%   <dt>`{rq_addr, 16#81..16#8d}'</dt>
+%%   <dd>
+%%     <p>
+%%     the requestor address used in IPMI lan packages, the default value of
+%%     `16#81' should be suitable for all common cases
+%%     </p>
+%%   </dd>
+%%   <dt>`{timeout, non_neg_integer()}'</dt>
+%%   <dd>
+%%     <p>
+%%     the timeout for IPMI requests, default is `1000ms'
+%%     </p>
+%%   </dd>
+%%   <dt>`{user, string() with length <= 16bytes}'</dt>
+%%   <dd>
+%%     <p>
+%%     a user name string used for authentication when neither anonymous nor
+%%     null user login are available, default is `""'
+%%     </p>
+%%   </dd>
+%% </dl>
 %% @end
 %%------------------------------------------------------------------------------
 -spec open(inet:ip_address() | inet:hostname(), [option()]) ->
                   {ok, session()} | {error, term()}.
 open(IPAddress, Options) ->
-    Session = {IPAddress, eipmi_util:get_val(port, Options, ?RMCP_PORT_NUMBER)},
+    Session = {IPAddress, proplists:get_value(port, Options, ?RMCP_PORT_NUMBER)},
     Start = {eipmi_session, start_link, [Session, IPAddress, Options]},
     Spec = {Session, Start, temporary, 2000, worker, [eipmi_session]},
     case supervisor:start_child(?MODULE, Spec) of

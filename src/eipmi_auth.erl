@@ -41,6 +41,8 @@
 %% or cut to a length of 16bytes.
 %% @end
 %%------------------------------------------------------------------------------
+-spec encrypt(type(), binary() | string()) ->
+                     binary().
 encrypt(none, _Ignored) ->
     <<>>;
 encrypt(md2, Binary) ->
@@ -55,6 +57,8 @@ encrypt(pwd, Password) ->
 %% Encodes an authentication type into its integer representation.
 %% @end
 %%------------------------------------------------------------------------------
+-spec encode_type(type()) ->
+                         0..4.
 encode_type(none) -> 0;
 encode_type(md2) -> 1;
 encode_type(md5) -> 2;
@@ -65,6 +69,8 @@ encode_type(pwd) -> 4.
 %% Decodes an authentication type integer into human readable format.
 %% @end
 %%------------------------------------------------------------------------------
+-spec decode_type(0..4) ->
+                         type().
 decode_type(0) -> none;
 decode_type(1) -> md2;
 decode_type(2) -> md5;

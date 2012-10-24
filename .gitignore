@@ -1,9 +1,7 @@
 .eunit
 .project
-.repoxy_ebin/
 
 deps
 doc
 ebin
-repoxy
 target

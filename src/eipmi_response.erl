@@ -35,6 +35,8 @@
 %% property list with the decoded values.
 %% @end
 %%------------------------------------------------------------------------------
+-spec decode(0..255, binary()) ->
+                    proplists:proplist().
 decode(?GET_DEVICE_ID,
        <<Id:8, _:1, ?EIPMI_RESERVED:3, Revision:4,
          Operation:1, Major:7, Minor:8,

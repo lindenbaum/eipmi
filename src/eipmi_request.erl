@@ -35,6 +35,8 @@
 %% values will be retrieved from the provided property list.
 %% @end
 %%------------------------------------------------------------------------------
+-spec encode(0..255, proplists:proplist()) ->
+                    binary().
 encode(?GET_CHANNEL_AUTHENTICATION_CAPABILITIES, Properties) ->
     P = encode_privilege(get_val(privilege, Properties)),
     <<0:1, ?EIPMI_RESERVED:3, ?IPMI_REQUESTED_CHANNEL:4, ?EIPMI_RESERVED:4,P:4>>;

@@ -37,6 +37,8 @@
 %% (in bytes).
 %% @end
 %%------------------------------------------------------------------------------
+-spec normalize(non_neg_integer(), string() | binary()) ->
+                       binary().
 normalize(Length, String) when is_list(String) ->
     normalize(Length, list_to_binary(String));
 normalize(Length, Binary) when is_binary(Binary) ->
@@ -54,14 +56,19 @@ normalize(Length, Binary) when is_binary(Binary) ->
 %% A flattening wrapper for {@link io_lib:format/2}.
 %% @end
 %%------------------------------------------------------------------------------
+-spec format(string(), [term()]) ->
+                    string().
 format(Format, Args) ->
     lists:flatten(io_lib:format(Format, Args)).
 
 %%------------------------------------------------------------------------------
 %% @doc
 %% Return the value of a property from a proplist.
+%% @see proplists:get_value/2
 %% @end
 %%------------------------------------------------------------------------------
+-spec get_val(atom(), proplists:proplist()) ->
+                     term().
 get_val(Property, PropList) ->
     proplists:get_value(Property, PropList).
 
@@ -71,6 +78,8 @@ get_val(Property, PropList) ->
 %% values associated with the property.
 %% @end
 %%------------------------------------------------------------------------------
+-spec update_val(atom(), term(), proplists:proplist()) ->
+                        proplists:proplist().
 update_val(Property, Value, PropList) ->
     [{Property, Value} | proplists:delete(Property, PropList)].
 
@@ -81,6 +90,8 @@ update_val(Property, Value, PropList) ->
 %% returned. This will remove all previous values associated with the property.
 %% @end
 %%------------------------------------------------------------------------------
+-spec copy_val(atom(), proplists:proplist(), proplists:proplist()) ->
+                      proplists:proplist().
 copy_val(Property, DestPropList, SrcPropList) ->
     case proplists:get_value(Property, SrcPropList) of
         undefined ->
@@ -97,6 +108,8 @@ copy_val(Property, DestPropList, SrcPropList) ->
 %% second proplist.
 %% @end
 %%------------------------------------------------------------------------------
+-spec merge_vals(proplists:proplist(), proplists:proplist()) ->
+                        proplists:proplist().
 merge_vals(PropList1, PropList2) ->
     lists:usort(
       lists:foldl(

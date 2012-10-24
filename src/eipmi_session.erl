@@ -14,9 +14,22 @@
 %%% OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 %%%
 %%% @doc
-%%% TODO
-%%% * keep_alive
-%%% * remove pending and queued requests on terminate
+%%% A state machine providing session management for IPMI over lan channels.
+%%% The session will be established as soon as the state machine gets started.
+%%% An established session will be closed when the state machine terminates.
+%%% The user can close the session using {@link stop/1}.
+%%%
+%%% Synchronous requests can be issued over this session at any given time using
+%%% {@link request/3}. When the session is not yet established requests will be
+%%% queued and issued as soon as the far end (BMC) is ready. Request timeouts
+%%% can be configured on state machine startup using the `timeout' property
+%%% of the `Options' field.
+%%%
+%%% A session may be shared between mutliple processes. While the requests of
+%%% one process will be synchronous and thus ordered, requests from different
+%%% processes will not block each other.
+%%%
+%%% @TODO Implement session keep alive.
 %%% @end
 %%%=============================================================================
 -module(eipmi_session).
@@ -106,6 +119,10 @@
 %% necessary IPMI protocol messages.
 %% @end
 %%------------------------------------------------------------------------------
+-spec start_link(eipmi:session(),
+                 inet:ip_address() | inet:hostname(),
+                 [property()]) ->
+                        {ok, pid()} | {error, term()}.
 start_link(Session, IPAddress, Options) ->
     gen_fsm:start_link(?MODULE, [Session, IPAddress, Options], []).
 
@@ -115,6 +132,8 @@ start_link(Session, IPAddress, Options) ->
 %% established the request will be queued.
 %% @end
 %%------------------------------------------------------------------------------
+-spec request(pid(), 0..255, proplists:proplist()) ->
+                     {ok, proplists:proplist()} | {error, term()}.
 request(Pid, Cmd, Properties) ->
     gen_fsm:sync_send_all_state_event(Pid, {request, Cmd, Properties}).
 
@@ -123,6 +142,8 @@ request(Pid, Cmd, Properties) ->
 %% Stop the server, close the session.
 %% @end
 %%------------------------------------------------------------------------------
+-spec stop(pid()) ->
+                  ok.
 stop(Pid) ->
     gen_fsm:send_all_state_event(Pid, stop).
 
@@ -198,10 +219,12 @@ handle_info(Info, StateName, State) ->
 %% @private
 %%------------------------------------------------------------------------------
 terminate(_Reason, active, State = #state{socket = Socket}) ->
+    clear_requests(active, State),
     send_request(?CLOSE_SESSION, [], State),
     gen_udp:close(Socket),
     ok;
-terminate(_Reason, _StateName, #state{socket = Socket}) ->
+terminate(_Reason, StateName, State = #state{socket = Socket}) ->
+    clear_requests(StateName, State),
     gen_udp:close(Socket),
     ok.
 
@@ -332,6 +355,13 @@ register_request(RqSeqNr, Handler, State = #state{pending = P}) ->
 %%------------------------------------------------------------------------------
 enqueue_request(Request, State = #state{queued = Q}) ->
     State#state{queued = Q ++ [Request]}.
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+clear_requests(StateName, State = #state{queued = Q, pending = P}) ->
+    [catch Handler({error, closed}, StateName, State) || {_, _, Handler} <- P],
+    [catch Handler({error, closed}, StateName, State) || {_, _, Handler} <- Q].
 
 %%------------------------------------------------------------------------------
 %% @private
