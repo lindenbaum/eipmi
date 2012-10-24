@@ -16,6 +16,16 @@ implements the remote console part of the IPMI over LAN interface, as specified
 
 == Usage ==
 
+If you are using <a href="http://github.com/basho/rebar"><tt>rebar</tt></a> to
+build your project and want to use EIPMI just specify it as a dependency in your
+`rebar.config' (please note that the below link will change in the future as
+soon as EIPMI gets released for the first time).
+
+```
+{deps,
+ [{eipmi, "1.0.0", {git, "https://github.com/lindenbaum/eipmi.git"}}]}.
+'''
+
 The following snippet shows an example usage of the EIPMI application:
 
 ```
@@ -53,3 +63,5 @@ and `password' need to be passed to a call to {@link eipmi:open/2}. In case
 <em>null users</em> are configured on the BMC only the `password' option will
 be required. If the BMC supports <em>anonymous</em> logins no options need to be
 set.
+
+== History ==

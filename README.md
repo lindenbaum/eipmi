@@ -39,4 +39,4 @@ meaning there will be sensible information in the source code modules. We will
 also try to author a nice `overview.edoc` document, so that we can generate
 an actual single-page programmers guide with links to the module documentation.
 
-More to come...
+For more information visit [http://lindenbaum.github.com/eipmi/].
