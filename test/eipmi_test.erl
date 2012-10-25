@@ -14,7 +14,7 @@
 %%% OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 %%%=============================================================================
 
--module(eipmi_session_test).
+-module(eipmi_test).
 
 -include_lib("eunit/include/eunit.hrl").
 
@@ -38,20 +38,20 @@ open_close_test() ->
     open_close(inet:gethostname()).
 
 open_close({ok, "tirana"}) ->
-    process_flag(trap_exit, true),
     application:start(sasl),
     application:start(crypto),
     application:start(md2),
     application:start(eipmi),
-    {ok, Session} = eipmi_session:start_link(session, "10.1.31.10", []),
+    {ok, Session} = eipmi:open("10.1.31.10"),
+    Mon = monitor_session(Session),
     receive after 1000 -> ok end,
-    ?assertEqual(ok, eipmi_session:stop(Session)),
-    ?assertEqual(normal, receive {'EXIT', Session, Reason} -> Reason end);
+    ?assertEqual(ok, eipmi:close(Session)),
+    ?assertEqual(normal, receive {'DOWN', Mon, _, _, Reason} -> Reason end);
 open_close(_) ->
     ok.
 
 parallel_request_test() ->
-    parallel_request(inet).
+    parallel_request(inet:gethostname()).
 
 parallel_request({ok, "tirana"}) ->
     process_flag(trap_exit, true),
@@ -59,13 +59,41 @@ parallel_request({ok, "tirana"}) ->
     application:start(crypto),
     application:start(md2),
     application:start(eipmi),
-    {ok, Session} = eipmi_session:start_link(session, "10.1.31.10", []),
-    Action = fun() -> {ok, _} = eipmi_session:request(Session, 16#3b, []) end,
-    lists:map(fun(_) -> spawn_link(Action) end, lists:seq(1, 10)),
-    Receive = fun(_) -> receive {'EXIT', _, Reason} -> Reason end end,
-    Results = lists:map(Receive, lists:seq(1, 10)),
+    {ok, Session} = eipmi:open("10.1.31.10"),
+    Mon = monitor_session(Session),
+    Action = fun() -> {ok, _} = eipmi:raw(Session, 16#06, 16#3b, []) end,
+    Pids = lists:map(fun(_) -> spawn_link(Action) end, lists:seq(1, 10)),
+    Receive = fun(P) -> receive {'EXIT', P, Reason} -> Reason end end,
+    Results = lists:map(Receive, Pids),
     ?assert(lists:all(fun(E) -> E =:= normal end, Results)),
-    ?assertEqual(ok, eipmi_session:stop(Session)),
-    ?assertEqual(normal, receive {'EXIT', Session, Reason} -> Reason end);
+    ?assertEqual(ok, eipmi:close(Session)),
+    ?assertEqual(normal, receive {'DOWN', Mon, _, _, Reason} -> Reason end);
 parallel_request(_) ->
     ok.
+
+read_fru_test() ->
+    read_fru(inet:gethostname()).
+
+read_fru({ok, "tirana"}) ->
+    application:start(sasl),
+    application:start(crypto),
+    application:start(md2),
+    application:start(eipmi),
+    {ok, Session} = eipmi:open("10.1.31.10"),
+    Mon = monitor_session(Session),
+    {ok, Data} = eipmi:read_fru(Session, 5),
+    error_logger:info_msg("fru data:~n~p~n", [Data]),
+    ?assertEqual(ok, eipmi:close(Session)),
+    ?assertEqual(normal, receive {'DOWN', Mon, _, _, Reason} -> Reason end);
+read_fru(_) ->
+    ok.
+
+%%%=============================================================================
+%%% Internal functions
+%%%=============================================================================
+
+%% don't look
+monitor_session(Session) ->
+    Cs = supervisor:which_children(eipmi),
+    [Pid] = [P || {I, P, worker, _} <- Cs, I =:= Session andalso is_pid(P)],
+    monitor(process, Pid).

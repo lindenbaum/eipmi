@@ -108,8 +108,12 @@ decode_application(?CLOSE_SESSION, <<>>) ->
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-decode_storage(_Cmd, _Data) ->
-    [].
+decode_storage(?GET_FRU_INVENTORY_AREA_INFO,
+               <<AreaSize:16/little, ?EIPMI_RESERVED:7, Access:1>>) ->
+    [{area_size, AreaSize},
+     {access, case Access of 1 -> by_words; 0 -> by_bytes end}];
+decode_storage(?READ_FRU_DATA, <<Count:8, Data/binary>>) ->
+    [{count, Count}, {data, Data}].
 
 %%------------------------------------------------------------------------------
 %% @private

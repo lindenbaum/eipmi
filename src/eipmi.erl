@@ -35,7 +35,9 @@
          ping/2,
          open/1,
          open/2,
-         close/1]).
+         close/1,
+         read_fru/2,
+         raw/4]).
 
 %% Application callbacks
 -export([start/2,
@@ -50,9 +52,11 @@
 
 -opaque session() :: {inet:ip_address() | inet:hostname(), reference()}.
 
--type request() :: {NetFn :: 16#04 | 16#06 | 16#a | 16#c, Command :: 0..255}.
+-type req_net_fn()  :: 16#04 | 16#06 | 16#a | 16#c.
+-type resp_net_fn() :: 16#05 | 16#07 | 16#b | 16#d.
 
--type response() :: {NetFn :: 16#05 | 16#07 | 16#b | 16#d, Command :: 0..255}.
+-type request() :: {req_net_fn(), Command :: 0..255}.
+-type response() :: {resp_net_fn(), Command :: 0..255}.
 
 -type option() ::
         {initial_outbound_seq_nr, non_neg_integer()} |
@@ -72,7 +76,12 @@
         timeout |
         user.
 
--export_type([session/0, request/0, response/0, option/0, option_name/0]).
+-export_type([session/0,
+              req_net_fn/0,
+              request/0,
+              response/0,
+              option/0,
+              option_name/0]).
 
 %%%=============================================================================
 %%% API
@@ -208,10 +217,36 @@ open(IPAddress, Options) ->
 %%------------------------------------------------------------------------------
 -spec close(session()) ->
                    ok | {error, no_session}.
-close(Session = {_, Ref}) when is_reference(Ref) ->
+close(Session = {_, _}) ->
     case get_session(Session, supervisor:which_children(?MODULE)) of
         {ok, Pid} ->
             eipmi_session:stop(Pid);
+        Error ->
+            Error
+    end.
+
+%%------------------------------------------------------------------------------
+%% @doc
+%% Returns all data from the FRU inventory info area for a given FRU id.
+%% @end
+%%------------------------------------------------------------------------------
+-spec read_fru(session(), 0..254) ->
+                      {ok, binary()} | {error, term()}.
+read_fru(Session, FruId) when FruId >= 0 andalso FruId < 255 ->
+    do_read_fru(get_session(Session, supervisor:which_children(?MODULE)), FruId).
+
+%%------------------------------------------------------------------------------
+%% @doc
+%% Sends a raw IPMI command over a given session. DO NOT USE THIS unless you
+%% really know what you're doing!
+%% @end
+%%------------------------------------------------------------------------------
+-spec raw(session(), req_net_fn(), 0..255, proplists:proplist()) ->
+                 {ok, proplists:proplist()} | {error, term()}.
+raw(Session = {_, _}, NetFn, Command, Properties) ->
+    case get_session(Session, supervisor:which_children(?MODULE)) of
+        {ok, Pid} ->
+            eipmi_session:request(Pid, {NetFn, Command}, Properties);
         Error ->
             Error
     end.
@@ -278,3 +313,28 @@ do_ping_receive(IPAddress, Timeout, Socket) ->
             gen_udp:send(Socket, IPAddress, ?RMCP_PORT_NUMBER, Ack),
             Es =:= [ipmi]
     end.
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+do_read_fru({ok, Pid}, FruId) ->
+    GetFruInfo = {?IPMI_NETFN_STORAGE_REQUEST, ?GET_FRU_INVENTORY_AREA_INFO},
+    {ok, Response} = eipmi_session:request(Pid, GetFruInfo, [{fru_id, FruId}]),
+    AreaSize = eipmi_util:get_val(area_size, Response),
+    {ok, do_read_fru(FruId, Pid, AreaSize, {0, <<>>})};
+do_read_fru(Error, _FruId) ->
+    Error.
+do_read_fru(_FruId, _Pid, Size, {Size, Acc}) ->
+    Acc;
+do_read_fru(FruId, Pid, Size, {Offset, Acc}) when (Offset + 32) =< Size ->
+    Count = 32,
+    do_read_fru(FruId, Pid, Size, do_read_fru(FruId, Pid, Offset, Count, Acc));
+do_read_fru(FruId, Pid, Size, {Offset, Acc}) ->
+    Count = Size - Offset,
+    do_read_fru(FruId, Pid, Size, do_read_fru(FruId, Pid, Offset, Count, Acc)).
+do_read_fru(FruId, Pid, Offset, Count, Acc) ->
+    ReadFru = {?IPMI_NETFN_STORAGE_REQUEST, ?READ_FRU_DATA},
+    Properties = [{fru_id, FruId}, {offset, Offset}, {count, Count}],
+    {ok, Response} = eipmi_session:request(Pid, ReadFru, Properties),
+    {Offset + eipmi_util:get_val(count, Response),
+     <<Acc/binary, (eipmi_util:get_val(data, Response))/binary>>}.

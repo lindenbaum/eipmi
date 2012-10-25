@@ -75,41 +75,41 @@ encode_application(?GET_DEVICE_GUID, _Properties) ->
 encode_application(?GET_SYSTEM_GUID, _Properties) ->
     <<>>;
 encode_application(?GET_CHANNEL_AUTHENTICATION_CAPABILITIES, Properties) ->
-    P = encode_privilege(get_val(privilege, Properties)),
+    P = encode_privilege(eipmi_util:get_val(privilege, Properties)),
     <<0:1, ?EIPMI_RESERVED:3, ?IPMI_REQUESTED_CHANNEL:4, ?EIPMI_RESERVED:4,P:4>>;
 encode_application(?GET_SESSION_CHALLENGE, Properties) ->
-    A = eipmi_auth:encode_type(get_val(auth_type, Properties)),
-    U = eipmi_util:normalize(16, get_val(user, Properties)),
+    A = eipmi_auth:encode_type(eipmi_util:get_val(auth_type, Properties)),
+    U = eipmi_util:normalize(16, eipmi_util:get_val(user, Properties)),
     <<?EIPMI_RESERVED:4, A:4, U/binary>>;
 encode_application(?ACTIVATE_SESSION, Properties) ->
-    A = eipmi_auth:encode_type(get_val(auth_type, Properties)),
-    P = encode_privilege(get_val(privilege, Properties)),
-    C = eipmi_util:normalize(16, get_val(challenge, Properties)),
-    S = get_val(initial_outbound_seq_nr, Properties),
+    A = eipmi_auth:encode_type(eipmi_util:get_val(auth_type, Properties)),
+    P = encode_privilege(eipmi_util:get_val(privilege, Properties)),
+    C = eipmi_util:normalize(16, eipmi_util:get_val(challenge, Properties)),
+    S = eipmi_util:get_val(initial_outbound_seq_nr, Properties),
     <<?EIPMI_RESERVED:4, A:4, ?EIPMI_RESERVED:4, P:4, C/binary, S:32/little>>;
 encode_application(?SET_SESSION_PRIVILEGE_LEVEL, Properties) ->
-    P = encode_privilege(get_val(privilege, Properties)),
+    P = encode_privilege(eipmi_util:get_val(privilege, Properties)),
     <<?EIPMI_RESERVED:4, P:4>>;
 encode_application(?CLOSE_SESSION, Properties) ->
-    <<(get_val(session_id, Properties)):32/little>>.
+    <<(eipmi_util:get_val(session_id, Properties)):32/little>>.
 
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-encode_storage(_Cmd, _Properties) ->
-    <<>>.
+encode_storage(?GET_FRU_INVENTORY_AREA_INFO, Properties) ->
+    <<(eipmi_util:get_val(fru_id, Properties)):8>>;
+encode_storage(?READ_FRU_DATA, Properties) ->
+    FruId = eipmi_util:get_val(fru_id, Properties),
+    Offset = eipmi_util:get_val(offset, Properties),
+    Count = eipmi_util:get_val(count, Properties),
+    true = Offset =< 16#ffff,
+    <<FruId:8, Offset:16/little, Count:8>>.
 
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
 encode_transport(_Cmd, _Properties) ->
     <<>>.
-
-%%------------------------------------------------------------------------------
-%% @private
-%%------------------------------------------------------------------------------
-get_val(Property, Properties) ->
-    proplists:get_value(Property, Properties).
 
 %%------------------------------------------------------------------------------
 %% @private

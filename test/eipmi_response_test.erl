@@ -117,3 +117,17 @@ decode_close_session_test() ->
     Resp = {?IPMI_NETFN_APPLICATION_RESPONSE, ?CLOSE_SESSION},
     Bin = <<>>,
     ?assertEqual([], eipmi_response:decode(Resp, Bin)).
+
+decode_get_fru_inventory_area_info_test() ->
+    Resp = {?IPMI_NETFN_STORAGE_RESPONSE, ?GET_FRU_INVENTORY_AREA_INFO},
+    Bin = <<16#22, 16#11, 16#00>>,
+    ?assertEqual(
+       [{area_size, 16#1122}, {access, by_bytes}],
+       eipmi_response:decode(Resp, Bin)).
+
+decode_read_fru_data_test() ->
+    Resp = {?IPMI_NETFN_STORAGE_RESPONSE, ?READ_FRU_DATA},
+    Bin = <<5, $h, $e, $l, $l, $o>>,
+    ?assertEqual(
+       [{count, 5}, {data, <<$h, $e, $l, $l, $o>>}],
+       eipmi_response:decode(Resp, Bin)).

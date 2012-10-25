@@ -88,3 +88,15 @@ encode_close_session_test() ->
     ?assertEqual(
        <<16#44, 16#33, 16#22, 16#11>>,
        eipmi_request:encode(Req, Properties)).
+
+encode_get_fru_inventory_area_info_test() ->
+    Req = {?IPMI_NETFN_STORAGE_REQUEST, ?GET_FRU_INVENTORY_AREA_INFO},
+    Properties = [{fru_id, 4}],
+    ?assertEqual(<<16#04>>, eipmi_request:encode(Req, Properties)).
+
+encode_read_fru_data_test() ->
+    Req = {?IPMI_NETFN_STORAGE_REQUEST, ?READ_FRU_DATA},
+    Properties = [{fru_id, 4}, {offset, 16#1122}, {count, 5}],
+    ?assertEqual(
+       <<16#04, 16#22, 16#11, 16#05>>,
+       eipmi_request:encode(Req, Properties)).
