@@ -24,21 +24,41 @@
 %%% TESTS
 %%%=============================================================================
 
+encode_get_device_id_test() ->
+    Req = {?IPMI_NETFN_APPLICATION_REQUEST, ?GET_DEVICE_ID},
+    ?assertEqual(<<>>, eipmi_request:encode(Req, [])).
+
+encode_cold_reset_test() ->
+    Req = {?IPMI_NETFN_APPLICATION_REQUEST, ?COLD_RESET},
+    ?assertEqual(<<>>, eipmi_request:encode(Req, [])).
+
+encode_warm_reset_test() ->
+    Req = {?IPMI_NETFN_APPLICATION_REQUEST, ?WARM_RESET},
+    ?assertEqual(<<>>, eipmi_request:encode(Req, [])).
+
+encode_get_device_guid_test() ->
+    Req = {?IPMI_NETFN_APPLICATION_REQUEST, ?GET_DEVICE_GUID},
+    ?assertEqual(<<>>, eipmi_request:encode(Req, [])).
+
+encode_get_system_guid_test() ->
+    Req = {?IPMI_NETFN_APPLICATION_REQUEST, ?GET_SYSTEM_GUID},
+    ?assertEqual(<<>>, eipmi_request:encode(Req, [])).
+
 encode_get_channel_authentication_capabilities_test() ->
-    Cmd = ?GET_CHANNEL_AUTHENTICATION_CAPABILITIES,
+    Req = {?IPMI_NETFN_APPLICATION_REQUEST, ?GET_CHANNEL_AUTHENTICATION_CAPABILITIES},
     Properties = [{privilege, administrator}],
-    ?assertEqual(<<16#0e, 16#04>>, eipmi_request:encode(Cmd, Properties)).
+    ?assertEqual(<<16#0e, 16#04>>, eipmi_request:encode(Req, Properties)).
 
 encode_get_session_challenge_test() ->
-    Cmd = ?GET_SESSION_CHALLENGE,
+    Req = {?IPMI_NETFN_APPLICATION_REQUEST, ?GET_SESSION_CHALLENGE},
     Properties = [{auth_type, none}, {user, "hello_world"}],
     ?assertEqual(
        <<16#00, $h, $e, $l, $l, $o, $_, $w, $o, $r, $l, $d,
          16#00, 16#00, 16#00, 16#00, 16#00>>,
-       eipmi_request:encode(Cmd, Properties)).
+       eipmi_request:encode(Req, Properties)).
 
 encode_activate_session_test() ->
-    Cmd = ?ACTIVATE_SESSION,
+    Req = {?IPMI_NETFN_APPLICATION_REQUEST, ?ACTIVATE_SESSION},
     Properties = [{auth_type, none},
                   {privilege, administrator},
                   {initial_outbound_seq_nr, 16#11223344},
@@ -47,16 +67,16 @@ encode_activate_session_test() ->
     ?assertEqual(
        <<16#00, 16#04, $h, $e, $l, $l, $o, 16#00, 16#00, 16#00, 16#00, 16#00,
          16#00, 16#00, 16#00, 16#00, 16#00, 16#00, 16#44, 16#33, 16#22, 16#11>>,
-       eipmi_request:encode(Cmd, Properties)).
+       eipmi_request:encode(Req, Properties)).
 
 encode_set_session_privilege_level_test() ->
-    Cmd = ?SET_SESSION_PRIVILEGE_LEVEL,
+    Req = {?IPMI_NETFN_APPLICATION_REQUEST, ?SET_SESSION_PRIVILEGE_LEVEL},
     Properties = [{privilege, administrator}],
-    ?assertEqual(<<16#04>>, eipmi_request:encode(Cmd, Properties)).
+    ?assertEqual(<<16#04>>, eipmi_request:encode(Req, Properties)).
 
 encode_close_session_test() ->
-    Cmd = ?CLOSE_SESSION,
+    Req = {?IPMI_NETFN_APPLICATION_REQUEST, ?CLOSE_SESSION},
     Properties = [{session_id, 16#11223344}],
     ?assertEqual(
        <<16#44, 16#33, 16#22, 16#11>>,
-       eipmi_request:encode(Cmd, Properties)).
+       eipmi_request:encode(Req, Properties)).

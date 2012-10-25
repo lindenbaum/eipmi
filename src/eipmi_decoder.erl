@@ -100,13 +100,11 @@ session(<<?EIPMI_RESERVED:4, 3:4, S:32/little, I:32/little, _:128, Rest/binary>>
 
 %%------------------------------------------------------------------------------
 %% @private
-%% Note: Currently only application responses are supported.
 %%------------------------------------------------------------------------------
 lan(Ipmi = #rmcp_ipmi{properties = Ps},
-    <<RqAddr:8, ?IPMI_NETFN_APPLICATION_RESPONSE:6, RqLun:2>>,
+    <<RqAddr:8, NetFn:6, RqLun:2>>,
     <<RsAddr:8, RqSeqNr:6, RsLun:2, Cmd:8, Code:8, Data/binary>>) ->
     {ok, Ipmi#rmcp_ipmi{
-           type = response,
            properties =
                Ps ++ [{rq_addr, RqAddr},
                       {rq_lun, RqLun},
@@ -114,7 +112,7 @@ lan(Ipmi = #rmcp_ipmi{properties = Ps},
                       {rs_addr, RsAddr},
                       {rs_lun, RsLun},
                       {completion, completion_code(Code)}],
-           cmd = Cmd,
+           cmd = {NetFn, Cmd},
            data = Data}};
 lan(_Ipmi, _Head, _Tail) ->
     {error, unsupported_ipmi_message}.

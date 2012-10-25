@@ -90,6 +90,16 @@
 -define(ASF_NOREPLY, 255).
 
 %%------------------------------------------------------------------------------
+%% The IPMI net function for sensor and event requests (length is 6bits).
+%%------------------------------------------------------------------------------
+-define(IPMI_NETFN_SENSOR_EVENT_REQUEST, 16#04).
+
+%%------------------------------------------------------------------------------
+%% The IPMI net function for sensor and event responses (length is 6bits).
+%%------------------------------------------------------------------------------
+-define(IPMI_NETFN_SENSOR_EVENT_RESPONSE, 16#05).
+
+%%------------------------------------------------------------------------------
 %% The IPMI net function for application requests (length is 6bits).
 %%------------------------------------------------------------------------------
 -define(IPMI_NETFN_APPLICATION_REQUEST, 16#06).
@@ -98,6 +108,26 @@
 %% The IPMI net function for application responses (length is 6bits).
 %%------------------------------------------------------------------------------
 -define(IPMI_NETFN_APPLICATION_RESPONSE, 16#07).
+
+%%------------------------------------------------------------------------------
+%% The IPMI net function for storage requests (length is 6bits).
+%%------------------------------------------------------------------------------
+-define(IPMI_NETFN_STORAGE_REQUEST, 16#0a).
+
+%%------------------------------------------------------------------------------
+%% The IPMI net function for storage responses (length is 6bits).
+%%------------------------------------------------------------------------------
+-define(IPMI_NETFN_STORAGE_RESPONSE, 16#0b).
+
+%%------------------------------------------------------------------------------
+%% The IPMI net function for transport requests (length is 6bits).
+%%------------------------------------------------------------------------------
+-define(IPMI_NETFN_TRANSPORT_REQUEST, 16#0c).
+
+%%------------------------------------------------------------------------------
+%% The IPMI net function for transport responses (length is 6bits).
+%%------------------------------------------------------------------------------
+-define(IPMI_NETFN_TRANSPORT_RESPONSE, 16#0d).
 
 %%------------------------------------------------------------------------------
 %% The default reponder address sent in all IPMI requests, currently this is
@@ -119,19 +149,116 @@
 %%% IPMI Commands
 %%%=============================================================================
 
-%% Global
--define(GET_DEVICE_ID, 16#01).
--define(COLD_RESET, 16#02).
--define(WARM_RESET, 16#03).
--define(GET_DEVICE_GUID, 16#08).
+%% Global (Application)
+-define(GET_DEVICE_ID, 16#01).                                      %% mandatory
+-define(COLD_RESET, 16#02).                                         %%  optional
+-define(WARM_RESET, 16#03).                                         %%  optional
+-define(SET_ACPI_POWER_STATE, 16#06).                               %%  optional
+-define(GET_ACPI_POWER_STATE, 16#07).                               %%  optional
+-define(GET_DEVICE_GUID, 16#08).                                    %%  optional
 
-%% Messaging Support
--define(GET_CHANNEL_AUTHENTICATION_CAPABILITIES, 16#38).
--define(GET_SYSTEM_GUID, 16#37).
--define(GET_SESSION_CHALLENGE, 16#39).
--define(ACTIVATE_SESSION, 16#3a).
--define(SET_SESSION_PRIVILEGE_LEVEL, 16#3b).
--define(CLOSE_SESSION, 16#3c).
+%% BMC Watchdog (Application)
+-define(RESET_WATCHDOG_TIMER, 16#22).                               %% mandatory
+-define(SET_WATCHDOG_TIMER, 16#24).                                 %% mandatory
+-define(GET_WATCHDOG_TIMER, 16#25).                                 %% mandatory
+
+%% BMC Messaging (Application)
+-define(SET_BMC_GLOBAL_ENABLES, 16#2e).                             %% mandatory
+-define(GET_BMC_GLOBAL_ENABLES, 16#2f).                             %% mandatory
+-define(CLEAR_MESSAGE_FLAGS, 16#30).                                %% mandatory
+-define(GET_MESSAGE_FLAGS, 16#31).                                  %% mandatory
+-define(GET_MESSAGE, 16#33).                                        %% mandatory
+-define(SEND_MESSAGE, 16#34).                                       %% mandatory
+-define(GET_SYSTEM_GUID, 16#37).                                    %%  optional
+-define(GET_CHANNEL_AUTHENTICATION_CAPABILITIES, 16#38).            %% mandatory
+-define(GET_SESSION_CHALLENGE, 16#39).                              %% mandatory
+-define(ACTIVATE_SESSION, 16#3a).                                   %% mandatory
+-define(SET_SESSION_PRIVILEGE_LEVEL, 16#3b).                        %% mandatory
+-define(CLOSE_SESSION, 16#3c).                                      %% mandatory
+-define(GET_SESSION_INFO, 16#3d).                                   %% mandatory
+-define(GET_AUTHCODE, 16#3f).                                       %%  optional
+-define(SET_CHANNEL_ACCESS, 16#40).                                 %% mandatory
+-define(GET_CHANNEL_ACCESS, 16#41).                                 %% mandatory
+-define(GET_CHANNEL_INFO_COMMAND, 16#42).                           %% mandatory
+-define(SET_USER_ACCESS_COMMAND, 16#43).                            %% mandatory
+-define(GET_USER_ACCESS_COMMAND, 16#44).                            %% mandatory
+-define(SET_USER_NAME, 16#45).                                      %%  optional
+-define(GET_USER_NAME_COMMAND, 16#46).                              %% mandatory
+-define(SET_USER_PASSWORD_COMMAND, 16#47).                          %% mandatory
+-define(MASTER_WRITE_READ, 16#52).                                  %% mandatory
+
+%% Events (Sensor/Event)
+-define(SET_EVENT_RECEIVER, 16#00).
+-define(GET_EVENT_RECEIVER, 16#01).
+-define(PLATFORM_EVENT, 16#02).
+
+%% PEF/Alerting (Sensor/Event)
+-define(GET_PEF_CAPABILITIES, 16#10).
+-define(ARM_PEF_POSTPONE_TIMER, 16#11).
+-define(SET_PEF_CONFIGURATION_PARAMETERS, 16#12).
+-define(GET_PEF_CONFIGURATION_PARAMETERS, 16#13).
+-define(SET_LAST_PROCESSED_EVENT_ID, 16#14).
+-define(GET_LAST_PROCESSED_EVENT_ID, 16#15).
+-define(ALERT_IMMEDIATE, 16#16).
+-define(PET_ACKNOWLEDGE, 16#17).
+
+%% Sensor (Sensor/Event)
+-define(GET_DEVICE_SDR_INFO, 16#20).
+-define(GET_DEVICE_SDR, 16#21).
+-define(RESERVE_DEVICE_SDR_REPOSITORY, 16#22).
+-define(GET_SENSOR_READING_FACTORS, 16#23).
+-define(SET_SENSOR_HYSTERESIS, 16#24).
+-define(GET_SENSOR_HYSTERESIS, 16#25).
+-define(SET_SENSOR_THRESHOLD, 16#26).
+-define(GET_SENSOR_THRESHOLD, 16#27).
+-define(SET_SENSOR_EVENT_ENABLE, 16#28).
+-define(GET_SENSOR_EVENT_ENABLE, 16#29).
+-define(RE_ARM_SENSOR_EVENTS, 16#2a).
+-define(GET_SENSOR_EVENT_STATUS, 16#2b).
+-define(GET_SENSOR_READING, 16#2d).
+-define(SET_SENSOR_TYPE, 16#2e).
+-define(GET_SENSOR_TYPE, 16#2f).
+-define(SET_SENSOR_READING_AND_EVENT_STATUS, 16#30).
+
+%% FRU (Storage)
+-define(GET_FRU_INVENTORY_AREA_INFO, 16#10).                        %% mandatory
+-define(READ_FRU_DATA, 16#11).                                      %% mandatory
+-define(WRITE_FRU_DATA, 16#12).                                     %% mandatory
+
+%% SDR (Storage)
+-define(GET_SDR_REPOSITORY_INFO, 16#20).
+-define(GET_SDR_REPOSITORY_ALLOCATION_INFO, 16#21).
+-define(RESERVE_SDR_REPOSITORY, 16#22).
+-define(GET_SDR, 16#23).
+-define(ADD_SDR, 16#24).
+-define(PARTIAL_ADD_SDR, 16#25).
+-define(DELETE_SDR, 16#26).
+-define(CLEAR_SDR_REPOSITORY, 16#27).
+-define(GET_SDR_REPOSITORY_TIME, 16#28).
+-define(SET_SDR_REPOSITORY_TIME, 16#29).
+-define(ENTER_SDR_REPOSITORY_UPDATE_MODE, 16#2a).
+-define(EXIT_SDR_REPOSITORY_UPDATE_MODE, 16#2b).
+-define(RUN_INITIALIZATION_AGENT, 16#2c).
+
+%% SEL (Storage)
+-define(GET_SEL_INFO, 16#40).
+-define(GET_SEL_ALLOCATION_INFO, 16#41).
+-define(RESERVE_SEL, 16#42).
+-define(GET_SEL_ENTRY, 16#43).
+-define(ADD_SEL_ENTRY, 16#44).
+-define(PARTIAL_ADD_SEL_ENTRY, 16#45).
+-define(DELETE_SEL_ENTRY, 16#46).
+-define(CLEAR_SEL, 16#47).
+-define(GET_SEL_TIME, 16#48).
+-define(SET_SEL_TIME, 16#49).
+-define(GET_AUXILIARY_LOG_STATUS, 16#5a).
+-define(SET_AUXILIARY_LOG_STATUS, 16#5b).
+
+%% LAN (Transport)
+-define(SET_LAN_CONFIGURATION_PARAMETERS, 16#01).
+-define(GET_LAN_CONFIGURATION_PARAMETERS, 16#02).
+-define(SUSPEND_BMC_ARPS, 16#03).
+-define(GET_IP_UDP_RMCP_STATISTICS, 16#04).
 
 %%%=============================================================================
 %%% Messages
@@ -180,8 +307,7 @@
 -record(rmcp_ipmi, {
           header          :: #rmcp_header{},
           properties = [] :: proplists:proplist(),
-          cmd             :: 0..255,
-          type = request  :: request | response,
+          cmd             :: eipmi:request() | eipmi:response(),
           data = <<>>     :: binary()}).
 
 -endif. %% eipmi_hrl_

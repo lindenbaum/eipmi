@@ -66,8 +66,8 @@ ipmi_response_test() ->
     ?assertMatch(
        #rmcp_ipmi{
           header = #rmcp_header{class = ?RMCP_IPMI},
-          type = response,
-          cmd = 16#38,
+          cmd = {?IPMI_NETFN_APPLICATION_RESPONSE,
+                 ?GET_CHANNEL_AUTHENTICATION_CAPABILITIES},
           data = <<16#00, 16#01, 16#19, 16#00, 16#00, 16#00, 16#00, 16#00>>},
        Ipmi),
     Ps = Ipmi#rmcp_ipmi.properties,

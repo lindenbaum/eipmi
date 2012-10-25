@@ -25,10 +25,10 @@
 %%%=============================================================================
 
 decode_get_device_id_test() ->
-    Cmd = ?GET_DEVICE_ID,
+    Resp = {?IPMI_NETFN_APPLICATION_RESPONSE, ?GET_DEVICE_ID},
     Bin = <<16#00, 16#82, 16#02, 16#0d, 16#51, 16#3e, 16#78, 16#6c, 16#00,
             16#03, 16#0b, 16#00, 16#00, 16#00, 16#00>>,
-    Properties = eipmi_response:decode(Cmd, Bin),
+    Properties = eipmi_response:decode(Resp, Bin),
     ?assertEqual(0, eipmi_util:get_val(device_id, Properties)),
     ?assertEqual(2, eipmi_util:get_val(device_revision, Properties)),
     ?assertEqual(normal, eipmi_util:get_val(operation, Properties)),
@@ -39,47 +39,63 @@ decode_get_device_id_test() ->
     ?assertEqual(27768, eipmi_util:get_val(manufacturer_id, Properties)),
     ?assertEqual(2819, eipmi_util:get_val(product_id, Properties)).
 
+decode_cold_reset_test() ->
+    Resp = {?IPMI_NETFN_APPLICATION_RESPONSE, ?COLD_RESET},
+    Bin = <<>>,
+    ?assertEqual([], eipmi_response:decode(Resp, Bin)).
+
+decode_warm_reset_test() ->
+    Resp = {?IPMI_NETFN_APPLICATION_RESPONSE, ?WARM_RESET},
+    Bin = <<>>,
+    ?assertEqual([], eipmi_response:decode(Resp, Bin)).
+
 decode_get_device_guid_test() ->
-    Cmd = ?GET_DEVICE_GUID,
+    Resp = {?IPMI_NETFN_APPLICATION_RESPONSE, ?GET_DEVICE_GUID},
     Bin = <<$h, $e, $l, $l, $o>>,
-    Properties = eipmi_response:decode(Cmd, Bin),
+    Properties = eipmi_response:decode(Resp, Bin),
+    ?assertEqual("hello", eipmi_util:get_val(guid, Properties)).
+
+decode_get_system_guid_test() ->
+    Resp = {?IPMI_NETFN_APPLICATION_RESPONSE, ?GET_SYSTEM_GUID},
+    Bin = <<$h, $e, $l, $l, $o>>,
+    Properties = eipmi_response:decode(Resp, Bin),
     ?assertEqual("hello", eipmi_util:get_val(guid, Properties)).
 
 decode_get_channel_authentication_capabilities_test() ->
-    Cmd = ?GET_CHANNEL_AUTHENTICATION_CAPABILITIES,
+    Resp = {?IPMI_NETFN_APPLICATION_RESPONSE, ?GET_CHANNEL_AUTHENTICATION_CAPABILITIES},
     Bin = <<16#00, 16#17, 16#1f, 16#00, 16#00, 16#00, 16#00, 16#00>>,
-    Properties = eipmi_response:decode(Cmd, Bin),
+    Properties = eipmi_response:decode(Resp, Bin),
     ?assertEqual([pwd, md5, md2, none],
                  eipmi_util:get_val(auth_types, Properties)),
     ?assertEqual([non_null, null, anonymous],
                  eipmi_util:get_val(login_status, Properties)).
 
 decode_get_session_challenge_test() ->
-    Cmd = ?GET_SESSION_CHALLENGE,
+    Resp = {?IPMI_NETFN_APPLICATION_RESPONSE, ?GET_SESSION_CHALLENGE},
     Bin = <<16#44, 16#33, 16#22, 16#11, $h, $e, $l, $l, $o, $_, $w, $o, $r,
             $l, $d, 16#00, 16#00, 16#00, 16#00, 16#00>>,
-    Properties = eipmi_response:decode(Cmd, Bin),
+    Properties = eipmi_response:decode(Resp, Bin),
     ?assertEqual(16#11223344, eipmi_util:get_val(session_id, Properties)),
     ?assertEqual(<<$h, $e, $l, $l, $o, $_, $w, $o, $r, $l, $d,
                    16#00, 16#00, 16#00, 16#00, 16#00>>,
                  eipmi_util:get_val(challenge, Properties)).
 
 decode_activate_session_test() ->
-    Cmd = ?ACTIVATE_SESSION,
+    Resp = {?IPMI_NETFN_APPLICATION_RESPONSE, ?ACTIVATE_SESSION},
     Bin = <<16#00, 16#44, 16#33, 16#22, 16#11, 16#88, 16#77, 16#66, 16#55, 16#04>>,
-    Properties = eipmi_response:decode(Cmd, Bin),
+    Properties = eipmi_response:decode(Resp, Bin),
     ?assertEqual(none, eipmi_util:get_val(auth_type, Properties)),
     ?assertEqual(16#11223344, eipmi_util:get_val(session_id, Properties)),
     ?assertEqual(16#55667788, eipmi_util:get_val(inbound_seq_nr, Properties)),
     ?assertEqual(administrator, eipmi_util:get_val(privilege, Properties)).
 
 decode_set_session_privilege_level_test() ->
-    Cmd = ?SET_SESSION_PRIVILEGE_LEVEL,
+    Resp = {?IPMI_NETFN_APPLICATION_RESPONSE, ?SET_SESSION_PRIVILEGE_LEVEL},
     Bin = <<16#04>>,
-    Properties = eipmi_response:decode(Cmd, Bin),
+    Properties = eipmi_response:decode(Resp, Bin),
     ?assertEqual(administrator, eipmi_util:get_val(privilege, Properties)).
 
 decode_close_session_test() ->
-    Cmd = ?CLOSE_SESSION,
+    Resp = {?IPMI_NETFN_APPLICATION_RESPONSE, ?CLOSE_SESSION},
     Bin = <<>>,
-    ?assertEqual([], eipmi_response:decode(Cmd, Bin)).
+    ?assertEqual([], eipmi_response:decode(Resp, Bin)).

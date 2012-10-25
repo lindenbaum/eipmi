@@ -63,12 +63,12 @@ ping(Header = #rmcp_header{class = ?RMCP_ASF}, #asf_ping{iana = I, tag = T}) ->
 %% currently only IPMI requests are supported.
 %% @end
 %%------------------------------------------------------------------------------
--spec ipmi(#rmcp_header{}, proplists:proplist(), 0..255, binary()) ->
+-spec ipmi(#rmcp_header{}, proplists:proplist(), eipmi:request(), binary()) ->
                   binary().
-ipmi(Header = #rmcp_header{class = ?RMCP_IPMI}, Properties, Cmd, Data) ->
+ipmi(Header = #rmcp_header{class = ?RMCP_IPMI}, Properties, Req, Data) ->
     HeaderBin = header(Header, ?RMCP_NORMAL),
     SessionBin = session(Properties, Data),
-    RequestBin = request(Properties, Cmd, Data),
+    RequestBin = request(Properties, Req, Data),
     Length = size(RequestBin),
     <<HeaderBin/binary, SessionBin/binary, Length:8, RequestBin/binary>>.
 
@@ -114,8 +114,8 @@ session(T, S, I, P, Data) ->
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-request(Properties, Cmd, Data) ->
-    Head = request_head(Properties),
+request(Properties, {NetFn, Cmd}, Data) ->
+    Head = request_head(NetFn, Properties),
     HeadSum = checksum(Head),
     Tail = request_tail(Properties, Cmd, Data),
     TailSum = checksum(Tail),
@@ -124,11 +124,10 @@ request(Properties, Cmd, Data) ->
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-request_head(Properties) ->
+request_head(NetFn, Properties) ->
     A = eipmi_util:get_val(rs_addr, Properties),
-    N = eipmi_util:get_val(net_fn, Properties),
     L = eipmi_util:get_val(rs_lun, Properties),
-    <<A:8, N:6, L:2>>.
+    <<A:8, NetFn:6, L:2>>.
 
 %%------------------------------------------------------------------------------
 %% @private

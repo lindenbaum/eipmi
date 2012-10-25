@@ -45,6 +45,10 @@
 
 -opaque session() :: {inet:ip_address() | inet:hostname(), reference()}.
 
+-type request() :: {NetFn :: 16#04 | 16#06 | 16#a | 16#c, Command :: 0..255}.
+
+-type response() :: {NetFn :: 16#05 | 16#07 | 16#b | 16#d, Command :: 0..255}.
+
 -type option() ::
         {initial_outbound_seq_nr, non_neg_integer()} |
         {password, string()} |
@@ -63,7 +67,7 @@
         timeout |
         user.
 
--export_type([session/0, option/0, option_name/0]).
+-export_type([session/0, request/0, response/0, option/0, option_name/0]).
 
 %%%=============================================================================
 %%% API

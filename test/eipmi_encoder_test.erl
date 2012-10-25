@@ -47,9 +47,8 @@ ipmi_test() ->
           {rq_addr, 16#81},
           {rq_seq_nr, 0},
           {session_id, 0},
-          {net_fn, ?IPMI_NETFN_APPLICATION_REQUEST},
           {rq_lun, ?IPMI_REQUESTOR_LUN},
           {rs_addr, ?IPMI_RESPONDER_ADDR},
           {rs_lun, ?IPMI_RESPONDER_LUN}],
-         16#38,
+         {?IPMI_NETFN_APPLICATION_REQUEST, ?GET_CHANNEL_AUTHENTICATION_CAPABILITIES},
          <<16#0e, 16#04>>)).

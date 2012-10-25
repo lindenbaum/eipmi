@@ -35,13 +35,36 @@
 %% property list with the decoded values.
 %% @end
 %%------------------------------------------------------------------------------
--spec decode(0..255, binary()) ->
+-spec decode(eipmi:response(), binary()) ->
                     proplists:proplist().
-decode(?GET_DEVICE_ID,
-       <<Id:8, _:1, ?EIPMI_RESERVED:3, Revision:4,
-         Operation:1, Major:7, Minor:8,
-         IPMILeast:4, IPMIMost:4, Support:8, Manufacterer:24/little,
-         Product:16/little, _/binary>>) ->
+decode({?IPMI_NETFN_SENSOR_EVENT_RESPONSE, Cmd}, Data) ->
+    decode_sensor_event(Cmd, Data);
+decode({?IPMI_NETFN_APPLICATION_RESPONSE, Cmd}, Data) ->
+    decode_application(Cmd, Data);
+decode({?IPMI_NETFN_STORAGE_RESPONSE, Cmd}, Data) ->
+    decode_storage(Cmd, Data);
+decode({?IPMI_NETFN_TRANSPORT_RESPONSE, Cmd}, Data) ->
+    decode_transport(Cmd, Data).
+
+%%%=============================================================================
+%%% internal functions
+%%%=============================================================================
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+decode_sensor_event(_Cmd, _Data) ->
+    [].
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+decode_application(?GET_DEVICE_ID,
+                   <<Id:8, _:1, ?EIPMI_RESERVED:3, Revision:4,
+                     Operation:1, Major:7, Minor:8,
+                     IPMILeast:4, IPMIMost:4,
+                     Support:8, Manufacterer:24/little,
+                     Product:16/little, _/binary>>) ->
     [{device_id, Id},
      {device_revision, Revision},
      {operation, case Operation of 0 -> normal; 1 -> progress end},
@@ -50,39 +73,43 @@ decode(?GET_DEVICE_ID,
      {device_support, get_device_support(Support)},
      {manufacturer_id, Manufacterer},
      {product_id, Product}];
-
-decode(?GET_DEVICE_GUID, <<GUID/binary>>) ->
+decode_application(?COLD_RESET, <<>>) ->
+    [];
+decode_application(?WARM_RESET, <<>>) ->
+    [];
+decode_application(?GET_DEVICE_GUID, <<GUID/binary>>) ->
     [{guid, binary_to_list(GUID)}];
-
-decode(?GET_CHANNEL_AUTHENTICATION_CAPABILITIES,
-       <<_:8, 0:1, _:1, A:6, ?EIPMI_RESERVED:3, _:1, _:1, L:3, ?EIPMI_RESERVED:40>>) ->
+decode_application(?GET_SYSTEM_GUID, <<GUID/binary>>) ->
+    [{guid, binary_to_list(GUID)}];
+decode_application(?GET_CHANNEL_AUTHENTICATION_CAPABILITIES,
+                   <<_:8, 0:1, _:1, A:6, ?EIPMI_RESERVED:3, _:1, _:1, L:3,
+                     ?EIPMI_RESERVED:40>>) ->
     [{auth_types, get_auth_types(A)}, {login_status, get_login_status(L)}];
-
-decode(?GET_SESSION_CHALLENGE, <<I:32/little, C/binary>>) ->
+decode_application(?GET_SESSION_CHALLENGE, <<I:32/little, C/binary>>) ->
     [{session_id, I}, {challenge, C}];
-
-decode(?ACTIVATE_SESSION,
-       <<?EIPMI_RESERVED:4, A:4, I:32/little, S:32/little, ?EIPMI_RESERVED:4, P:4>>) ->
+decode_application(?ACTIVATE_SESSION,
+                   <<?EIPMI_RESERVED:4, A:4, I:32/little, S:32/little,
+                     ?EIPMI_RESERVED:4, P:4>>) ->
     [{session_id, I},
      {inbound_seq_nr, S},
      {auth_type, eipmi_auth:decode_type(A)},
      {privilege, decode_privilege(P)}];
-
-decode(?SET_SESSION_PRIVILEGE_LEVEL, <<?EIPMI_RESERVED:4, P:4>>) ->
+decode_application(?SET_SESSION_PRIVILEGE_LEVEL, <<?EIPMI_RESERVED:4, P:4>>) ->
     [{privilege, decode_privilege(P)}];
-
-decode(Cmd, <<>>)
-  when Cmd =:= ?CLOSE_SESSION orelse
-       Cmd =:= ?COLD_RESET orelse
-       Cmd =:= ?WARM_RESET ->
-    [];
-
-decode(_Cmd, _Binary) ->
+decode_application(?CLOSE_SESSION, <<>>) ->
     [].
 
-%%%=============================================================================
-%%% internal functions
-%%%=============================================================================
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+decode_storage(_Cmd, _Data) ->
+    [].
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+decode_transport(_Cmd, _Data) ->
+    [].
 
 %%------------------------------------------------------------------------------
 %% @private

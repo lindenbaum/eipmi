@@ -35,42 +35,70 @@
 %% values will be retrieved from the provided property list.
 %% @end
 %%------------------------------------------------------------------------------
--spec encode(0..255, proplists:proplist()) ->
+-spec encode(eipmi:request(), proplists:proplist()) ->
                     binary().
-encode(?GET_CHANNEL_AUTHENTICATION_CAPABILITIES, Properties) ->
+encode({?IPMI_NETFN_SENSOR_EVENT_REQUEST, Cmd}, Properties) ->
+    encode_sensor_event(Cmd, Properties);
+encode({?IPMI_NETFN_APPLICATION_REQUEST, Cmd}, Properties) ->
+    encode_application(Cmd, Properties);
+encode({?IPMI_NETFN_STORAGE_REQUEST, Cmd}, Properties) ->
+    encode_storage(Cmd, Properties);
+encode({?IPMI_NETFN_TRANSPORT_REQUEST, Cmd}, Properties) ->
+    encode_transport(Cmd, Properties).
+
+%%%=============================================================================
+%%% Internal functions
+%%%=============================================================================
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+encode_sensor_event(_Cmd, _Properties) ->
+    <<>>.
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+encode_application(?GET_DEVICE_ID, _Properties) ->
+    <<>>;
+encode_application(?COLD_RESET, _Properties) ->
+    <<>>;
+encode_application(?WARM_RESET, _Properties) ->
+    <<>>;
+encode_application(?GET_DEVICE_GUID, _Properties) ->
+    <<>>;
+encode_application(?GET_SYSTEM_GUID, _Properties) ->
+    <<>>;
+encode_application(?GET_CHANNEL_AUTHENTICATION_CAPABILITIES, Properties) ->
     P = encode_privilege(get_val(privilege, Properties)),
     <<0:1, ?EIPMI_RESERVED:3, ?IPMI_REQUESTED_CHANNEL:4, ?EIPMI_RESERVED:4,P:4>>;
-
-encode(?GET_SESSION_CHALLENGE, Properties) ->
+encode_application(?GET_SESSION_CHALLENGE, Properties) ->
     A = eipmi_auth:encode_type(get_val(auth_type, Properties)),
     U = eipmi_util:normalize(16, get_val(user, Properties)),
     <<?EIPMI_RESERVED:4, A:4, U/binary>>;
-
-encode(?ACTIVATE_SESSION, Properties) ->
+encode_application(?ACTIVATE_SESSION, Properties) ->
     A = eipmi_auth:encode_type(get_val(auth_type, Properties)),
     P = encode_privilege(get_val(privilege, Properties)),
     C = eipmi_util:normalize(16, get_val(challenge, Properties)),
     S = get_val(initial_outbound_seq_nr, Properties),
     <<?EIPMI_RESERVED:4, A:4, ?EIPMI_RESERVED:4, P:4, C/binary, S:32/little>>;
-
-encode(?SET_SESSION_PRIVILEGE_LEVEL, Properties) ->
+encode_application(?SET_SESSION_PRIVILEGE_LEVEL, Properties) ->
     P = encode_privilege(get_val(privilege, Properties)),
     <<?EIPMI_RESERVED:4, P:4>>;
+encode_application(?CLOSE_SESSION, Properties) ->
+    <<(get_val(session_id, Properties)):32/little>>.
 
-encode(?CLOSE_SESSION, Properties) ->
-    <<(get_val(session_id, Properties)):32/little>>;
-
-encode(Cmd, _Properties)
-  when Cmd =:= ?GET_DEVICE_ID orelse
-       Cmd =:= ?COLD_RESET orelse
-       Cmd =:= ?WARM_RESET orelse
-       Cmd =:= ?GET_DEVICE_GUID orelse
-       Cmd =:= ?GET_SYSTEM_GUID ->
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+encode_storage(_Cmd, _Properties) ->
     <<>>.
 
-%%%=============================================================================
-%%% Internal functions
-%%%=============================================================================
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+encode_transport(_Cmd, _Properties) ->
+    <<>>.
 
 %%------------------------------------------------------------------------------
 %% @private
