@@ -64,4 +64,28 @@ and `password' need to be passed to a call to {@link eipmi:open/2}. In case
 be required. If the BMC supports <em>anonymous</em> logins no options need to be
 set.
 
+=== Session Sharing ===
+
+TODO
+
+== Supported Commands ==
+
+Currently supported commands/responses are:
+<dl>
+  <dt>Get Device Id</dt>
+  <dt>Cold Reset</dt>
+  <dt>Warm Reset</dt>
+  <dt>Get Self Test Results</dt>
+  <dt>Get ACPI Power State</dt>
+  <dt>Get Device GUID</dt>
+  <dt>Get System GUID</dt>
+  <dt>Get Channel Authentication Capabilities</dt>
+  <dt>Get Session Challenge</dt>
+  <dt>Activate Session</dt>
+  <dt>Set Session Privilege Level</dt>
+  <dt>Close Session</dt>
+</dl>
+
 == History ==
+
+TODO

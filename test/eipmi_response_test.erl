@@ -49,6 +49,24 @@ decode_warm_reset_test() ->
     Bin = <<>>,
     ?assertEqual([], eipmi_response:decode(Resp, Bin)).
 
+decode_get_self_test_results_test() ->
+    Resp = {?IPMI_NETFN_APPLICATION_RESPONSE, ?GET_SELF_TEST_RESULTS},
+    Bin = <<16#57, 16#ff>>,
+    ?assertEqual(
+       [{result,
+         {{corrupted_devices,
+           [sel, sdr, fru, ipmb_signal_lines]},
+          {inaccessible_devices,
+           [sdr, fru, boot_firmware, optional_firmware]}}}],
+       eipmi_response:decode(Resp, Bin)).
+
+decode_get_acpi_power_state_test() ->
+    Resp = {?IPMI_NETFN_APPLICATION_RESPONSE, ?GET_ACPI_POWER_STATE},
+    Bin = <<16#00, 16#01>>,
+    ?assertEqual(
+       [{system, {s0_g0, working}}, {device, d1}],
+       eipmi_response:decode(Resp, Bin)).
+
 decode_get_device_guid_test() ->
     Resp = {?IPMI_NETFN_APPLICATION_RESPONSE, ?GET_DEVICE_GUID},
     Bin = <<$h, $e, $l, $l, $o>>,

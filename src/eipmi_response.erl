@@ -15,7 +15,8 @@
 %%%
 %%% @doc
 %%% A module providing decoding functionality for the data parts of IPMI
-%%% responses.
+%%% responses. This module will need care if support for new responses is
+%%% demanded.
 %%% @end
 %%%=============================================================================
 
@@ -77,6 +78,11 @@ decode_application(?COLD_RESET, <<>>) ->
     [];
 decode_application(?WARM_RESET, <<>>) ->
     [];
+decode_application(?GET_SELF_TEST_RESULTS, <<Result:8, Detail:8>>) ->
+    [{result, get_self_test_result(Result, Detail)}];
+decode_application(?GET_ACPI_POWER_STATE, <<_:1, System:7, _:1, Device:7>>) ->
+    [{system, get_system_power_state(System)},
+     {device, get_device_power_state(Device)}];
 decode_application(?GET_DEVICE_GUID, <<GUID/binary>>) ->
     [{guid, binary_to_list(GUID)}];
 decode_application(?GET_SYSTEM_GUID, <<GUID/binary>>) ->
@@ -110,6 +116,56 @@ decode_storage(_Cmd, _Data) ->
 %%------------------------------------------------------------------------------
 decode_transport(_Cmd, _Data) ->
     [].
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+get_self_test_result(16#55, 16#00) ->
+    self_tests_passed;
+get_self_test_result(16#56, 16#00) ->
+    self_tests_not_implemented;
+get_self_test_result(16#57, Bitfield) ->
+    A = case Bitfield band 2#10000000 of 2#10000000 -> [sel]; _ -> [] end,
+    B = case Bitfield band 2#1000000 of 2#1000000 -> [sdr]; _ -> [] end,
+    C = case Bitfield band 2#100000 of 2#100000 -> [fru]; _ -> [] end,
+    D = case Bitfield band 2#10000 of 2#10000 -> [ipmb_signal_lines]; _ -> [] end,
+    E = case Bitfield band 2#1000 of 2#1000 -> [sdr]; _ -> [] end,
+    F = case Bitfield band 2#100 of 2#100 -> [fru]; _ -> [] end,
+    G = case Bitfield band 2#10 of 2#10 -> [boot_firmware]; _ -> [] end,
+    H = case Bitfield band 2#1 of 2#1 -> [optional_firmware]; _ -> [] end,
+    {{corrupted_devices, A ++ B ++ C ++ D},
+     {inaccessible_devices, E ++ F ++ G ++ H}};
+get_self_test_result(16#58, Detail) ->
+    {fatal_hardware_error, Detail};
+get_self_test_result(Result, Detail) ->
+    {device_specific_error, Result, Detail}.
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+get_system_power_state(16#00) -> {s0_g0, working};
+get_system_power_state(16#01) -> {s1, clocks_stopped};
+get_system_power_state(16#02) -> {s2, clocks_stopped};
+get_system_power_state(16#03) -> {s3, suspend_to_ram};
+get_system_power_state(16#04) -> {s4, suspend_to_disk};
+get_system_power_state(16#05) -> {s5_g2, soft_off};
+get_system_power_state(16#06) -> {s4_s5, soft_off};
+get_system_power_state(16#07) -> {g3, mechanical_off};
+get_system_power_state(16#08) -> {s1_s2_s3, sleeping};
+get_system_power_state(16#09) -> {g1, sleeping};
+get_system_power_state(16#0a) -> {s5, override};
+get_system_power_state(16#20) -> legacy_on;
+get_system_power_state(16#21) -> legacy_off;
+get_system_power_state(_) -> unknown.
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+get_device_power_state(16#00) -> d0;
+get_device_power_state(16#01) -> d1;
+get_device_power_state(16#02) -> d2;
+get_device_power_state(16#03) -> d3;
+get_device_power_state(_) -> unknown.
 
 %%------------------------------------------------------------------------------
 %% @private

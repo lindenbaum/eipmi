@@ -29,6 +29,11 @@
 %%% one process will be synchronous and thus ordered, requests from different
 %%% processes will not block each other.
 %%%
+%%% A session will use the modules {@link eipmi_request} and
+%%% {@link eipmi_response} to encode and decode requests/responses. Therefore,
+%%% there's no need to edit the session but extending these modules when
+%%% support for new requests/responses is added.
+%%%
 %%% @TODO Implement session keep alive.
 %%% @end
 %%%=============================================================================

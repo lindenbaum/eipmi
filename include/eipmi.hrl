@@ -153,6 +153,7 @@
 -define(GET_DEVICE_ID, 16#01).                                      %% mandatory
 -define(COLD_RESET, 16#02).                                         %%  optional
 -define(WARM_RESET, 16#03).                                         %%  optional
+-define(GET_SELF_TEST_RESULTS, 16#04).                              %% mandatory
 -define(SET_ACPI_POWER_STATE, 16#06).                               %%  optional
 -define(GET_ACPI_POWER_STATE, 16#07).                               %%  optional
 -define(GET_DEVICE_GUID, 16#08).                                    %%  optional
@@ -179,12 +180,12 @@
 -define(GET_AUTHCODE, 16#3f).                                       %%  optional
 -define(SET_CHANNEL_ACCESS, 16#40).                                 %% mandatory
 -define(GET_CHANNEL_ACCESS, 16#41).                                 %% mandatory
--define(GET_CHANNEL_INFO_COMMAND, 16#42).                           %% mandatory
--define(SET_USER_ACCESS_COMMAND, 16#43).                            %% mandatory
--define(GET_USER_ACCESS_COMMAND, 16#44).                            %% mandatory
+-define(GET_CHANNEL_INFO, 16#42).                                   %% mandatory
+-define(SET_USER_ACCESS, 16#43).                                    %% mandatory
+-define(GET_USER_ACCESS, 16#44).                                    %% mandatory
 -define(SET_USER_NAME, 16#45).                                      %%  optional
--define(GET_USER_NAME_COMMAND, 16#46).                              %% mandatory
--define(SET_USER_PASSWORD_COMMAND, 16#47).                          %% mandatory
+-define(GET_USER_NAME, 16#46).                                      %% mandatory
+-define(SET_USER_PASSWORD, 16#47).                                  %% mandatory
 -define(MASTER_WRITE_READ, 16#52).                                  %% mandatory
 
 %% Events (Sensor/Event)

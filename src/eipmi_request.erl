@@ -15,7 +15,8 @@
 %%%
 %%% @doc
 %%% A module providing encoding functionality for the data parts of IPMI
-%%% requests.
+%%% requests. This module will need care if support for new requests is
+%%% demanded.
 %%% @end
 %%%=============================================================================
 
@@ -64,6 +65,10 @@ encode_application(?GET_DEVICE_ID, _Properties) ->
 encode_application(?COLD_RESET, _Properties) ->
     <<>>;
 encode_application(?WARM_RESET, _Properties) ->
+    <<>>;
+encode_application(?GET_SELF_TEST_RESULTS, _Properties) ->
+    <<>>;
+encode_application(?GET_ACPI_POWER_STATE, _Properties) ->
     <<>>;
 encode_application(?GET_DEVICE_GUID, _Properties) ->
     <<>>;

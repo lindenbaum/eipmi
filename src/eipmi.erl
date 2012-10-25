@@ -18,6 +18,11 @@
 %%% callback as well as the top level supervisor.
 %%%
 %%% This module provides capabilities to discover and use IPMI-capable devices.
+%%% The {@link eipmi_session} module provides a IPMI session implementation that
+%%% is able to send requests and receive responses implemented in the
+%%% {@link eipmi_request} and {@link eipmi_response} modules. Frontend API
+%%% functions using a combination of several requests to provide a certain
+%%% feature should be put here.
 %%% @end
 %%%=============================================================================
 -module(eipmi).

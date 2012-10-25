@@ -36,6 +36,14 @@ encode_warm_reset_test() ->
     Req = {?IPMI_NETFN_APPLICATION_REQUEST, ?WARM_RESET},
     ?assertEqual(<<>>, eipmi_request:encode(Req, [])).
 
+encode_self_test_results_test() ->
+    Req = {?IPMI_NETFN_APPLICATION_REQUEST, ?GET_SELF_TEST_RESULTS},
+    ?assertEqual(<<>>, eipmi_request:encode(Req, [])).
+
+encode_get_acpi_power_state_test() ->
+    Req = {?IPMI_NETFN_APPLICATION_REQUEST, ?GET_ACPI_POWER_STATE},
+    ?assertEqual(<<>>, eipmi_request:encode(Req, [])).
+
 encode_get_device_guid_test() ->
     Req = {?IPMI_NETFN_APPLICATION_REQUEST, ?GET_DEVICE_GUID},
     ?assertEqual(<<>>, eipmi_request:encode(Req, [])).
