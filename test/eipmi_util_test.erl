@@ -36,6 +36,9 @@ normalize_test() ->
     ?assertEqual(<<"1", 0, 0, 0>>, eipmi_util:normalize(4, <<"1">>)),
     ?assertEqual(<<0, 0, 0, 0>>, eipmi_util:normalize(4, <<>>)).
 
+format_test() ->
+    ?assertEqual("1.2", eipmi_util:format("~B.~B", [1, 2])).
+
 get_val_test() ->
     ?assertEqual(v, eipmi_util:get_val(k, [{k, v}])),
     ?assertEqual(undefined, eipmi_util:get_val(k, [])).
@@ -63,3 +66,11 @@ merge_vals_test() ->
     ?assertEqual(1, eipmi_util:get_val(a, Merged3)),
     ?assertEqual(2, eipmi_util:get_val(b, Merged3)),
     ?assertEqual(4, eipmi_util:get_val(c, Merged3)).
+
+no_badmatch_test() ->
+    Ok = fun() -> ok end,
+    ?assertEqual(ok, eipmi_util:no_badmatch(Ok)),
+    Badmatch = fun() -> a = b end,
+    ?assertEqual(b, eipmi_util:no_badmatch(Badmatch)),
+    Exception = fun() -> erlang:error(other) end,
+    ?assertMatch({'EXIT', {other, _}}, catch eipmi_util:no_badmatch(Exception)).

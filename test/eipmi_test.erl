@@ -81,8 +81,7 @@ read_fru({ok, "tirana"}) ->
     application:start(eipmi),
     {ok, Session} = eipmi:open("10.1.31.10"),
     Mon = monitor_session(Session),
-    {ok, Data} = eipmi:read_fru(Session, 5),
-    error_logger:info_msg("fru data:~n~p~n", [Data]),
+    ?assertMatch({ok, _}, eipmi:read_fru(Session, 5)),
     ?assertEqual(ok, eipmi:close(Session)),
     ?assertEqual(normal, receive {'DOWN', Mon, _, _, Reason} -> Reason end);
 read_fru(_) ->

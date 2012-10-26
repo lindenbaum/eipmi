@@ -233,7 +233,8 @@ close(Session = {_, _}) ->
 -spec read_fru(session(), 0..254) ->
                       {ok, binary()} | {error, term()}.
 read_fru(Session, FruId) when FruId >= 0 andalso FruId < 255 ->
-    do_read_fru(get_session(Session, supervisor:which_children(?MODULE)), FruId).
+    S = get_session(Session, supervisor:which_children(?MODULE)),
+    eipmi_util:no_badmatch(fun() -> do_read_fru(S, FruId) end).
 
 %%------------------------------------------------------------------------------
 %% @doc
@@ -314,6 +315,8 @@ do_ping_receive(IPAddress, Timeout, Socket) ->
             Es =:= [ipmi]
     end.
 
+-define(FRU_MAX_READ_COUNT, 23).
+
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
@@ -326,8 +329,9 @@ do_read_fru(Error, _FruId) ->
     Error.
 do_read_fru(_FruId, _Pid, Size, {Size, Acc}) ->
     Acc;
-do_read_fru(FruId, Pid, Size, {Offset, Acc}) when (Offset + 32) =< Size ->
-    Count = 32,
+do_read_fru(FruId, Pid, Size, {Offset, Acc})
+  when (Offset + ?FRU_MAX_READ_COUNT) =< Size ->
+    Count = ?FRU_MAX_READ_COUNT,
     do_read_fru(FruId, Pid, Size, do_read_fru(FruId, Pid, Offset, Count, Acc));
 do_read_fru(FruId, Pid, Size, {Offset, Acc}) ->
     Count = Size - Offset,

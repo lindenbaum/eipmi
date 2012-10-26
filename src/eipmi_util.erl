@@ -25,7 +25,8 @@
          get_val/2,
          update_val/3,
          copy_val/3,
-         merge_vals/2]).
+         merge_vals/2,
+         no_badmatch/1]).
 
 %%%=============================================================================
 %%% API
@@ -120,3 +121,19 @@ merge_vals(PropList1, PropList2) ->
         end,
         PropList2,
         PropList1)).
+
+%%------------------------------------------------------------------------------
+%% @doc
+%% Evaluates the given function catching an occurence of badmatch errors. In
+%% case of badmatch the offending term is returned, in case of normal function
+%% completion its result is returned.
+%% @end
+%%------------------------------------------------------------------------------
+-spec no_badmatch(fun(() -> term())) ->
+                         term().
+no_badmatch(Function) ->
+    try Function() of
+        Result -> Result
+    catch
+        error:{badmatch, Error} -> Error
+    end.
