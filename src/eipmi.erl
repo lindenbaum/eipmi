@@ -227,14 +227,21 @@ close(Session = {_, _}) ->
 
 %%------------------------------------------------------------------------------
 %% @doc
-%% Returns all data from the FRU inventory info area for a given FRU id.
+%% Return the FRU inventory data for a specific FRU id. The returned FRU
+%% information is a property list that does only contain the available and
+%% checksum error free fields of the inventory. If no FRU data is available for
+%% a specific id the returned inventory data is the empty list.
 %% @end
 %%------------------------------------------------------------------------------
 -spec read_fru(session(), 0..254) ->
-                      {ok, binary()} | {error, term()}.
-read_fru(Session, FruId) when FruId >= 0 andalso FruId < 255 ->
-    S = get_session(Session, supervisor:which_children(?MODULE)),
-    eipmi_util:no_badmatch(fun() -> do_read_fru(S, FruId) end).
+                      {ok, eipmi_fru:info()} | {error, term()}.
+read_fru(Session = {_, _}, FruId) when FruId >= 0 andalso FruId < 255 ->
+    case get_session(Session, supervisor:which_children(?MODULE)) of
+        {ok, Pid} ->
+            eipmi_fru:read(Pid, FruId);
+        Error ->
+            Error
+    end.
 
 %%------------------------------------------------------------------------------
 %% @doc
@@ -314,31 +321,3 @@ do_ping_receive(IPAddress, Timeout, Socket) ->
             gen_udp:send(Socket, IPAddress, ?RMCP_PORT_NUMBER, Ack),
             Es =:= [ipmi]
     end.
-
--define(FRU_MAX_READ_COUNT, 23).
-
-%%------------------------------------------------------------------------------
-%% @private
-%%------------------------------------------------------------------------------
-do_read_fru({ok, Pid}, FruId) ->
-    GetFruInfo = {?IPMI_NETFN_STORAGE_REQUEST, ?GET_FRU_INVENTORY_AREA_INFO},
-    {ok, Response} = eipmi_session:request(Pid, GetFruInfo, [{fru_id, FruId}]),
-    AreaSize = eipmi_util:get_val(area_size, Response),
-    {ok, do_read_fru(FruId, Pid, AreaSize, {0, <<>>})};
-do_read_fru(Error, _FruId) ->
-    Error.
-do_read_fru(_FruId, _Pid, Size, {Size, Acc}) ->
-    Acc;
-do_read_fru(FruId, Pid, Size, {Offset, Acc})
-  when (Offset + ?FRU_MAX_READ_COUNT) =< Size ->
-    Count = ?FRU_MAX_READ_COUNT,
-    do_read_fru(FruId, Pid, Size, do_read_fru(FruId, Pid, Offset, Count, Acc));
-do_read_fru(FruId, Pid, Size, {Offset, Acc}) ->
-    Count = Size - Offset,
-    do_read_fru(FruId, Pid, Size, do_read_fru(FruId, Pid, Offset, Count, Acc)).
-do_read_fru(FruId, Pid, Offset, Count, Acc) ->
-    ReadFru = {?IPMI_NETFN_STORAGE_REQUEST, ?READ_FRU_DATA},
-    Properties = [{fru_id, FruId}, {offset, Offset}, {count, Count}],
-    {ok, Response} = eipmi_session:request(Pid, ReadFru, Properties),
-    {Offset + eipmi_util:get_val(count, Response),
-     <<Acc/binary, (eipmi_util:get_val(data, Response))/binary>>}.

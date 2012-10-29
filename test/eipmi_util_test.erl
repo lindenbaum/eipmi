@@ -74,3 +74,12 @@ no_badmatch_test() ->
     ?assertEqual(b, eipmi_util:no_badmatch(Badmatch)),
     Exception = fun() -> erlang:error(other) end,
     ?assertMatch({'EXIT', {other, _}}, catch eipmi_util:no_badmatch(Exception)).
+
+read_test() ->
+    Reader = fun(0, _Count) -> {3, <<$a, $b, $c>>};
+                (3, _Count) -> {3, <<$d, $e, $f>>};
+                (6, _Count) -> {2, <<$g, $h>>}
+             end,
+    ?assertEqual(
+       <<$a, $b, $c, $d, $e, $f, $g, $h>>,
+       eipmi_util:read(Reader, 8, 7)).

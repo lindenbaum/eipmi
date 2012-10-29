@@ -30,7 +30,7 @@ ping({ok, "tirana"}) ->
     application:start(crypto),
     application:start(md2),
     application:start(eipmi),
-    ?assertEqual(pong, eipmi:ping("10.1.31.10"));
+    ?assertEqual(pong, eipmi:ping("10.1.31.11"));
 ping(_) ->
     ok.
 
@@ -42,7 +42,7 @@ open_close({ok, "tirana"}) ->
     application:start(crypto),
     application:start(md2),
     application:start(eipmi),
-    {ok, Session} = eipmi:open("10.1.31.10"),
+    {ok, Session} = eipmi:open("10.1.31.11"),
     Mon = monitor_session(Session),
     receive after 1000 -> ok end,
     ?assertEqual(ok, eipmi:close(Session)),
@@ -59,7 +59,7 @@ parallel_request({ok, "tirana"}) ->
     application:start(crypto),
     application:start(md2),
     application:start(eipmi),
-    {ok, Session} = eipmi:open("10.1.31.10"),
+    {ok, Session} = eipmi:open("10.1.31.11"),
     Mon = monitor_session(Session),
     Action = fun() -> {ok, _} = eipmi:raw(Session, 16#06, 16#3b, []) end,
     Pids = lists:map(fun(_) -> spawn_link(Action) end, lists:seq(1, 10)),
@@ -79,9 +79,10 @@ read_fru({ok, "tirana"}) ->
     application:start(crypto),
     application:start(md2),
     application:start(eipmi),
-    {ok, Session} = eipmi:open("10.1.31.10"),
+    {ok, Session} = eipmi:open("10.1.31.11"),
     Mon = monitor_session(Session),
-    ?assertMatch({ok, _}, eipmi:read_fru(Session, 5)),
+    {ok, FruData} = eipmi:read_fru(Session, 253),
+    error_logger:info_msg("~n~p~n", [FruData]),
     ?assertEqual(ok, eipmi:close(Session)),
     ?assertEqual(normal, receive {'DOWN', Mon, _, _, Reason} -> Reason end);
 read_fru(_) ->
