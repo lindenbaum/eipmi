@@ -49,7 +49,7 @@ well as some usage examples for developers integrating the application into
 their project. Additional information can be found in the projects EDoc
 documentation located under [http://lindenbaum.github.com/eipmi/].
 
-### Sessions & Authentication
+### Sessions &amp; Authentication
 
 EIPMI does all the necessary session handling for the user as soon as a session
 is requested using `eipmi:open/1` or `eipmi:open/2`. However, according to the
