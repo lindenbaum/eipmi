@@ -113,7 +113,24 @@ decode_storage(?GET_FRU_INVENTORY_AREA_INFO,
     [{area_size, AreaSize},
      {access, case Access of 1 -> by_words; 0 -> by_bytes end}];
 decode_storage(?READ_FRU_DATA, <<Count:8, Data/binary>>) ->
-    [{count, Count}, {data, Data}].
+    [{count, Count}, {data, Data}];
+decode_storage(?GET_SEL_INFO,
+               <<Version:1/binary, Entries:16/little, Free:16/little,
+                 Addition:32/little, Erase:32/little,
+                 Dropped:1, ?EIPMI_RESERVED:3, Operations:4>>) ->
+    [{version, lists:reverse(eipmi_util:from_bcd_plus(Version))},
+     {entries, Entries},
+     {free_space, Free},
+     {most_recent_addition, Addition},
+     {most_recent_erase, Erase},
+     {dropped_events, case Dropped of 1 -> true; 0 -> false end},
+     {operations, get_operations(Operations)}];
+decode_storage(?RESERVE_SEL, <<Reservation:16/little>>) ->
+    [{reservation_id, Reservation}];
+decode_storage(?GET_SEL_ENTRY, <<Next:16/little, Data/binary>>) ->
+    [{next_record_id, Next}, {data, Data}];
+decode_storage(?CLEAR_SEL, <<?EIPMI_RESERVED:4, Progress:4>>) ->
+    [{progress, case Progress of 1 -> completed; 0 -> in_progress end}].
 
 %%------------------------------------------------------------------------------
 %% @private
@@ -132,9 +149,7 @@ decode_transport(?GET_IP_UDP_RMCP_STATISTICS,
      {udp_proxy_packets_dropped, UDPDr},
      {rmcp_packets_received, RMCPRx}];
 decode_transport(?GET_LAN_CONFIGURATION_PARAMETERS, <<_Rev:8, Data/binary>>) ->
-    [{data, Data}];
-decode_transport(_Cmd, _Data) ->
-    [].
+    [{data, Data}].
 
 %%------------------------------------------------------------------------------
 %% @private
@@ -226,3 +241,13 @@ decode_privilege(1) -> callback;
 decode_privilege(2) -> user;
 decode_privilege(3) -> operator;
 decode_privilege(4) -> administrator.
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+get_operations(Operations) ->
+    A = case Operations band 2#1000 of 2#1000 -> [delete]; _ -> [] end,
+    B = case Operations band 2#100 of 2#100 -> [partial_add]; _ -> [] end,
+    C = case Operations band 2#10 of 2#10 -> [reserve]; _ -> [] end,
+    D = case Operations band 2#1 of 2#1 -> [get_allocation_info]; _ -> [] end,
+    A ++ B ++ C ++ D.

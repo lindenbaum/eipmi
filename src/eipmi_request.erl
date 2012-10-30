@@ -103,22 +103,32 @@ encode_storage(?READ_FRU_DATA, Properties) ->
     Offset = eipmi_util:get_val(offset, Properties),
     Count = eipmi_util:get_val(count, Properties),
     true = Offset =< 16#ffff,
-    <<FruId:8, Offset:16/little, Count:8>>.
+    <<FruId:8, Offset:16/little, Count:8>>;
+encode_storage(?GET_SEL_INFO, _Properties) ->
+    <<>>;
+encode_storage(?RESERVE_SEL, _Properties) ->
+    <<>>;
+encode_storage(?GET_SEL_ENTRY, Properties) ->
+    Record = eipmi_util:get_val(record_id, Properties),
+    <<0:16, Record:16/little, 0:8, 16#ff:8>>;
+encode_storage(?CLEAR_SEL, Properties) ->
+    Reservation = eipmi_util:get_val(reservation_id, Properties),
+    Init = eipmi_util:get_val(initiate, Properties, true),
+    InitOrGet = case Init of true -> 16#aa; false -> 0 end,
+    <<Reservation:16/little, $C:8, $L:8, $R:8, InitOrGet:8>>.
 
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
 encode_transport(?GET_IP_UDP_RMCP_STATISTICS, Properties) ->
-    Clear = proplists:get_value(clear_statistics, Properties, false),
+    Clear = eipmi_util:get_val(clear_statistics, Properties, false),
     C = case Clear of true -> 1; false -> 0 end,
     <<?EIPMI_RESERVED:4, ?IPMI_REQUESTED_CHANNEL:4, ?EIPMI_RESERVED:7, C:1>>;
 encode_transport(?GET_LAN_CONFIGURATION_PARAMETERS, Properties) ->
     P = eipmi_util:get_val(parameter, Properties),
-    S = proplists:get_value(set, Properties, 0),
-    B = proplists:get_value(block, Properties, 0),
-    <<1:1, ?EIPMI_RESERVED:3, ?IPMI_REQUESTED_CHANNEL:4, P:8, S:8 , B:8>>;
-encode_transport(_Cmd, _Properties) ->
-    <<>>.
+    S = eipmi_util:get_val(set, Properties, 0),
+    B = eipmi_util:get_val(block, Properties, 0),
+    <<1:1, ?EIPMI_RESERVED:3, ?IPMI_REQUESTED_CHANNEL:4, P:8, S:8 , B:8>>.
 
 %%------------------------------------------------------------------------------
 %% @private

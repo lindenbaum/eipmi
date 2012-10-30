@@ -196,7 +196,7 @@ open(IPAddress) ->
 -spec open(inet:ip_address() | inet:hostname(), [option()]) ->
                   {ok, session()} | {error, term()}.
 open(IPAddress, Options) ->
-    Session = {IPAddress, proplists:get_value(port, Options, ?RMCP_PORT_NUMBER)},
+    Session = {IPAddress, eipmi_util:get_val(port, Options, ?RMCP_PORT_NUMBER)},
     Start = {eipmi_session, start_link, [Session, IPAddress, Options]},
     Spec = {Session, Start, temporary, 2000, worker, [eipmi_session]},
     case supervisor:start_child(?MODULE, Spec) of

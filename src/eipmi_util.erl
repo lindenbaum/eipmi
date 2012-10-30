@@ -23,11 +23,14 @@
 -export([normalize/2,
          format/2,
          get_val/2,
+         get_val/3,
          update_val/3,
          copy_val/3,
          merge_vals/2,
          no_badmatch/1,
-         read/3]).
+         read/3,
+         from_bcd_plus/1,
+         from_packed_ascii/1]).
 
 %%%=============================================================================
 %%% API
@@ -73,6 +76,17 @@ format(Format, Args) ->
                      term().
 get_val(Property, PropList) ->
     proplists:get_value(Property, PropList).
+
+%%------------------------------------------------------------------------------
+%% @doc
+%% Return the value of a property from a proplist.
+%% @see proplists:get_value/3
+%% @end
+%%------------------------------------------------------------------------------
+-spec get_val(atom(), proplists:proplist(), term()) ->
+                     term().
+get_val(Property, PropList, Default) ->
+    proplists:get_value(Property, PropList, Default).
 
 %%------------------------------------------------------------------------------
 %% @doc
@@ -164,3 +178,65 @@ read(ReadFun, Size, BlockSize, {Offset, Acc}) ->
 do_read(ReadFun, Offset, Count, Acc) ->
     {ReadCount, Data} = ReadFun(Offset, Count),
     {Offset + ReadCount, <<Acc/binary, Data/binary>>}.
+
+%%------------------------------------------------------------------------------
+%% @doc
+%% Decodes a BCD plus encoded binary into a string.
+%% @doc
+%%------------------------------------------------------------------------------
+-spec from_bcd_plus(binary()) ->
+                           string().
+from_bcd_plus(Binary) ->
+    from_bcd_plus(Binary, "").
+from_bcd_plus(<<>>, Acc) ->
+    lists:reverse(Acc);
+from_bcd_plus(<<16#0:4, Rest/bitstring>>, Acc) ->
+    from_bcd_plus(Rest, [$0 | Acc]);
+from_bcd_plus(<<16#1:4, Rest/bitstring>>, Acc) ->
+    from_bcd_plus(Rest, [$1 | Acc]);
+from_bcd_plus(<<16#2:4, Rest/bitstring>>, Acc) ->
+    from_bcd_plus(Rest, [$2 | Acc]);
+from_bcd_plus(<<16#3:4, Rest/bitstring>>, Acc) ->
+    from_bcd_plus(Rest, [$3 | Acc]);
+from_bcd_plus(<<16#4:4, Rest/bitstring>>, Acc) ->
+    from_bcd_plus(Rest, [$4 | Acc]);
+from_bcd_plus(<<16#5:4, Rest/bitstring>>, Acc) ->
+    from_bcd_plus(Rest, [$5 | Acc]);
+from_bcd_plus(<<16#6:4, Rest/bitstring>>, Acc) ->
+    from_bcd_plus(Rest, [$6 | Acc]);
+from_bcd_plus(<<16#7:4, Rest/bitstring>>, Acc) ->
+    from_bcd_plus(Rest, [$7 | Acc]);
+from_bcd_plus(<<16#8:4, Rest/bitstring>>, Acc) ->
+    from_bcd_plus(Rest, [$8 | Acc]);
+from_bcd_plus(<<16#9:4, Rest/bitstring>>, Acc) ->
+    from_bcd_plus(Rest, [$9 | Acc]);
+from_bcd_plus(<<16#a:4, Rest/bitstring>>, Acc) ->
+    from_bcd_plus(Rest, [32 | Acc]);
+from_bcd_plus(<<16#b:4, Rest/bitstring>>, Acc) ->
+    from_bcd_plus(Rest, [$- | Acc]);
+from_bcd_plus(<<16#c:4, Rest/bitstring>>, Acc) ->
+    from_bcd_plus(Rest, [$. | Acc]);
+from_bcd_plus(<<_:4, Rest/bitstring>>, Acc) ->
+    from_bcd_plus(Rest, Acc).
+
+%%------------------------------------------------------------------------------
+%% @doc
+%% Decodes a packed 6bit ASCII encoded binary into a string.
+%% @doc
+%%------------------------------------------------------------------------------
+-spec from_packed_ascii(binary()) ->
+                               string().
+from_packed_ascii(Binary) ->
+    from_packed_ascii1(Binary, "").
+from_packed_ascii1(<<>>, Acc) ->
+    lists:reverse(Acc);
+from_packed_ascii1(<<Carry2:2, Char1:6, Rest/bitstring>>, Acc) ->
+    from_packed_ascii2(Carry2, Rest, [Char1 + 32 | Acc]).
+from_packed_ascii2(Carry2, <<Carry3:4, Char2:4, Rest/bitstring>>, Acc) ->
+    from_packed_ascii3(Carry3, Rest, [Char2 bsl 2 + Carry2 + 32 | Acc]);
+from_packed_ascii2(_Carry2, <<>>, Acc) ->
+    lists:reverse(Acc).
+from_packed_ascii3(Carry3, <<Char4:6, Char3:2, Rest/bitstring>>, Acc) ->
+    from_packed_ascii1(Rest, [Char4 + 32 | [Char3 bsl 4 + Carry3 + 32 | Acc]]);
+from_packed_ascii3(_Carry3, <<>>, Acc) ->
+    lists:reverse(Acc).

@@ -94,13 +94,15 @@ read_fru(Error = {error, _}, _SessionPid, _FruId) ->
     Error;
 read_fru({ok, FruInfo}, SessionPid, FruId) ->
     ReadFru = {?IPMI_NETFN_STORAGE_REQUEST, ?READ_FRU_DATA},
-    AreaSize = eipmi_util:get_val(area_size, FruInfo),
+    Access = eipmi_util:get_val(access, FruInfo),
+    Divider = case Access of by_words -> 2; by_bytes -> 1 end,
+    AreaSize = eipmi_util:get_val(area_size, FruInfo) div Divider,
     F = fun(Offset, Count) ->
                 Ps = [{fru_id, FruId}, {offset, Offset}, {count, Count}],
                 {ok, R} = eipmi_session:request(SessionPid, ReadFru, Ps),
                 {eipmi_util:get_val(count, R), eipmi_util:get_val(data, R)}
         end,
-    decode(eipmi_util:read(F, AreaSize, ?MAX_READ_COUNT)).
+    decode(eipmi_util:read(F, AreaSize, ?MAX_READ_COUNT div Divider)).
 
 %%------------------------------------------------------------------------------
 %% @private
@@ -275,68 +277,14 @@ decode_field(_Name, _Lang, <<_:2, 0:6, Rest/binary>>) ->
 decode_field(Name, _Lang, <<0:2, Len:6, Data:Len/binary, Rest/binary>>) ->
     {[{Name, Data}], Rest};
 decode_field(Name, _Lang, <<1:2, Len:6, Data:Len/binary, Rest/binary>>) ->
-    {[{Name, from_bcd_plus(Data)}], Rest};
+    {[{Name, eipmi_util:from_bcd_plus(Data)}], Rest};
 decode_field(Name, _Lang, <<2:2, Len:6, Data:Len/binary, Rest/binary>>) ->
-    {[{Name, from_packed_ascii(Data)}], Rest};
+    {[{Name, eipmi_util:from_packed_ascii(Data)}], Rest};
 decode_field(Name, Lang, <<3:2, Len:6, Data:Len/binary, Rest/binary>>)
   when Lang =:= ?ENGLISH orelse Lang =:= ?OLD_ENGLISH ->
     {[{Name, binary_to_list(Data)}], Rest};
 decode_field(Name, _Lang, <<3:2, _Len:6, Data/utf16-little, Rest/binary>>) ->
     {[{Name, Data}], Rest}.
-
-%%------------------------------------------------------------------------------
-%% @private
-%%------------------------------------------------------------------------------
-from_bcd_plus(Binary) ->
-    from_bcd_plus(Binary, "").
-from_bcd_plus(<<>>, Acc) ->
-    lists:reverse(Acc);
-from_bcd_plus(<<16#0:4, Rest/bitstring>>, Acc) ->
-    from_bcd_plus(Rest, [$0 | Acc]);
-from_bcd_plus(<<16#1:4, Rest/bitstring>>, Acc) ->
-    from_bcd_plus(Rest, [$1 | Acc]);
-from_bcd_plus(<<16#2:4, Rest/bitstring>>, Acc) ->
-    from_bcd_plus(Rest, [$2 | Acc]);
-from_bcd_plus(<<16#3:4, Rest/bitstring>>, Acc) ->
-    from_bcd_plus(Rest, [$3 | Acc]);
-from_bcd_plus(<<16#4:4, Rest/bitstring>>, Acc) ->
-    from_bcd_plus(Rest, [$4 | Acc]);
-from_bcd_plus(<<16#5:4, Rest/bitstring>>, Acc) ->
-    from_bcd_plus(Rest, [$5 | Acc]);
-from_bcd_plus(<<16#6:4, Rest/bitstring>>, Acc) ->
-    from_bcd_plus(Rest, [$6 | Acc]);
-from_bcd_plus(<<16#7:4, Rest/bitstring>>, Acc) ->
-    from_bcd_plus(Rest, [$7 | Acc]);
-from_bcd_plus(<<16#8:4, Rest/bitstring>>, Acc) ->
-    from_bcd_plus(Rest, [$8 | Acc]);
-from_bcd_plus(<<16#9:4, Rest/bitstring>>, Acc) ->
-    from_bcd_plus(Rest, [$9 | Acc]);
-from_bcd_plus(<<16#a:4, Rest/bitstring>>, Acc) ->
-    from_bcd_plus(Rest, [32 | Acc]);
-from_bcd_plus(<<16#b:4, Rest/bitstring>>, Acc) ->
-    from_bcd_plus(Rest, [$- | Acc]);
-from_bcd_plus(<<16#c:4, Rest/bitstring>>, Acc) ->
-    from_bcd_plus(Rest, [$. | Acc]);
-from_bcd_plus(<<_:4, Rest/bitstring>>, Acc) ->
-    from_bcd_plus(Rest, Acc).
-
-%%------------------------------------------------------------------------------
-%% @private
-%%------------------------------------------------------------------------------
-from_packed_ascii(Binary) ->
-    from_packed_ascii1(Binary, "").
-from_packed_ascii1(<<>>, Acc) ->
-    lists:reverse(Acc);
-from_packed_ascii1(<<Carry2:2, Char1:6, Rest/bitstring>>, Acc) ->
-    from_packed_ascii2(Carry2, Rest, [Char1 + 32 | Acc]).
-from_packed_ascii2(Carry2, <<Carry3:4, Char2:4, Rest/bitstring>>, Acc) ->
-    from_packed_ascii3(Carry3, Rest, [Char2 bsl 2 + Carry2 + 32 | Acc]);
-from_packed_ascii2(_Carry2, <<>>, Acc) ->
-    lists:reverse(Acc).
-from_packed_ascii3(Carry3, <<Char4:6, Char3:2, Rest/bitstring>>, Acc) ->
-    from_packed_ascii1(Rest, [Char4 + 32 | [Char3 bsl 4 + Carry3 + 32 | Acc]]);
-from_packed_ascii3(_Carry3, <<>>, Acc) ->
-    lists:reverse(Acc).
 
 %%------------------------------------------------------------------------------
 %% @private
@@ -363,22 +311,3 @@ sum(<<>>, Sum) ->
     Sum rem 256;
 sum(<<Byte:8, Rest/binary>>, Sum) ->
     sum(Rest, Sum + Byte).
-
-%%%=============================================================================
-%%% TESTS
-%%%=============================================================================
-
--ifdef(TEST).
-
--include_lib("eunit/include/eunit.hrl").
-
-from_bcd_plus_test() ->
-    Bin = <<16#0:4, 16#1:4, 16#2:4, 16#3:4, 16#4:4, 16#5:4, 16#6:4, 16#7:4,
-            16#8:4, 16#9:4, 16#a:4, 16#b:4, 16#c:4, 16#d:4, 16#e:4, 16#f:4>>,
-    ?assertEqual("0123456789 -.", from_bcd_plus(Bin)).
-
-from_packed_ascii_test() ->
-    Bin = <<2#00101001, 2#11011100, 2#10100110>>,
-    ?assertEqual("IPMI", from_packed_ascii(Bin)).
-
--endif.

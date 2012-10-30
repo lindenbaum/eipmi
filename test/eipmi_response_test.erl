@@ -131,3 +131,56 @@ decode_read_fru_data_test() ->
     ?assertEqual(
        [{count, 5}, {data, <<$h, $e, $l, $l, $o>>}],
        eipmi_response:decode(Resp, Bin)).
+
+decode_get_sel_info_test() ->
+    Resp = {?IPMI_NETFN_STORAGE_RESPONSE, ?GET_SEL_INFO},
+    Bin = <<16#51, 16#01, 16#00, 16#ff, 16#ff, 16#44, 16#33, 16#22, 16#11,
+            16#44, 16#33, 16#22, 16#11, 16#8f>>,
+    ?assertEqual(
+       [{version, "15"}, {entries, 1}, {free_space, 16#ffff},
+        {most_recent_addition, 16#11223344},
+        {most_recent_erase, 16#11223344},
+        {dropped_events, true},
+        {operations, [delete, partial_add, reserve, get_allocation_info]}],
+       eipmi_response:decode(Resp, Bin)).
+
+decode_reserve_sel_test() ->
+    Resp = {?IPMI_NETFN_STORAGE_RESPONSE, ?RESERVE_SEL},
+    Bin = <<16#22, 16#11>>,
+    ?assertEqual(
+       [{reservation_id, 16#1122}],
+       eipmi_response:decode(Resp, Bin)).
+
+decode_get_sel_entry_test() ->
+    Resp = {?IPMI_NETFN_STORAGE_RESPONSE, ?GET_SEL_ENTRY},
+    Bin = <<16#22, 16#11, $d, $a, $t, $a>>,
+    ?assertEqual(
+       [{next_record_id, 16#1122},
+        {data, <<$d, $a, $t, $a>>}],
+       eipmi_response:decode(Resp, Bin)).
+
+decode_clear_sel_test() ->
+    Resp = {?IPMI_NETFN_STORAGE_RESPONSE, ?CLEAR_SEL},
+    Bin = <<16#01>>,
+    ?assertEqual([{progress, completed}], eipmi_response:decode(Resp, Bin)).
+
+decode_get_ip_udp_rmcp_statistics_test() ->
+    Resp = {?IPMI_NETFN_TRANSPORT_RESPONSE, ?GET_IP_UDP_RMCP_STATISTICS},
+    Bin = <<16#01, 16#02, 16#03, 16#04, 16#05, 16#06, 16#07, 16#08, 16#09, 16#a,
+            16#01, 16#02, 16#03, 16#04, 16#05, 16#06, 16#07, 16#08>>,
+    ?assertEqual(
+       [{ip_packets_received, 16#0201},
+        {ip_header_errors, 16#0403},
+        {ip_address_errors, 16#0605},
+        {ip_fragmented_packets_received, 16#0807},
+        {ip_packets_transmitted, 16#0a09},
+        {udp_packets_received, 16#0201},
+        {udp_proxy_packets_received, 16#0605},
+        {udp_proxy_packets_dropped, 16#0807},
+        {rmcp_packets_received, 16#0403}],
+       eipmi_response:decode(Resp, Bin)).
+
+decode_get_lan_configuration_parameters_test() ->
+    Resp = {?IPMI_NETFN_TRANSPORT_RESPONSE, ?GET_LAN_CONFIGURATION_PARAMETERS},
+    Bin = <<16#00, $d, $a, $t, $a>>,
+    ?assertEqual([{data, <<$d, $a, $t, $a>>}], eipmi_response:decode(Resp, Bin)).

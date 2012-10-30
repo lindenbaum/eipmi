@@ -101,6 +101,26 @@ encode_read_fru_data_test() ->
        <<16#04, 16#22, 16#11, 16#05>>,
        eipmi_request:encode(Req, Properties)).
 
+encode_get_sel_info_test() ->
+    Req = {?IPMI_NETFN_STORAGE_REQUEST, ?GET_SEL_INFO},
+    ?assertEqual(<<>>, eipmi_request:encode(Req, [])).
+
+encode_reserve_sel_test() ->
+    Req = {?IPMI_NETFN_STORAGE_REQUEST, ?RESERVE_SEL},
+    ?assertEqual(<<>>, eipmi_request:encode(Req, [])).
+
+encode_get_sel_entry_test() ->
+    Req = {?IPMI_NETFN_STORAGE_REQUEST, ?GET_SEL_ENTRY},
+    ?assertEqual(
+       <<16#00, 16#00, 16#22, 16#11, 16#00, 16#ff>>,
+       eipmi_request:encode(Req, [{record_id, 16#1122}])).
+
+encode_clear_sel_test() ->
+    Req = {?IPMI_NETFN_STORAGE_REQUEST, ?CLEAR_SEL},
+    ?assertEqual(
+       <<16#22, 16#11, $C, $L, $R, 16#aa>>,
+       eipmi_request:encode(Req, [{reservation_id, 16#1122}, initiate])).
+
 encode_get_ip_udp_rmcp_statistics_test() ->
     Req = {?IPMI_NETFN_TRANSPORT_REQUEST, ?GET_IP_UDP_RMCP_STATISTICS},
     Properties = [{clear_statistics, true}],

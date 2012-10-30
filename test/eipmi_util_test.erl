@@ -41,7 +41,9 @@ format_test() ->
 
 get_val_test() ->
     ?assertEqual(v, eipmi_util:get_val(k, [{k, v}])),
-    ?assertEqual(undefined, eipmi_util:get_val(k, [])).
+    ?assertEqual(undefined, eipmi_util:get_val(k, [])),
+    ?assertEqual(v, eipmi_util:get_val(k, [{k, v}], v0)),
+    ?assertEqual(v, eipmi_util:get_val(k, [], v)).
 
 update_val_test() ->
     ?assertEqual([{k, v1}], eipmi_util:update_val(k, v1, [])),
@@ -83,3 +85,16 @@ read_test() ->
     ?assertEqual(
        <<$a, $b, $c, $d, $e, $f, $g, $h>>,
        eipmi_util:read(Reader, 8, 7)).
+
+from_bcd_plus_test() ->
+    Bin = <<16#0:4, 16#1:4, 16#2:4, 16#3:4, 16#4:4, 16#5:4, 16#6:4, 16#7:4,
+            16#8:4, 16#9:4, 16#a:4, 16#b:4, 16#c:4, 16#d:4, 16#e:4, 16#f:4>>,
+    ?assertEqual("0123456789 -.", eipmi_util:from_bcd_plus(Bin)).
+
+from_packed_ascii_test() ->
+    Bin3 = <<2#00101001, 2#11011100, 2#10100110>>,
+    ?assertEqual("IPMI", eipmi_util:from_packed_ascii(Bin3)),
+    Bin2 = <<2#00101001, 2#11011100>>,
+    ?assertEqual("IP", eipmi_util:from_packed_ascii(Bin2)),
+    Bin1 = <<2#00101001>>,
+    ?assertEqual("I", eipmi_util:from_packed_ascii(Bin1)).
