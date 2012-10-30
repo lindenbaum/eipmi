@@ -1,5 +1,11 @@
 #!/bin/bash
 
+# Script to generate EDoc documentation and optionally deploy it
+# to the github gh-pages branch
+# Usage:
+#   ./edoc.sh        - will only generate the documentation
+#   ./edoc.sh deploy - will do the above and deploy to github
+
 # get edown from github
 mkdir -p tmp
 git clone https://github.com/hdiedrich/markedoc.git tmp
@@ -20,5 +26,9 @@ rm -rf tmp
 
 # deploy to gh-pages
 if [ "$1" == "deploy" ]; then
-    echo deploy
+    git checkout gh-pages
+    git rm *
+    cp doc/* .
+    git commit -a -m "Regenerated site documentation."
+    git push
 fi
