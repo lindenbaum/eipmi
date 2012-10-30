@@ -27,8 +27,13 @@ rm -rf tmp
 # deploy to gh-pages
 if [ "$1" == "deploy" ]; then
     git checkout gh-pages
-    git rm *
+    rm *.html
+    rm edoc-info
+    rm erlang.png
+    rm stylesheet.css
     cp doc/* .
+    git add .
     git commit -a -m "Regenerated site documentation."
-    git push
+    git push origin gh-pages
+    git checkout master
 fi
