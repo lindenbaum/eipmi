@@ -118,6 +118,21 @@ decode_storage(?READ_FRU_DATA, <<Count:8, Data/binary>>) ->
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
+decode_transport(?GET_IP_UDP_RMCP_STATISTICS,
+                 <<IPRx:16/little, IPRxHdErr:16/little, IPRxAddrErr:16/little,
+                   IPRxFrag:16/little,IPTx:16/little, UDPRx:16/little,
+                   RMCPRx:16/little, UDPRxProxy:16/little, UDPDr:16/little>>) ->
+    [{ip_packets_received, IPRx},
+     {ip_header_errors, IPRxHdErr},
+     {ip_address_errors, IPRxAddrErr},
+     {ip_fragmented_packets_received, IPRxFrag},
+     {ip_packets_transmitted, IPTx},
+     {udp_packets_received, UDPRx},
+     {udp_proxy_packets_received, UDPRxProxy},
+     {udp_proxy_packets_dropped, UDPDr},
+     {rmcp_packets_received, RMCPRx}];
+decode_transport(?GET_LAN_CONFIGURATION_PARAMETERS, <<_Rev:8, Data/binary>>) ->
+    [{data, Data}];
 decode_transport(_Cmd, _Data) ->
     [].
 

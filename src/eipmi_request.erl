@@ -108,6 +108,15 @@ encode_storage(?READ_FRU_DATA, Properties) ->
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
+encode_transport(?GET_IP_UDP_RMCP_STATISTICS, Properties) ->
+    Clear = proplists:get_value(clear_statistics, Properties, false),
+    C = case Clear of true -> 1; false -> 0 end,
+    <<?EIPMI_RESERVED:4, ?IPMI_REQUESTED_CHANNEL:4, ?EIPMI_RESERVED:7, C:1>>;
+encode_transport(?GET_LAN_CONFIGURATION_PARAMETERS, Properties) ->
+    P = eipmi_util:get_val(parameter, Properties),
+    S = proplists:get_value(set, Properties, 0),
+    B = proplists:get_value(block, Properties, 0),
+    <<1:1, ?EIPMI_RESERVED:3, ?IPMI_REQUESTED_CHANNEL:4, P:8, S:8 , B:8>>;
 encode_transport(_Cmd, _Properties) ->
     <<>>.
 

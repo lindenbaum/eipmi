@@ -100,3 +100,15 @@ encode_read_fru_data_test() ->
     ?assertEqual(
        <<16#04, 16#22, 16#11, 16#05>>,
        eipmi_request:encode(Req, Properties)).
+
+encode_get_ip_udp_rmcp_statistics_test() ->
+    Req = {?IPMI_NETFN_TRANSPORT_REQUEST, ?GET_IP_UDP_RMCP_STATISTICS},
+    Properties = [{clear_statistics, true}],
+    ?assertEqual(<<16#0e, 16#01>>, eipmi_request:encode(Req, Properties)).
+
+encode_get_lan_configuration_parameters_test() ->
+    Req = {?IPMI_NETFN_TRANSPORT_REQUEST, ?GET_LAN_CONFIGURATION_PARAMETERS},
+    Properties = [{parameter, 3}],
+    ?assertEqual(
+       <<16#8e, 16#03, 16#00, 16#00>>,
+       eipmi_request:encode(Req, Properties)).
