@@ -94,7 +94,6 @@ case eipmi:ping("10.1.31.11") of
      pang ->
           ipmi_not_supported
 end,
-
 ```
 
 After successful device discovery an actual session can be opened. This example
@@ -108,7 +107,6 @@ Name = proplists:get_value(name, BoardArea),
 Serial = proplists:get_value(serial_number, BoardArea),
 error_logger:info_msg("Board ~s has serial number ~s.~n", [Name, Serial]),
 eipmi:close(Session),
-
 ```
 
 EIPMI also allows to send *raw* requests over a session. However, raw does not
@@ -121,5 +119,4 @@ privilege to `administrator`.
 {ok, Response} = eipmi:raw(Session, 16#06, 16#3b, [{privilege, administrator}]),
 NewPrivilege = proplists:get_value(privilege, Response),
 error_logger:info_msg("New privilege level is ~p.~n", [NewPrivilege]),
-
 ```
