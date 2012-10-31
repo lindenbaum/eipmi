@@ -3,7 +3,7 @@ EIPMI
 
 EIPMI is a native Erlang/OTP library application for RMCP/IPMI 1.5. The goal is
 to implement the remote console part of the IPMI LAN interface, as specified
-here [http://www.intel.com/design/servers/ipmi/spec.htm]. We would like to
+[here](http://www.intel.com/design/servers/ipmi/spec.htm). We would like to
 provide a low threshold for learning and using EIPMI, aiming to make it fit well
 with other Erlang/OTP concepts and solutions.
 
@@ -47,7 +47,7 @@ Documentation
 The following sections will give a brief description of the EIPMI features as
 well as some usage examples for developers integrating the application into
 their project. Additional information can be found in the projects EDoc
-documentation located under [http://lindenbaum.github.com/eipmi/].
+documentation located [here](http://lindenbaum.github.com/eipmi/).
 
 ### Sessions &amp; Authentication
 
@@ -119,4 +119,289 @@ privilege to `administrator`.
 {ok, Response} = eipmi:raw(Session, 16#06, 16#3b, [{privilege, administrator}]),
 NewPrivilege = proplists:get_value(privilege, Response),
 error_logger:info_msg("New privilege level is ~p.~n", [NewPrivilege]),
+```
+
+### Command Support
+
+The following commands are currently supported, e.g. can be sent as `raw`
+request/response:
+
+#### Get Device Id
+
+Argument:
+```erlang
+[]
+```
+
+Return:
+```erlang
+[{device_id, non_neg_integer()},
+ {device_revision, non_neg_integer()},
+ {operation, normal | progress},
+ {firmware_version, string()},
+ {ipmi_version, string()},
+ {device_support, [chassis | bridge | event_generator | event_receiver | fru_inventory | sel | sdr | sensor]},
+ {manufacturer_id, non_neg_integer()},
+ {product_id, non_neg_integer()}]
+```
+
+#### Cold Reset
+Argument:
+```erlang
+[]
+```
+
+Return:
+```erlang
+[]
+```
+
+#### Warm Reset
+Argument:
+```erlang
+[]
+```
+
+Return:
+```erlang
+[]
+```
+
+#### Get Self Test Results
+Argument:
+```erlang
+[]
+```
+
+Return:
+```erlang
+[{result,
+  self_tests_passed |
+  self_tests_not_implemented |
+  {{corrupted_devices, [sel | sdr | fru | ipmb_signal_lines]},
+   {inaccessible_devices, [sdr | fru | boot_firmware | optional_firmware]}} |
+  {fatal_hardware_error, non_neg_integer()},
+  {device_specific_error, non_neg_integer(), non_neg_integer()}}]
+```
+
+#### Get Acpi Power State
+Argument:
+```erlang
+[]
+```
+
+Return:
+```erlang
+[{system,
+  {s0_g0, working} |
+  {s1, clocks_stopped} |
+  {s2, clocks_stopped} |
+  {s3, suspend_to_ram} |
+  {s4, suspend_to_disk} |
+  {s5_g2, soft_off} |
+  {s4_s5, soft_off} |
+  {g3, mechanical_off} |
+  {s1_s2_s3, sleeping} |
+  {g1, sleeping} |
+  {s5, override} |
+  legacy_on |
+  legacy_off |
+  unknown},
+ {device, d0 | d1 | d2 | d3 | unknown}]
+```
+
+#### Get Device GUID
+Argument:
+```erlang
+[]
+```
+
+Return:
+```erlang
+[{guid, string()}]
+```
+
+#### Get System GUID
+Argument:
+```erlang
+[]
+```
+
+Return:
+```erlang
+[{guid, string()}]
+```
+
+#### Get Channel Authentication Capabilities
+Argument:
+```erlang
+[{privilege, callback | user | operator | administrator}]
+```
+
+Return:
+```erlang
+[{auth_types, none | pwd | md2 | md5},
+ {login_status, [null | non_null | anonymous]}]
+```
+
+#### Get Session Challenge
+Argument:
+```erlang
+[{auth_type, none | pwd | md2 | md5},
+ {user, string()}]
+```
+
+Return:
+```erlang
+[{session_id, non_neg_integer()},
+ {challenge, binary()}]
+```
+
+#### Activate Session
+Argument:
+```erlang
+[{auth_type, none | pwd | md2 | md5},
+ {privilege, callback | user | operator | administrator},
+ {challenge, binary()},
+ {initial_outbound_seq_nr, non_neg_integer()}]
+```
+
+Return:
+```erlang
+[{session_id, non_neg_integer()},
+ {inbound_seq_nr, non_neg_integer()},
+ {auth_type, none | pwd | md2 | md5},
+ {privilege, callback | user | operator | administrator}]
+```
+
+#### Set Session Privilege Level
+Argument:
+```erlang
+[{privilege, callback | user | operator | administrator}]
+```
+
+Return:
+```erlang
+[{privilege, callback | user | operator | administrator}]
+```
+
+#### Close Session
+Argument:
+```erlang
+[{session_id, non_neg_integer()}]
+```
+
+Return:
+```erlang
+[]
+```
+
+#### Get FRU Inventory Area Info
+Argument:
+```erlang
+[{fru_id, 0..254}]
+```
+
+Return:
+```erlang
+[{area_size, non_neg_integer()},
+ {access, by_words | by_bytes}]
+```
+
+#### Read FRU Data
+Argument:
+```erlang
+[{fru_id, 0..254},
+ {offset, non_neg_integer()},
+ {count, 1..255}]
+```
+
+Return:
+```erlang
+[{count, 1..255},
+ {data, binary()}]
+```
+
+#### Get SEL Info
+Argument:
+```erlang
+[]
+```
+
+Return:
+```erlang
+[{version, string()},
+ {entries, non_neg_integer()},
+ {free_space, non_neg_integer()},
+ {most_recent_addition, non_neg_integer()},
+ {most_recent_erase, non_neg_integer()},
+ {dropped_events, boolean()},
+ {operations, [delete | partial_add | reserve | get_allocation_info]}]
+```
+
+#### Reserve SEL
+Argument:
+```erlang
+[]
+```
+
+Return:
+```erlang
+[{reservation_id, non_neg_integer()}]
+```
+
+#### Get SEL Entry
+Argument:
+```erlang
+[{record_id, non_neg_integer()}]
+```
+
+Return:
+```erlang
+[{next_record_id, non_neg_integer()},
+ {data, binary()}]
+```
+
+#### Clear SEL
+Argument:
+```erlang
+[{reservation_id, non_neg_integer()},
+ {initiate, boolean()} (optional)]
+```
+
+Return:
+```erlang
+[{progress, completed | in_progress}]
+```
+
+#### Get IP/UDP/RMCP Statistics
+Argument:
+```erlang
+[{clear_statistics, boolean()} (optional)]
+```
+
+Return:
+```erlang
+[{ip_packets_received, non_neg_integer()},
+ {ip_header_errors, non_neg_integer()},
+ {ip_address_errors, non_neg_integer()},
+ {ip_fragmented_packets_received, non_neg_integer()},
+ {ip_packets_transmitted, non_neg_integer()},
+ {udp_packets_received, non_neg_integer()},
+ {udp_proxy_packets_received, non_neg_integer()},
+ {udp_proxy_packets_dropped, non_neg_integer()},
+ {rmcp_packets_received, non_neg_integer()}]
+```
+
+#### Get LAN Configuration Parameters
+Argument:
+```erlang
+[{parameter, 0..255},
+ {set, 0..255}, (optional)
+ {block, 0..255} (optional)]
+```
+
+Returns:
+```erlang
+[{data, binary()}]
 ```

@@ -182,7 +182,7 @@ do_read(ReadFun, Offset, Count, Acc) ->
 %%------------------------------------------------------------------------------
 %% @doc
 %% Decodes a BCD plus encoded binary into a string.
-%% @doc
+%% @end
 %%------------------------------------------------------------------------------
 -spec from_bcd_plus(binary()) ->
                            string().
@@ -222,7 +222,7 @@ from_bcd_plus(<<_:4, Rest/bitstring>>, Acc) ->
 %%------------------------------------------------------------------------------
 %% @doc
 %% Decodes a packed 6bit ASCII encoded binary into a string.
-%% @doc
+%% @end
 %%------------------------------------------------------------------------------
 -spec from_packed_ascii(binary()) ->
                                string().
