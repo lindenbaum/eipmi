@@ -1,8 +1,10 @@
 #!/bin/bash
 
-# Script to generate EDoc documentation and optionally deploy it
-# to the github gh-pages branch. The current branch must be clean
-# when executing this script.
+# Script to generate EDoc documentation.
+# It is also possible to (optionally) deploy the documentation to
+# the github gh-pages branch. The current branch must be clean (no
+# changes in 'git status') when deploying to gh-pages.
+#
 # Usage:
 #   ./edoc.sh        - will only generate the documentation
 #   ./edoc.sh deploy - will do the above and deploy to github
