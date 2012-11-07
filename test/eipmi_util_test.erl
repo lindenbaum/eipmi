@@ -18,6 +18,8 @@
 
 -include_lib("eunit/include/eunit.hrl").
 
+-include("eipmi.hrl").
+
 %%%=============================================================================
 %%% TESTS
 %%%=============================================================================
@@ -69,13 +71,9 @@ merge_vals_test() ->
     ?assertEqual(2, eipmi_util:get_val(b, Merged3)),
     ?assertEqual(4, eipmi_util:get_val(c, Merged3)).
 
-no_badmatch_test() ->
-    Ok = fun() -> ok end,
-    ?assertEqual(ok, eipmi_util:no_badmatch(Ok)),
-    Badmatch = fun() -> a = b end,
-    ?assertEqual(b, eipmi_util:no_badmatch(Badmatch)),
-    Exception = fun() -> erlang:error(other) end,
-    ?assertMatch({'EXIT', {other, _}}, catch eipmi_util:no_badmatch(Exception)).
+eipmi_catch_test() ->
+    ?assertEqual({error, b}, ?EIPMI_CATCH(a = b)),
+    ?assertEqual({error, b}, ?EIPMI_CATCH(a = {error, b})).
 
 read_test() ->
     Reader = fun(0, _Count) -> {3, <<$a, $b, $c>>};
@@ -89,7 +87,7 @@ read_test() ->
 from_bcd_plus_test() ->
     Bin = <<16#0:4, 16#1:4, 16#2:4, 16#3:4, 16#4:4, 16#5:4, 16#6:4, 16#7:4,
             16#8:4, 16#9:4, 16#a:4, 16#b:4, 16#c:4, 16#d:4, 16#e:4, 16#f:4>>,
-    ?assertEqual("0123456789 -.", eipmi_util:from_bcd_plus(Bin)).
+    ?assertEqual("0123456789 -.:,_", eipmi_util:from_bcd_plus(Bin)).
 
 from_packed_ascii_test() ->
     Bin3 = <<2#00101001, 2#11011100, 2#10100110>>,

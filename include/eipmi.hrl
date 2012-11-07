@@ -316,4 +316,19 @@
           cmd             :: eipmi:request() | eipmi:response(),
           data = <<>>     :: binary()}).
 
+%%%=============================================================================
+%%% Utilities
+%%%=============================================================================
+
+%%------------------------------------------------------------------------------
+%% A try-catch expression returning '{error, term()}' on badmatch.
+%%------------------------------------------------------------------------------
+-define(EIPMI_CATCH(Expression),
+        try Expression of
+            Result -> Result
+        catch
+            error:{badmatch, Error = {error, _}} -> Error;
+            error:{badmatch, Error} -> {error, Error}
+        end).
+
 -endif. %% eipmi_hrl_

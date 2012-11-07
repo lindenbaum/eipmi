@@ -27,7 +27,6 @@
          update_val/3,
          copy_val/3,
          merge_vals/2,
-         no_badmatch/1,
          read/3,
          from_bcd_plus/1,
          from_packed_ascii/1]).
@@ -139,22 +138,6 @@ merge_vals(PropList1, PropList2) ->
 
 %%------------------------------------------------------------------------------
 %% @doc
-%% Evaluates the given function catching an occurence of badmatch errors. In
-%% case of badmatch the offending term is returned, in case of normal function
-%% completion its result is returned.
-%% @end
-%%------------------------------------------------------------------------------
--spec no_badmatch(fun(() -> term())) ->
-                         term().
-no_badmatch(Function) ->
-    try Function() of
-        Result -> Result
-    catch
-        error:{badmatch, Error} -> Error
-    end.
-
-%%------------------------------------------------------------------------------
-%% @doc
 %% Generic read function that reads up to `Size' bytes in steps of `BlockSize'
 %% bytes using a provided reader function. A read operation is always expected
 %% to succeed, any exception thrown by a read will fall through to the original
@@ -216,8 +199,12 @@ from_bcd_plus(<<16#b:4, Rest/bitstring>>, Acc) ->
     from_bcd_plus(Rest, [$- | Acc]);
 from_bcd_plus(<<16#c:4, Rest/bitstring>>, Acc) ->
     from_bcd_plus(Rest, [$. | Acc]);
-from_bcd_plus(<<_:4, Rest/bitstring>>, Acc) ->
-    from_bcd_plus(Rest, Acc).
+from_bcd_plus(<<16#d:4, Rest/bitstring>>, Acc) ->
+    from_bcd_plus(Rest, [$: | Acc]);
+from_bcd_plus(<<16#e:4, Rest/bitstring>>, Acc) ->
+    from_bcd_plus(Rest, [$, | Acc]);
+from_bcd_plus(<<16#f:4, Rest/bitstring>>, Acc) ->
+    from_bcd_plus(Rest, [$_ | Acc]).
 
 %%------------------------------------------------------------------------------
 %% @doc

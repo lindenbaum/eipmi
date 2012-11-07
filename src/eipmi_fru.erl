@@ -14,8 +14,8 @@
 %%% OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 %%%
 %%% @doc
-%%% A module providing FRU decoding functionality according to the official IPMI
-%%% Platform Management FRU Information Storage Definition.
+%%% A module providing FRU reading and decoding functionality according to the
+%%% official IPMI Platform Management FRU Information Storage Definition.
 %%% Currently missing features:
 %%% * support for multi record fields (according to IPMI spec)
 %%% * support for mutli record fields (according to PICMG spec)
@@ -32,6 +32,9 @@
 -define(ENGLISH, 25).
 -define(EOFIELDS, 16#c1).
 -define(MAX_READ_COUNT, 23).
+
+-define(READ, {?IPMI_NETFN_STORAGE_REQUEST, ?READ_FRU_DATA}).
+-define(GET_INFO, {?IPMI_NETFN_STORAGE_REQUEST, ?GET_FRU_INVENTORY_AREA_INFO}).
 
 -type chassis_info() ::
         {type, string()} |
@@ -77,9 +80,8 @@
 -spec read(pid(), 0..254) ->
                   {ok, info()} | {error, term()}.
 read(SessionPid, FruId) ->
-    GetFruInfo = {?IPMI_NETFN_STORAGE_REQUEST, ?GET_FRU_INVENTORY_AREA_INFO},
-    FruInfo = eipmi_session:request(SessionPid, GetFruInfo, [{fru_id, FruId}]),
-    eipmi_util:no_badmatch(fun() -> read_fru(FruInfo, SessionPid, FruId) end).
+    FruInfo = eipmi_session:request(SessionPid, ?GET_INFO, [{fru_id, FruId}]),
+    read_fru(FruInfo, SessionPid, FruId).
 
 %%%=============================================================================
 %%% Internal functions
@@ -93,13 +95,12 @@ read_fru({error, {bmc_error, parameter_out_of_range}}, _SessionPid, _FruId) ->
 read_fru(Error = {error, _}, _SessionPid, _FruId) ->
     Error;
 read_fru({ok, FruInfo}, SessionPid, FruId) ->
-    ReadFru = {?IPMI_NETFN_STORAGE_REQUEST, ?READ_FRU_DATA},
     Access = eipmi_util:get_val(access, FruInfo),
     Divider = case Access of by_words -> 2; by_bytes -> 1 end,
     AreaSize = eipmi_util:get_val(area_size, FruInfo) div Divider,
     F = fun(Offset, Count) ->
                 Ps = [{fru_id, FruId}, {offset, Offset}, {count, Count}],
-                {ok, R} = eipmi_session:request(SessionPid, ReadFru, Ps),
+                {ok, R} = eipmi_session:request(SessionPid, ?READ, Ps),
                 {eipmi_util:get_val(count, R), eipmi_util:get_val(data, R)}
         end,
     decode(eipmi_util:read(F, AreaSize, ?MAX_READ_COUNT div Divider)).

@@ -81,11 +81,28 @@ read_fru({ok, "tirana"}) ->
     application:start(eipmi),
     {ok, Session} = eipmi:open("10.1.31.11"),
     Mon = monitor_session(Session),
-    {ok, FruData} = eipmi:read_fru(Session, 253),
-    error_logger:info_msg("~n~p~n", [FruData]),
+    Result = eipmi:read_fru(Session, 253),
+    error_logger:info_msg("~n~p~n", [Result]),
     ?assertEqual(ok, eipmi:close(Session)),
     ?assertEqual(normal, receive {'DOWN', Mon, _, _, Reason} -> Reason end);
 read_fru(_) ->
+    ok.
+
+read_sel_test() ->
+    read_sel(inet:gethostname()).
+
+read_sel({ok, "tirana"}) ->
+    application:start(sasl),
+    application:start(crypto),
+    application:start(md2),
+    application:start(eipmi),
+    {ok, Session} = eipmi:open("10.1.31.11"),
+    Mon = monitor_session(Session),
+    Result = eipmi:read_sel(Session, false),
+    error_logger:info_msg("~n~p~n", [Result]),
+    ?assertEqual(ok, eipmi:close(Session)),
+    ?assertEqual(normal, receive {'DOWN', Mon, _, _, Reason} -> Reason end);
+read_sel(_) ->
     ok.
 
 %%%=============================================================================

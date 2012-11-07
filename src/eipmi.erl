@@ -37,6 +37,7 @@
          open/2,
          close/1,
          read_fru/2,
+         read_sel/2,
          raw/4]).
 
 %% Application callbacks
@@ -127,8 +128,9 @@ ping(IPAddress, Timeout) when is_integer(Timeout) andalso Timeout > 0 ->
 %% other login types at least the `password' and maybe the `user' option will be
 %% required.
 %%
-%% The returned handle can be used to send requests to the target BMC using TODO
-%% or close the session using {@link close/1}.
+%% The returned handle can be used to send requests to the target BMC using one
+%% of the functions provided by this module (e.g. {@link raw/4}) or close the
+%% session using {@link close/1}.
 %% @see open/2
 %% @see close/1
 %% @end
@@ -238,7 +240,22 @@ close(Session = {_, _}) ->
 read_fru(Session = {_, _}, FruId) when FruId >= 0 andalso FruId < 255 ->
     case get_session(Session, supervisor:which_children(?MODULE)) of
         {ok, Pid} ->
-            eipmi_fru:read(Pid, FruId);
+            ?EIPMI_CATCH(eipmi_fru:read(Pid, FruId));
+        Error ->
+            Error
+    end.
+
+%%------------------------------------------------------------------------------
+%% @doc
+%% TODO
+%% @end
+%%------------------------------------------------------------------------------
+-spec read_sel(session(), boolean()) ->
+                      {ok, term()} | {error, term()}.
+read_sel(Session = {_, _}, Clear) ->
+    case get_session(Session, supervisor:which_children(?MODULE)) of
+        {ok, Pid} ->
+            ?EIPMI_CATCH(eipmi_sel:read(Pid, Clear));
         Error ->
             Error
     end.
