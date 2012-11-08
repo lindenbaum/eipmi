@@ -110,12 +110,24 @@ encode_storage(?RESERVE_SEL, _Properties) ->
     <<>>;
 encode_storage(?GET_SEL_ENTRY, Properties) ->
     Record = eipmi_util:get_val(record_id, Properties),
+    true = Record =< 16#ffff,
     <<0:16, Record:16/little, 0:8, 16#ff:8>>;
 encode_storage(?CLEAR_SEL, Properties) ->
     Reservation = eipmi_util:get_val(reservation_id, Properties),
     Init = eipmi_util:get_val(initiate, Properties, true),
     InitOrGet = case Init of true -> 16#aa; false -> 0 end,
-    <<Reservation:16/little, $C:8, $L:8, $R:8, InitOrGet:8>>.
+    <<Reservation:16/little, $C:8, $L:8, $R:8, InitOrGet:8>>;
+encode_storage(?GET_SDR_REPOSITORY_INFO, _Properties) ->
+    <<>>;
+encode_storage(?RESERVE_SDR_REPOSITORY, _Properties) ->
+    <<>>;
+encode_storage(?GET_SDR, Properties) ->
+    Reservation = eipmi_util:get_val(reservation_id, Properties, 16#0000),
+    Record = eipmi_util:get_val(record_id, Properties),
+    Offset = eipmi_util:get_val(offset, Properties, 16#00),
+    Count = eipmi_util:get_val(count, Properties, 16#ff),
+    true = Record =< 16#ffff,
+    <<Reservation:16/little, Record:16/little, Offset:8, Count:8>>.
 
 %%------------------------------------------------------------------------------
 %% @private

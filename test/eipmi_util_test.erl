@@ -75,15 +75,6 @@ eipmi_catch_test() ->
     ?assertEqual({error, b}, ?EIPMI_CATCH(a = b)),
     ?assertEqual({error, b}, ?EIPMI_CATCH(a = {error, b})).
 
-read_test() ->
-    Reader = fun(0, _Count) -> {3, <<$a, $b, $c>>};
-                (3, _Count) -> {3, <<$d, $e, $f>>};
-                (6, _Count) -> {2, <<$g, $h>>}
-             end,
-    ?assertEqual(
-       <<$a, $b, $c, $d, $e, $f, $g, $h>>,
-       eipmi_util:read(Reader, 8, 7)).
-
 from_bcd_plus_test() ->
     Bin = <<16#0:4, 16#1:4, 16#2:4, 16#3:4, 16#4:4, 16#5:4, 16#6:4, 16#7:4,
             16#8:4, 16#9:4, 16#a:4, 16#b:4, 16#c:4, 16#d:4, 16#e:4, 16#f:4>>,

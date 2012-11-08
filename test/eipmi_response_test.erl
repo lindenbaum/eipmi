@@ -140,7 +140,7 @@ decode_get_sel_info_test() ->
        [{version, "15"}, {entries, 1}, {free_space, 16#ffff},
         {most_recent_addition, 16#11223344},
         {most_recent_erase, 16#11223344},
-        {dropped_events, true},
+        {overflow, true},
         {operations, [delete, partial_add, reserve, get_allocation_info]}],
        eipmi_response:decode(Resp, Bin)).
 
@@ -184,3 +184,30 @@ decode_get_lan_configuration_parameters_test() ->
     Resp = {?IPMI_NETFN_TRANSPORT_RESPONSE, ?GET_LAN_CONFIGURATION_PARAMETERS},
     Bin = <<16#00, $d, $a, $t, $a>>,
     ?assertEqual([{data, <<$d, $a, $t, $a>>}], eipmi_response:decode(Resp, Bin)).
+
+decode_get_sdr_repository_info_test() ->
+    Resp = {?IPMI_NETFN_STORAGE_RESPONSE, ?GET_SDR_REPOSITORY_INFO},
+    Bin = <<16#51, 16#01, 16#00, 16#ff, 16#ff, 16#44, 16#33, 16#22, 16#11,
+            16#44, 16#33, 16#22, 16#11, 16#8f>>,
+    ?assertEqual(
+       [{version, "15"}, {entries, 1}, {free_space, 16#ffff},
+        {most_recent_addition, 16#11223344},
+        {most_recent_erase, 16#11223344},
+        {overflow, true},
+        {operations, [delete, partial_add, reserve, get_allocation_info]}],
+       eipmi_response:decode(Resp, Bin)).
+
+decode_reserve_sdr_repository_test() ->
+    Resp = {?IPMI_NETFN_STORAGE_RESPONSE, ?RESERVE_SDR_REPOSITORY},
+    Bin = <<16#22, 16#11>>,
+    ?assertEqual(
+       [{reservation_id, 16#1122}],
+       eipmi_response:decode(Resp, Bin)).
+
+decode_get_sdr_test() ->
+    Resp = {?IPMI_NETFN_STORAGE_RESPONSE, ?GET_SDR},
+    Bin = <<16#22, 16#11, $d, $a, $t, $a>>,
+    ?assertEqual(
+       [{next_record_id, 16#1122},
+        {data, <<$d, $a, $t, $a>>}],
+       eipmi_response:decode(Resp, Bin)).

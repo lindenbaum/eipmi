@@ -114,20 +114,23 @@ decode_storage(?GET_FRU_INVENTORY_AREA_INFO,
      {access, case Access of 1 -> by_words; 0 -> by_bytes end}];
 decode_storage(?READ_FRU_DATA, <<Count:8, Data/binary>>) ->
     [{count, Count}, {data, Data}];
-decode_storage(?GET_SEL_INFO,
+decode_storage(Cmd,
                <<Version:1/binary, Entries:16/little, Free:16/little,
                  Addition:32/little, Erase:32/little,
-                 Dropped:1, ?EIPMI_RESERVED:3, Operations:4>>) ->
+                 Overflow:1, ?EIPMI_RESERVED:3, Operations:4>>)
+  when Cmd =:= ?GET_SEL_INFO orelse Cmd =:= ?GET_SDR_REPOSITORY_INFO ->
     [{version, lists:reverse(eipmi_util:from_bcd_plus(Version))},
      {entries, Entries},
      {free_space, Free},
      {most_recent_addition, Addition},
      {most_recent_erase, Erase},
-     {dropped_events, case Dropped of 1 -> true; 0 -> false end},
+     {overflow, case Overflow of 1 -> true; 0 -> false end},
      {operations, get_operations(Operations)}];
-decode_storage(?RESERVE_SEL, <<Reservation:16/little>>) ->
+decode_storage(Cmd, <<Reservation:16/little>>)
+  when Cmd =:= ?RESERVE_SEL orelse Cmd =:= ?RESERVE_SDR_REPOSITORY ->
     [{reservation_id, Reservation}];
-decode_storage(?GET_SEL_ENTRY, <<Next:16/little, Data/binary>>) ->
+decode_storage(Cmd, <<Next:16/little, Data/binary>>)
+  when Cmd =:= ?GET_SEL_ENTRY orelse Cmd =:= ?GET_SDR ->
     [{next_record_id, Next}, {data, Data}];
 decode_storage(?CLEAR_SEL, <<?EIPMI_RESERVED:4, Progress:4>>) ->
     [{progress, case Progress of 1 -> completed; 0 -> in_progress end}].

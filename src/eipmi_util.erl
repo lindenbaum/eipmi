@@ -27,7 +27,6 @@
          update_val/3,
          copy_val/3,
          merge_vals/2,
-         read/3,
          from_bcd_plus/1,
          from_packed_ascii/1]).
 
@@ -135,32 +134,6 @@ merge_vals(PropList1, PropList2) ->
         end,
         PropList2,
         PropList1)).
-
-%%------------------------------------------------------------------------------
-%% @doc
-%% Generic read function that reads up to `Size' bytes in steps of `BlockSize'
-%% bytes using a provided reader function. A read operation is always expected
-%% to succeed, any exception thrown by a read will fall through to the original
-%% caller.
-%% @end
-%%------------------------------------------------------------------------------
--spec read(fun((Offset :: non_neg_integer(),
-                Count :: non_neg_integer()) ->
-                      {ReadCount :: non_neg_integer(), Data :: binary()}),
-           Size :: non_neg_integer(),
-           BlockSize :: non_neg_integer()) ->
-                  binary().
-read(ReadFun, Size, BlockSize) ->
-    read(ReadFun, Size, BlockSize, {0, <<>>}).
-read(_ReadFun, Size, _BlockSize, {Size, Acc}) ->
-    Acc;
-read(ReadFun, Size, BlockSize, {Offset, Acc}) when Offset + BlockSize =< Size ->
-    read(ReadFun, Size, BlockSize, do_read(ReadFun, Offset, BlockSize, Acc));
-read(ReadFun, Size, BlockSize, {Offset, Acc}) ->
-    read(ReadFun, Size, BlockSize, do_read(ReadFun, Offset, Size - Offset, Acc)).
-do_read(ReadFun, Offset, Count, Acc) ->
-    {ReadCount, Data} = ReadFun(Offset, Count),
-    {Offset + ReadCount, <<Acc/binary, Data/binary>>}.
 
 %%------------------------------------------------------------------------------
 %% @doc

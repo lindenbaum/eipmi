@@ -132,3 +132,21 @@ encode_get_lan_configuration_parameters_test() ->
     ?assertEqual(
        <<16#8e, 16#03, 16#00, 16#00>>,
        eipmi_request:encode(Req, Properties)).
+
+encode_get_sdr_repository_info_test() ->
+    Req = {?IPMI_NETFN_STORAGE_REQUEST, ?GET_SDR_REPOSITORY_INFO},
+    ?assertEqual(<<>>, eipmi_request:encode(Req, [])).
+
+encode_reserve_sdr_repository_test() ->
+    Req = {?IPMI_NETFN_STORAGE_REQUEST, ?RESERVE_SDR_REPOSITORY},
+    ?assertEqual(<<>>, eipmi_request:encode(Req, [])).
+
+encode_get_sdr_test() ->
+    Req = {?IPMI_NETFN_STORAGE_REQUEST, ?GET_SDR},
+    Properties = [{reservation_id, 16#1122},
+                  {record_id, 16#3344},
+                  {offset, 0},
+                  {count, 5}],
+    ?assertEqual(
+       <<16#22, 16#11, 16#44, 16#33, 16#00, 16#05>>,
+       eipmi_request:encode(Req, Properties)).

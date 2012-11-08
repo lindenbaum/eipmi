@@ -335,7 +335,7 @@ Return:
  {free_space, non_neg_integer()},
  {most_recent_addition, non_neg_integer()},
  {most_recent_erase, non_neg_integer()},
- {dropped_events, boolean()},
+ {overflow, boolean()},
  {operations, [delete | partial_add | reserve | get_allocation_info]}]
 ```
 
@@ -372,6 +372,49 @@ Argument:
 Return:
 ```erlang
 [{progress, completed | in_progress}]
+```
+
+#### Get SDR Repository Info
+Argument:
+```erlang
+[]
+```
+
+Return:
+```erlang
+[{version, string()},
+ {entries, non_neg_integer()},
+ {free_space, non_neg_integer()},
+ {most_recent_addition, non_neg_integer()},
+ {most_recent_erase, non_neg_integer()},
+ {overflow, boolean()},
+ {operations, [delete | partial_add | reserve | get_allocation_info]}]
+```
+
+#### Reserve SDR Repository
+Argument:
+```erlang
+[]
+```
+
+Return:
+```erlang
+[{reservation_id, non_neg_integer()}]
+```
+
+#### Get SDR
+Argument:
+```erlang
+[{reservation_id, non_neg_integer()}, (optional)
+ {record_id, non_neg_integer()},
+ {offset, non_neg_integer()}, (optional)
+ {count, 1..255} (optional)]
+```
+
+Return:
+```erlang
+[{next_record_id, non_neg_integer()},
+ {data, binary()}]
 ```
 
 #### Get IP/UDP/RMCP Statistics

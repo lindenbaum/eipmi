@@ -98,12 +98,31 @@ read_fru({ok, FruInfo}, SessionPid, FruId) ->
     Access = eipmi_util:get_val(access, FruInfo),
     Divider = case Access of by_words -> 2; by_bytes -> 1 end,
     AreaSize = eipmi_util:get_val(area_size, FruInfo) div Divider,
-    F = fun(Offset, Count) ->
-                Ps = [{fru_id, FruId}, {offset, Offset}, {count, Count}],
-                {ok, R} = eipmi_session:request(SessionPid, ?READ, Ps),
-                {eipmi_util:get_val(count, R), eipmi_util:get_val(data, R)}
-        end,
-    decode(eipmi_util:read(F, AreaSize, ?MAX_READ_COUNT div Divider)).
+    decode(read_fru(SessionPid, FruId, AreaSize, ?MAX_READ_COUNT div Divider)).
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+read_fru(SessionPid, FruId, Size, BlockSize) ->
+    read_fru(SessionPid, FruId, Size, BlockSize, {0, <<>>}).
+read_fru(_SessionPid, _FruId, Size, _BlockSize, {Size, Acc}) ->
+    Acc;
+read_fru(SessionPid, FruId, Size, BlockSize, {Offset, Acc})
+  when Offset + BlockSize =< Size ->
+    NewAcc = do_read_fru(SessionPid, FruId, Offset, BlockSize, Acc),
+    read_fru(SessionPid, FruId, Size, BlockSize, NewAcc);
+read_fru(SessionPid, FruId, Size, BlockSize, {Offset, Acc}) ->
+    NewAcc = do_read_fru(SessionPid, FruId, Offset, Size - Offset, Acc),
+    read_fru(SessionPid, FruId, Size, BlockSize, NewAcc).
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+do_read_fru(SessionPid, FruId, Offset, Count, Acc) ->
+    Ps = [{fru_id, FruId}, {offset, Offset}, {count, Count}],
+    {ok, R} = eipmi_session:request(SessionPid, ?READ, Ps),
+    Data = eipmi_util:get_val(data, R),
+    {Offset + eipmi_util:get_val(count, R), <<Acc/binary, Data/binary>>}.
 
 %%------------------------------------------------------------------------------
 %% @private

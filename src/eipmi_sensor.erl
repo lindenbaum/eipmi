@@ -14,7 +14,8 @@
 %%% OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 %%%
 %%% @doc
-%%% TODO
+%%% Sensor-related functions, e.g. mapping of reading/event type codes/offsets,
+%%% sensor name retrieval, etc.
 %%% @end
 %%%=============================================================================
 
@@ -25,7 +26,7 @@
 
 -include("eipmi.hrl").
 
--type property() :: term().
+-type property() :: term(). %% TODO
 
 -export_type([property/0]).
 
@@ -35,6 +36,9 @@
 
 %%------------------------------------------------------------------------------
 %% @doc
+%% Retrieve the sensor category and reading type from the given sensor and
+%% reading type. See sections 41 & 42 of the IPMI specification for more
+%% information.
 %% @end
 %%------------------------------------------------------------------------------
 get_reading(16#01, _SensorType) ->
@@ -50,6 +54,8 @@ get_reading(ReadingType, SensorType)
 
 %%------------------------------------------------------------------------------
 %% @doc
+%% Decode the system event log 'event data' fields according to the given
+%% sensor reading type (as returned from {@link get_reading/2}).
 %% @end
 %%------------------------------------------------------------------------------
 decode_data({threshold, Type}, Assertion, EventData) ->
@@ -69,8 +75,12 @@ decode_data({oem, Type}, Assertion, EventData) ->
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-decode_threshold(_Type, _Assertion, _Data) ->
-    [].
+decode_threshold(Type, Assertion, <<1:2, 0:2, Offset:4, B2:8, _:8>>) ->
+    [map(Type, Offset, Assertion, 16#ff, 16#ff)];
+decode_threshold(Type, Assertion, <<1:2, 1:2, Offset:4, B2:8, B3:8>>) ->
+    [map(Type, Offset, Assertion, 16#ff, 16#ff)];
+decode_threshold(Type, Assertion, <<_:2, _:2, Offset:4, _:8, _:8>>) ->
+    [map(Type, Offset, Assertion, 16#ff, 16#ff)].
 
 %%------------------------------------------------------------------------------
 %% @private
