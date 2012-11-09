@@ -67,9 +67,15 @@
 %% @end
 %%------------------------------------------------------------------------------
 -spec read(pid(), boolean()) ->
-                  {ok, [entry()]} | {error, term()}.
-read(SessionPid, Clear) ->
-    read_sel(SessionPid, Clear).
+                  [entry()].
+read(SessionPid, true) ->
+    {ok, SelInfo} = eipmi_session:request(SessionPid, ?GET_INFO, []),
+    Entries = get_sel(SessionPid, eipmi_util:get_val(entries, SelInfo)),
+    Operations = eipmi_util:get_val(operations, SelInfo),
+    clear_sel(SessionPid, lists:member(reserve, Operations)),
+    Entries;
+read(SessionPid, false) ->
+    get_sel(SessionPid, all).
 
 %%------------------------------------------------------------------------------
 %% @doc
@@ -85,18 +91,6 @@ clear(SessionPid) ->
 %%%=============================================================================
 %%% Internal functions
 %%%=============================================================================
-
-%%------------------------------------------------------------------------------
-%% @private
-%%------------------------------------------------------------------------------
-read_sel(SessionPid, true) ->
-    {ok, SelInfo} = eipmi_session:request(SessionPid, ?GET_INFO, []),
-    Entries = get_sel(SessionPid, eipmi_util:get_val(entries, SelInfo)),
-    Operations = eipmi_util:get_val(operations, SelInfo),
-    clear_sel(SessionPid, lists:member(reserve, Operations)),
-    {ok, Entries};
-read_sel(SessionPid, false) ->
-    {ok, get_sel(SessionPid, all)}.
 
 %%------------------------------------------------------------------------------
 %% @private

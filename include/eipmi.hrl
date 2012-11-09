@@ -325,10 +325,10 @@
 %%------------------------------------------------------------------------------
 -define(EIPMI_CATCH(Expression),
         try Expression of
-            Result -> Result
+            Result_Dont_Look -> Result_Dont_Look
         catch
-            error:{badmatch, Error = {error, _}} -> Error;
-            error:{badmatch, Error} -> {error, Error}
+            error:{badmatch, Error_Dont_Look = {error, _}} -> Error_Dont_Look;
+            error:{badmatch, Error_Dont_Look} -> {error, Error_Dont_Look}
         end).
 
 -endif. %% eipmi_hrl_

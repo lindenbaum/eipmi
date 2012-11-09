@@ -251,11 +251,16 @@ read_fru(Session = {_, _}, FruId) when FruId >= 0 andalso FruId < 255 ->
 %% @end
 %%------------------------------------------------------------------------------
 -spec read_sel(session(), boolean()) ->
-                      {ok, term()} | {error, term()}.
+                      {ok, [eipmi_sel:entry()]} | {error, term()}.
 read_sel(Session = {_, _}, Clear) ->
     case get_session(Session, supervisor:which_children(?MODULE)) of
         {ok, Pid} ->
-            ?EIPMI_CATCH(eipmi_sel:read(Pid, Clear));
+            case ?EIPMI_CATCH(eipmi_sel:read(Pid, Clear)) of
+                Error = {error, _} ->
+                    Error;
+                Entries ->
+                    {ok, Entries}
+            end;
         Error ->
             Error
     end.
