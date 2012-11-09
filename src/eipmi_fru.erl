@@ -17,7 +17,7 @@
 %%% A module providing FRU reading and decoding functionality according to the
 %%% official IPMI Platform Management FRU Information Storage Definition.
 %%% Currently missing features:
-%%% * support for multi record fields (according to IPMI spec)
+%%% * support for compatibility multi record fields (according to IPMI spec)
 %%% * support for mutli record fields (according to PICMG spec)
 %%% @end
 %%%=============================================================================
@@ -247,14 +247,14 @@ decode_record(true, <<T:8, 0:1, _:7, L:8, C:8, _:8, Data:L/binary, R/binary>>) -
     {decode_record(sum(Data, C) =:= 0, T, Data), R}.
 decode_record(false, _Type, _Data) ->
     [];
-decode_record(true, 16#00, _Data) ->
-    [{power_supply, [not_yet_implemented]}];
-decode_record(true, 16#01, _Data) ->
-    [{dc_output, [not_yet_implemented]}];
-decode_record(true, 16#02, _Data) ->
-    [{dc_load, [not_yet_implemented]}];
-decode_record(true, 16#03, _Data) ->
-    [{management_access, [not_yet_implemented]}];
+decode_record(true, 16#00, Data) ->
+    [{power_supply, decode_power_supply(Data)}];
+decode_record(true, 16#01, Data) ->
+    [{dc_output, decode_dc_output(Data)}];
+decode_record(true, 16#02, Data) ->
+    [{dc_load, decode_dc_load(Data)}];
+decode_record(true, 16#03, Data) ->
+    [{management_access, decode_management_access(Data)}];
 decode_record(true, 16#04, _Data) ->
     [{base_compatibility, [not_yet_implemented]}];
 decode_record(true, 16#05, _Data) ->
@@ -262,6 +262,142 @@ decode_record(true, 16#05, _Data) ->
 decode_record(true, _Type, _Data) ->
     %% unsupported
     [].
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+decode_power_supply(<<0:4, OverallCapacity:12/little, PeakVA:16/little,
+                      InrushCurrent:8, InrushInterval:8,
+                      LowEndInputV1:16/little, HighEndInputV1:16/little,
+                      LowEndInputV2:16/little, HighEndInputV2:16/little,
+                      LowEndInputFrequency:8, HighEndInputFrequency:8,
+                      ACDropOutTolerance:8, 0:4, FailSignal:1,
+                      HotSwap:1, Autoswitch:1, PowerFactor:1,
+                      PredictiveFailSupport:1, PeakWattageSecs:4,
+                      PeakWattage:12/little, CombinedWattageV1:4,
+                      CombinedWattageV2:4, TotalWattage:16/little,
+                      PredictiveFailTachometerLowerThreshold:8>>) ->
+    [{overall_capacitly, {OverallCapacity, 'W'}},
+     {peak_voltage, maybe_value({PeakVA, 'VA'}, unspecified)},
+     {inrush_current, maybe_value({InrushCurrent, 'A'}, unspecified)},
+     {inrush_interval, maybe_value({InrushInterval, ms}, unspecified)},
+     {low_end_input_voltage_range_110v, {LowEndInputV1 * 10, mV}},
+     {high_end_input_voltage_range_110v, {HighEndInputV1 * 10, mV}},
+     {low_end_input_voltage_range_220v, {LowEndInputV2 * 10, mV}},
+     {high_end_input_voltage_range_220v, {HighEndInputV2 * 10, mV}},
+     {low_end_input_frequency_range, {LowEndInputFrequency, hz}},
+     {high_end_input_frequency_range, {HighEndInputFrequency, hz}},
+     {ac_dropout_tolerance, {ACDropOutTolerance, ms}},
+     {predictive_fail_signal, get_power_supply_predictive_fail_signal(FailSignal)},
+     {hot_swap_supported, get_bool(HotSwap)},
+     {autoswitch_supported, get_bool(Autoswitch)},
+     {power_factor_correction_supported, get_bool(PowerFactor)},
+     {predictive_fail_pin_supported, get_bool(PredictiveFailSupport)},
+     get_predictive_fail_tachometer_lower_threshold(PredictiveFailTachometerLowerThreshold),
+     {peak_wattage_tolerance, {PeakWattageSecs, s}},
+     {peak_wattage, {PeakWattage, 'W'}},
+     get_combined_wattage(CombinedWattageV1, CombinedWattageV2, TotalWattage)].
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+decode_dc_output(<<Standby:1, 0:3, OutputNumber:4,
+                   NominalVoltage:16/signed-little,
+                   MaximumNegativeVoltageDeviation:16/signed-little,
+                   MaximumPositiveVoltageDeviation:16/signed-little,
+                   RippleAndNoise:16/little,
+                   MinimumCurrentDraw:16/little,
+                   MaximumCurrentDraw:16/little>>) ->
+    [{provides_standby_output, get_bool(Standby)},
+     {output, maybe_value({OutputNumber, number}, unknown)},
+     {nominal_voltage, {NominalVoltage / 100, 'V'}},
+     {maximum_negative_voltage_deviation, {MaximumNegativeVoltageDeviation / 100, 'V'}},
+     {maximum_positive_voltage_deviation, {MaximumPositiveVoltageDeviation / 100, 'V'}},
+     {ripple_and_noise, {RippleAndNoise, mV}},
+     {minimum_current_draw, {MinimumCurrentDraw, mA}},
+     {maximum_current_draw, {MaximumCurrentDraw, mA}}].
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+decode_dc_load(<<0:4, OutputNumber:4,
+                 NominalVoltage:16/signed-little,
+                 MinimumVoltage:16/signed-little,
+                 MaximumVoltage:16/signed-little,
+                 RippleAndNoise:16/little,
+                 MinimumCurrentLoad:16/little,
+                 MaximumCurrentLoad:16/little>>) ->
+    [{output, maybe_value({OutputNumber, number}, unknown)},
+     {nominal_voltage, {NominalVoltage / 100, 'V'}},
+     {minimum_voltage, {MinimumVoltage / 100, 'V'}},
+     {maximum_voltage, {MaximumVoltage / 100, 'V'}},
+     {ripple_and_noise, {RippleAndNoise, mV}},
+     {minimum_current_load, {MinimumCurrentLoad, mA}},
+     {maximum_current_load, {MaximumCurrentLoad, mA}}].
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+decode_management_access(<<16#01:8, URL/binary>>) ->
+    [{system_management_url, binary_to_list(URL)}];
+decode_management_access(<<16#02:8, Name/binary>>) ->
+    [{system_name, binary_to_list(Name)}];
+decode_management_access(<<16#03:8, Addr/binary>>) ->
+    [{system_ping_address, binary_to_list(Addr)}];
+decode_management_access(<<16#04:8, URL/binary>>) ->
+    [{component_management_url, binary_to_list(URL)}];
+decode_management_access(<<16#05:8, Name/binary>>) ->
+    [{component_name, binary_to_list(Name)}];
+decode_management_access(<<16#06:8, Addr/binary>>) ->
+    [{component_ping_address, binary_to_list(Addr)}];
+decode_management_access(<<16#07:8, Id/binary>>) ->
+    [{system_unique_id, binary_to_list(Id)}].
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+get_predictive_fail_tachometer_lower_threshold(0) ->
+    {predictive_fail_lower_treshold, none};
+get_predictive_fail_tachometer_lower_threshold(Value) ->
+    {predictive_fail_lower_treshold, {Value, rps}}.
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+get_combined_wattage(0, 0, 0) ->
+    {combined_wattage, none};
+get_combined_wattage(A, B, Wattage) ->
+    {combined_wattage, {get_voltage(A), get_voltage(B), {Wattage, 'W'}}}.
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+get_voltage(0) -> {12, 'V'};
+get_voltage(1) -> {-12, 'V'};
+get_voltage(2) -> {5, 'V'};
+get_voltage(3) -> {3.3, 'V'}.
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+get_power_supply_predictive_fail_signal(0) ->
+    one_pulse_per_rotation_or_signal_asserted;
+get_power_supply_predictive_fail_signal(1) ->
+    two_pulses_per_rotation_or_signal_deasserted.
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+get_bool(0) -> false;
+get_bool(1) -> true.
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+maybe_value({0, _}, Alternative) -> Alternative;
+maybe_value({16#ffff, _}, Alternative) -> Alternative;
+maybe_value({16#ff, _}, Alternative) -> Alternative;
+maybe_value(Value, _) -> Value.
 
 %%------------------------------------------------------------------------------
 %% @private

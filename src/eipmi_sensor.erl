@@ -16,6 +16,10 @@
 %%% @doc
 %%% Sensor-related functions, e.g. mapping of reading/event type codes/offsets,
 %%% sensor name retrieval, etc.
+%%% TODOs:
+%%% * decode threshold based sensor readings
+%%% * decode oem based sensor readings
+%%% * populate property type
 %%% @end
 %%%=============================================================================
 
