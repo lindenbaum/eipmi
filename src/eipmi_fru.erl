@@ -246,20 +246,26 @@ decode_record(true, <<T:8, 0:1, _:7, L:8, C:8, _:8, Data:L/binary, R/binary>>) -
     {decode_record(sum(Data, C) =:= 0, T, Data), R}.
 decode_record(false, _Type, _Data) ->
     [];
-decode_record(true, 16#00, Data) ->
+decode_record(true, Type, Data) ->
+    decode_record_field_definition(Type, Data).
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+decode_record_field_definition(16#00, Data) ->
     [{power_supply, decode_power_supply(Data)}];
-decode_record(true, 16#01, Data) ->
+decode_record_field_definition(16#01, Data) ->
     [{dc_output, decode_dc_output(Data)}];
-decode_record(true, 16#02, Data) ->
+decode_record_field_definition(16#02, Data) ->
     [{dc_load, decode_dc_load(Data)}];
-decode_record(true, 16#03, Data) ->
+decode_record_field_definition(16#03, Data) ->
     [{management_access, decode_management_access(Data)}];
-decode_record(true, 16#04, Data) ->
+decode_record_field_definition(16#04, Data) ->
     [{base_compatibility, decode_compatibility(Data)}];
-decode_record(true, 16#05, Data) ->
+decode_record_field_definition(16#05, Data) ->
     [{extended_compatibility, decode_compatibility(Data)}];
-decode_record(true, _Type, _Data) ->
-    %% unsupported
+decode_record_field_definition(_Type, _Data) ->
+    %% oem multi records go here
     [].
 
 %%------------------------------------------------------------------------------
