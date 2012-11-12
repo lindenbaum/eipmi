@@ -255,8 +255,8 @@ decode_record(true, 16#02, Data) ->
     [{dc_load, decode_dc_load(Data)}];
 decode_record(true, 16#03, Data) ->
     [{management_access, decode_management_access(Data)}];
-decode_record(true, 16#04, _Data) ->
-    [{base_compatibility, [not_yet_implemented]}];
+decode_record(true, 16#04, Data) ->
+    [{base_compatibility, decode_base_compatibility(Data)}];
 decode_record(true, 16#05, _Data) ->
     [{extended_compatibility, [not_yet_implemented]}];
 decode_record(true, _Type, _Data) ->
@@ -266,17 +266,18 @@ decode_record(true, _Type, _Data) ->
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-decode_power_supply(<<0:4, OverallCapacity:12/little, PeakVA:16/little,
+decode_power_supply(<<OverallCapacity:16/little, PeakVA:16/little,
                       InrushCurrent:8, InrushInterval:8,
                       LowEndInputV1:16/little, HighEndInputV1:16/little,
                       LowEndInputV2:16/little, HighEndInputV2:16/little,
                       LowEndInputFrequency:8, HighEndInputFrequency:8,
                       ACDropOutTolerance:8, 0:4, FailSignal:1,
                       HotSwap:1, Autoswitch:1, PowerFactor:1,
-                      PredictiveFailSupport:1, PeakWattageSecs:4,
-                      PeakWattage:12/little, CombinedWattageV1:4,
-                      CombinedWattageV2:4, TotalWattage:16/little,
+                      PredictiveFailSupport:1, PeakW:16/little,
+                      CombinedWattageV1:4, CombinedWattageV2:4,
+                      TotalWattage:16/little,
                       PredictiveFailTachometerLowerThreshold:8>>) ->
+    <<PeakWattageSecs:4, PeakWattage:12>>  = <<PeakW:16>>,
     [{overall_capacitly, {OverallCapacity, 'W'}},
      {peak_voltage, maybe_value({PeakVA, 'VA'}, unspecified)},
      {inrush_current, maybe_value({InrushCurrent, 'A'}, unspecified)},
@@ -356,6 +357,30 @@ decode_management_access(<<16#06:8, Addr/binary>>) ->
     [{component_ping_address, binary_to_list(Addr)}];
 decode_management_access(<<16#07:8, Id/binary>>) ->
     [{system_unique_id, binary_to_list(Id)}].
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+decode_base_compatibility(<<ManufacturerID:24/little, EntityID:8,
+                            CompatibilityBase:8, 0:1, CodeStart:7,
+                            CodeRanges/binary>>) ->
+    [{manufacturer_id, ManufacturerID},
+     {entity_id, EntityID},
+     {compatibility_base, CompatibilityBase},
+     {compatible_codes, get_code_ranges(CodeRanges, CodeStart)}].
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+get_code_ranges(Bytes, CodeStart) ->
+    lists:sort(get_code_ranges(Bytes, CodeStart, 0, [CodeStart])).
+get_code_ranges(<<>>, _CodeStart, _BitIndex, Acc) ->
+    lists:reverse(Acc);
+get_code_ranges(<<1:1, Rest/bitstring>>, CodeStart, BitIndex, Acc) ->
+    NewCode = CodeStart + (((BitIndex div 8) * 8) + ((8 - (BitIndex rem 8)))),
+    get_code_ranges(Rest, CodeStart, BitIndex + 1, [NewCode|Acc]);
+get_code_ranges(<<0:1, Rest/bitstring>>, CodeStart, BitIndex, Acc) ->
+    get_code_ranges(Rest, CodeStart, BitIndex + 1, Acc).
 
 %%------------------------------------------------------------------------------
 %% @private
@@ -471,3 +496,23 @@ sum(<<>>, Sum) ->
     Sum rem 256;
 sum(<<Byte:8, Rest/binary>>, Sum) ->
     sum(Rest, Sum + Byte).
+
+%%%=============================================================================
+%%% TESTS
+%%%=============================================================================
+
+-ifdef(TEST).
+
+-include_lib("eunit/include/eunit.hrl").
+
+decode_base_compatibility_test() ->
+    ?assertEqual([{manufacturer_id,123},
+                  {entity_id,1},
+                  {compatibility_base,42},
+                  {compatible_codes,[10,11,12,13,14,15,16,22,23]}],
+                 decode_base_compatibility(<<123:24/little,
+                                             1:8, 42:8, 10:8,
+                                             2#00111111:8,
+                                             2#00011000:8>>)).
+
+-endif.
