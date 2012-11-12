@@ -17,7 +17,6 @@
 %%% A module providing FRU reading and decoding functionality according to the
 %%% official IPMI Platform Management FRU Information Storage Definition.
 %%% Currently missing features:
-%%% * support for compatibility multi record fields (according to IPMI spec)
 %%% * support for mutli record fields (according to PICMG spec)
 %%% @end
 %%%=============================================================================
@@ -256,9 +255,9 @@ decode_record(true, 16#02, Data) ->
 decode_record(true, 16#03, Data) ->
     [{management_access, decode_management_access(Data)}];
 decode_record(true, 16#04, Data) ->
-    [{base_compatibility, decode_base_compatibility(Data)}];
-decode_record(true, 16#05, _Data) ->
-    [{extended_compatibility, [not_yet_implemented]}];
+    [{base_compatibility, decode_compatibility(Data)}];
+decode_record(true, 16#05, Data) ->
+    [{extended_compatibility, decode_compatibility(Data)}];
 decode_record(true, _Type, _Data) ->
     %% unsupported
     [].
@@ -361,9 +360,9 @@ decode_management_access(<<16#07:8, Id/binary>>) ->
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-decode_base_compatibility(<<ManufacturerID:24/little, EntityID:8,
-                            CompatibilityBase:8, 0:1, CodeStart:7,
-                            CodeRanges/binary>>) ->
+decode_compatibility(<<ManufacturerID:24/little, EntityID:8,
+                       CompatibilityBase:8, 0:1, CodeStart:7,
+                       CodeRanges/binary>>) ->
     [{manufacturer_id, ManufacturerID},
      {entity_id, EntityID},
      {compatibility_base, CompatibilityBase},
@@ -505,14 +504,14 @@ sum(<<Byte:8, Rest/binary>>, Sum) ->
 
 -include_lib("eunit/include/eunit.hrl").
 
-decode_base_compatibility_test() ->
+decode_compatibility_test() ->
     ?assertEqual([{manufacturer_id,123},
                   {entity_id,1},
                   {compatibility_base,42},
                   {compatible_codes,[10,11,12,13,14,15,16,22,23]}],
-                 decode_base_compatibility(<<123:24/little,
-                                             1:8, 42:8, 10:8,
-                                             2#00111111:8,
-                                             2#00011000:8>>)).
+                 decode_compatibility(<<123:24/little,
+                                        1:8, 42:8, 10:8,
+                                        2#00111111:8,
+                                        2#00011000:8>>)).
 
 -endif.
