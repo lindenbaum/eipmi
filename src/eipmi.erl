@@ -175,7 +175,8 @@ open(IPAddress) ->
 %%   <dt>`{privilege, callback | user | operator | administrator}'</dt>
 %%   <dd>
 %%     <p>
-%%     the requested privilege level for this session, default is `administrator'
+%%     the requested privilege level for this session, default is
+%%     `administrator'
 %%     </p>
 %%   </dd>
 %%   <dt>`{rq_addr, 16#81..16#8d}'</dt>
@@ -252,6 +253,10 @@ read_fru(Session = {_, _}, FruId) when FruId >= 0 andalso FruId < 255 ->
 
 %%------------------------------------------------------------------------------
 %% @doc
+%% Return all currently available entries from the System Event Log (SEL). The
+%% returned SEL entries are property lists that do only contain the available
+%% and checksum error free fields of the respective entry. Using the second
+%% argument the SEL can optionally be cleared after reading.
 %% TODO
 %% @end
 %%------------------------------------------------------------------------------
@@ -306,11 +311,13 @@ raw(Session = {_, _}, NetFn, Command, Properties) ->
 %%   <dd>
 %%     <p>a received packet could not be decoded</p>
 %%   </dd>
-%%   <dt>`{Session :: session(), {request_timeout, RqSeqNr :: non_neg_integer()}}'</dt>
+%%   <dt>`{Session :: session(), {request_timeout,
+%%                                RqSeqNr :: non_neg_integer()}}'</dt>
 %%   <dd>
 %%     <p>the corresponding request timed out</p>
 %%   </dd>
-%%   <dt>`{Session :: session(), {no_requestor, {RqSeqNr :: non_neg_integer(), Response}}}'</dt>
+%%   <dt>`{Session :: session(), {no_requestor, {RqSeqNr :: non_neg_integer(),
+%%                                               Response}}}'</dt>
 %%   <dd>
 %%     <p>no requestor could be found for the corresponding request</p>
 %%   </dd>
@@ -344,7 +351,8 @@ unsubscribe(Handler, Args) ->
                    [{sessions, [{target(), pid()}]} |
                     {handlers, [module() | {module(), term()}]}].
 stats() ->
-    [{sessions, get_sessions(supervisor:which_children(?MODULE))},
+    Children = supervisor:which_children(?MODULE),
+    [{sessions, get_sessions(Children)},
      {handlers, eipmi_events:list_handlers()}].
 
 %%%=============================================================================
