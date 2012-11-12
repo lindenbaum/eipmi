@@ -228,13 +228,15 @@ handle_info(Info, StateName, State) ->
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-terminate(_Reason, active, State = #state{socket = Socket}) ->
+terminate(Reason, active, State = #state{socket = Socket}) ->
     clear_requests(active, State),
     send_request({?IPMI_NETFN_APPLICATION_REQUEST, ?CLOSE_SESSION}, [], State),
+    fire({closed, Reason}, State),
     gen_udp:close(Socket),
     ok;
-terminate(_Reason, StateName, State = #state{socket = Socket}) ->
+terminate(Reason, StateName, State = #state{socket = Socket}) ->
     clear_requests(StateName, State),
+    fire({closed, Reason}, State),
     gen_udp:close(Socket),
     ok.
 
@@ -270,16 +272,13 @@ handle_packet({ok, I = #rmcp_ipmi{header = Header}}, StateName, State) ->
     {NewStateName, NewState} = handle_request_response(I, StateName, State),
     {next_state, NewStateName,
      process_next_request(NewStateName =:= active, NewState)};
-handle_packet({ok, Ack = #rmcp_ack{}}, StateName, State) ->
-    error_logger:info_msg("unhandled ACK message ~p", [Ack]),
+handle_packet({ok, #rmcp_ack{}}, StateName, State) ->
     {next_state, StateName, State};
-handle_packet({ok, Asf = #rmcp_asf{header = Header}}, StateName, State) ->
+handle_packet({ok, #rmcp_asf{header = Header}}, StateName, State) ->
     maybe_send_ack(Header, State),
-    error_logger:info_msg("unhandled ASF message ~p", [Asf]),
     {next_state, StateName, State};
 handle_packet({error, Reason}, StateName, State) ->
-    error_logger:info_msg("failed to decode packet ~p", [Reason]),
-    {next_state, StateName, State}.
+    {next_state, StateName, fire({decode_error, Reason}, State)}.
 
 %%------------------------------------------------------------------------------
 %% @private
@@ -338,6 +337,7 @@ handle_request_response(I = #rmcp_ipmi{properties = Ps}, StateName, State) ->
 %% @private
 %%------------------------------------------------------------------------------
 handle_request_timeout(RqSeqNr, StateName, State) ->
+    fire({request_timeout, RqSeqNr}, State),
     unregister_request(RqSeqNr, {error, timeout}, StateName, State).
 
 %%------------------------------------------------------------------------------
@@ -346,7 +346,7 @@ handle_request_timeout(RqSeqNr, StateName, State) ->
 unregister_request(RqSeqNr, Response, StateName, State = #state{pending = P}) ->
     case lists:keyfind(RqSeqNr, 1, P) of
         false ->
-            {StateName, State};
+            {StateName, fire({no_requestor, {RqSeqNr, Response}}, State)};
         {RqSeqNr, TimerRef, Handler} ->
             gen_fsm:cancel_timer(TimerRef),
             Handler(
@@ -436,7 +436,7 @@ get_activate_session_handler() ->
              copy_state_vals(
                [auth_type, session_id, inbound_seq_nr],
                eipmi_response:decode(Resp, D),
-               State)}
+               fire(established, State))}
     end.
 
 %%------------------------------------------------------------------------------
@@ -545,3 +545,10 @@ copy_state_vals(PropertyList, Fields, State) ->
     lists:foldl(
       fun(P, Acc) -> copy_state_val(P, Fields, Acc) end,
       State, PropertyList).
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+fire(Event, State = #state{session = Session}) ->
+    eipmi_events:fire(Session, Event),
+    State.

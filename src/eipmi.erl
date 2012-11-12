@@ -38,7 +38,10 @@
          close/1,
          read_fru/2,
          read_sel/2,
-         raw/4]).
+         raw/4,
+         subscribe/2,
+         unsubscribe/2,
+         stats/0]).
 
 %% Application callbacks
 -export([start/2,
@@ -51,7 +54,9 @@
 
 -include("eipmi.hrl").
 
--opaque session() :: {inet:ip_address() | inet:hostname(), reference()}.
+-type target() :: {inet:ip_address() | inet:hostname(), inet:port_number()}.
+
+-opaque session() :: {target(), reference()}.
 
 -type req_net_fn()  :: 16#04 | 16#06 | 16#a | 16#c.
 -type resp_net_fn() :: 16#05 | 16#07 | 16#b | 16#d.
@@ -77,7 +82,8 @@
         timeout |
         user.
 
--export_type([session/0,
+-export_type([target/0,
+              session/0,
               req_net_fn/0,
               request/0,
               response/0,
@@ -198,13 +204,12 @@ open(IPAddress) ->
 -spec open(inet:ip_address() | inet:hostname(), [option()]) ->
                   {ok, session()} | {error, term()}.
 open(IPAddress, Options) ->
-    Session = {IPAddress, eipmi_util:get_val(port, Options, ?RMCP_PORT_NUMBER)},
+    Target = {IPAddress, eipmi_util:get_val(port, Options, ?RMCP_PORT_NUMBER)},
+    Session = {Target, erlang:make_ref()},
     Start = {eipmi_session, start_link, [Session, IPAddress, Options]},
     Spec = {Session, Start, temporary, 2000, worker, [eipmi_session]},
     case supervisor:start_child(?MODULE, Spec) of
         {ok, _} ->
-            {ok, Session};
-        {error, {already_started, _}} ->
             {ok, Session};
         Error ->
             Error
@@ -281,6 +286,67 @@ raw(Session = {_, _}, NetFn, Command, Properties) ->
             Error
     end.
 
+%%------------------------------------------------------------------------------
+%% @doc
+%% Registers/adds a handler for session related events. The handler module must
+%% implement the {@link gen_event} behaviour. For more information on the
+%% arguments `Handler' and `Args' refer to {@link gen_event:add_handler/3}.
+%% The event handling module should be prepared to receive the following events
+%% on the `handle_call/2' callback:
+%% <dl>
+%%   <dt>`{Session :: session(), established}'</dt>
+%%   <dd>
+%%     <p>the session was successfully established and activated</p>
+%%   </dd>
+%%   <dt>`{Session :: session(), {closed, Reason :: term()}}'</dt>
+%%   <dd>
+%%     <p>the session was closed with the provided reason</p>
+%%   </dd>
+%%   <dt>`{Session :: session(), {decode_error, Reason :: term()}}'</dt>
+%%   <dd>
+%%     <p>a received packet could not be decoded</p>
+%%   </dd>
+%%   <dt>`{Session :: session(), {request_timeout, RqSeqNr :: non_neg_integer()}}'</dt>
+%%   <dd>
+%%     <p>the corresponding request timed out</p>
+%%   </dd>
+%%   <dt>`{Session :: session(), {no_requestor, {RqSeqNr :: non_neg_integer(), Response}}}'</dt>
+%%   <dd>
+%%     <p>no requestor could be found for the corresponding request</p>
+%%   </dd>
+%% </dl>
+%% @end
+%%------------------------------------------------------------------------------
+-spec subscribe(module() | {module(), term()}, term()) ->
+                       ok | {error, term()}.
+subscribe(Handler, Args) ->
+    eipmi_events:subscribe(Handler, Args).
+
+%%------------------------------------------------------------------------------
+%% @doc
+%% Unregisters/removes a handler for session related events previously added
+%% using {@link subscribe/2}. For more information refer to on the arguments
+%% {@link gen_event:delete_handler/3}.
+%% @end
+%%------------------------------------------------------------------------------
+-spec unsubscribe(module() | {module(), term()}, term()) ->
+                         term().
+unsubscribe(Handler, Args) ->
+    eipmi_events:unsubscribe(Handler, Args).
+
+%%------------------------------------------------------------------------------
+%% @doc
+%% Returns statistical information about the currently opened sessions and the
+%% registered event handlers.
+%% @end
+%%------------------------------------------------------------------------------
+-spec stats() ->
+                   [{sessions, [{target(), pid()}]} |
+                    {handlers, [module() | {module(), term()}]}].
+stats() ->
+    [{sessions, get_sessions(supervisor:which_children(?MODULE))},
+     {handlers, eipmi_events:list_handlers()}].
+
 %%%=============================================================================
 %%% Application callbacks
 %%%=============================================================================
@@ -305,7 +371,10 @@ stop(_State) ->
 %% @private
 %%------------------------------------------------------------------------------
 init([]) ->
-    {ok, {{one_for_one, 0, 1}, []}}.
+    {ok, {{one_for_one, 0, 1},
+          [{eipmi_events,
+            {eipmi_events, start_link, []},
+            permanent, 2000, worker, dynamic}]}}.
 
 %%%=============================================================================
 %%% internal functions
@@ -321,6 +390,12 @@ get_session(S, Cs) ->
         [P] ->
             {ok, P}
     end.
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+get_sessions(Cs) ->
+    [{Target, P} || {{Target, _Ref}, P, worker, _} <- Cs, is_pid(P)].
 
 %%------------------------------------------------------------------------------
 %% @private

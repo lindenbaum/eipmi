@@ -41,7 +41,7 @@
 %%------------------------------------------------------------------------------
 %% @doc
 %% Retrieve the sensor category and reading type from the given sensor and
-%% reading type. See sections 41 & 42 of the IPMI specification for more
+%% reading type. See sections 41 and 42 of the IPMI specification for more
 %% information.
 %% @end
 %%------------------------------------------------------------------------------
