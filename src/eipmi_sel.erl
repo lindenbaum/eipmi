@@ -150,24 +150,25 @@ decode_event(<<Id:16/little, Type:8, Data/binary>>)
 %%------------------------------------------------------------------------------
 decode_system_event(<<Generator:2/binary, 16#04:8, SensorType:8, SensorNum:8,
                       Assertion:1, EventType:7, EventData/binary>>) ->
-    Reading = eipmi_sensor:get_reading(EventType, SensorType),
-    get_generator(Generator)
+    eipmi_sensor:decode_addr(Generator)
         ++ [{revision, 16#04}, {sensor_number, SensorNum}]
-        ++ eipmi_sensor:decode_data(Reading, Assertion, EventData);
+        ++ eipmi_sensor:decode_event_data(
+             eipmi_sensor:get_reading(EventType, SensorType),
+             Assertion,
+             pad_event_data(EventData));
 decode_system_event(<<Generator:2/binary, Revision:8, Data/binary>>) ->
-    get_generator(Generator) ++ [{revision, Revision}, {data, Data}].
+    eipmi_sensor:decode_addr(Generator)
+        ++ [{revision, Revision}, {data, Data}].
 
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-get_generator(<<Addr:7, 0:1, 0:4, ?EIPMI_RESERVED:2, Lun:2>>) ->
-    [{slave_addr, Addr}, {slave_lun, Lun}];
-get_generator(<<Addr:7, 0:1, Channel:4, ?EIPMI_RESERVED:2, Lun:2>>) ->
-    [{slave_addr, Addr}, {slave_lun, Lun}, {channel, Channel}];
-get_generator(<<Id:7, 1:1, 0:4, ?EIPMI_RESERVED:2, 0:2>>) ->
-    [{software_id, Id}];
-get_generator(<<Id:7, 1:1, Channel:4, ?EIPMI_RESERVED:2, 0:2>>) ->
-    [{software_id, Id}, {channel, Channel}].
+pad_event_data(Data = <<_:1/binary>>) ->
+    <<Data/binary, 16#ff:8, 16#ff:8>>;
+pad_event_data(Data = <<_:2/binary>>) ->
+    <<Data/binary, 16#ff:8>>;
+pad_event_data(Data = <<_:3/binary>>) ->
+    Data.
 
 %%%=============================================================================
 %%% TESTS

@@ -26,7 +26,9 @@
 -module(eipmi_sensor).
 
 -export([get_reading/2,
-         decode_data/3]).
+         get_entity/1,
+         decode_event_data/3,
+         decode_addr/1]).
 
 -include("eipmi.hrl").
 
@@ -58,19 +60,96 @@ get_reading(ReadingType, SensorType)
 
 %%------------------------------------------------------------------------------
 %% @doc
+%% Returns the human readable entity for a given entity id according to
+%% section 43.14 from the IPMI specification.
+%% @end
+%%------------------------------------------------------------------------------
+get_entity(16#00) -> unspecified;
+get_entity(16#01) -> other;
+get_entity(16#02) -> unknown;
+get_entity(16#03) -> processor;
+get_entity(16#04) -> disk_or_disk_bay;
+get_entity(16#05) -> peripheral_bay;
+get_entity(16#06) -> system_management_module;
+get_entity(16#07) -> system_board;
+get_entity(16#08) -> memory_module;
+get_entity(16#09) -> processor_module;
+get_entity(16#0a) -> power_supply;
+get_entity(16#0b) -> add_in_card;
+get_entity(16#0c) -> front_panel_board;
+get_entity(16#0d) -> back_panel_board;
+get_entity(16#0e) -> power_system_board;
+get_entity(16#0f) -> drive_backplane;
+get_entity(16#10) -> system_internal_expansion_board;
+get_entity(16#11) -> other_system_board;
+get_entity(16#12) -> processor_board;
+get_entity(16#13) -> power_unit;
+get_entity(16#14) -> power_module;
+get_entity(16#15) -> power_management;
+get_entity(16#16) -> chassis_back_panel_board;
+get_entity(16#17) -> system_chassis;
+get_entity(16#18) -> sub_chassis;
+get_entity(16#19) -> other_chassis_board;
+get_entity(16#1a) -> disk_drive_bay;
+get_entity(16#1b) -> peripheral_bay;
+get_entity(16#1c) -> device_bay;
+get_entity(16#1d) -> cooling_device;
+get_entity(16#1e) -> cooling_unit;
+get_entity(16#1f) -> interconnect;
+get_entity(16#20) -> memory_device;
+get_entity(16#21) -> system_management_software;
+get_entity(16#22) -> system_firmware;
+get_entity(16#23) -> operating_system;
+get_entity(16#24) -> system_bus;
+get_entity(16#25) -> group;
+get_entity(16#26) -> remote_management_communication_device;
+get_entity(16#27) -> external_environment;
+get_entity(16#28) -> battery;
+get_entity(16#29) -> processing_blade;
+get_entity(16#2a) -> connectivity_switch;
+get_entity(16#2b) -> processor_memory_module;
+get_entity(16#2c) -> io_module;
+get_entity(16#2d) -> processor_io_module;
+get_entity(16#2e) -> management_controller_firmware;
+get_entity(16#2f) -> ipmi_channel;
+get_entity(16#30) -> pci_bus;
+get_entity(16#31) -> pci_expresstm_bus;
+get_entity(16#32) -> scsi_bus;
+get_entity(16#33) -> sata_bus;
+get_entity(16#34) -> front_side_bus;
+get_entity(16#35) -> real_time_clock;
+get_entity(16#37) -> air_inlet;
+get_entity(16#40) -> air_inlet;
+get_entity(16#41) -> processor;
+get_entity(16#42) -> main_system_board;
+get_entity(Id)    -> Id.
+
+%%------------------------------------------------------------------------------
+%% @doc
 %% Decode the system event log 'event data' fields according to the given
 %% sensor reading type (as returned from {@link get_reading/2}).
 %% @end
 %%------------------------------------------------------------------------------
-decode_data({threshold, Type}, Assertion, EventData) ->
-    Data = pad_event_data(EventData),
+decode_event_data({threshold, Type}, Assertion, Data) ->
     [{sensor, get_sensor(Type)}] ++ decode_threshold(Type, Assertion, Data);
-decode_data({discrete, Type}, Assertion, EventData) ->
-    Data = pad_event_data(EventData),
+decode_event_data({discrete, Type}, Assertion, Data) ->
     [{sensor, get_sensor(Type)}] ++ decode_generic(Type, Assertion, Data);
-decode_data({oem, Type}, Assertion, EventData) ->
-    Data = pad_event_data(EventData),
+decode_event_data({oem, Type}, Assertion, Data) ->
     [{sensor, get_sensor(Type)}] ++ decode_oem(Type, Assertion, Data).
+
+%%------------------------------------------------------------------------------
+%% @doc
+%% Decodes the id, lun and channel from a standard encoded binary.
+%% @end
+%%------------------------------------------------------------------------------
+decode_addr(<<Addr:7, 0:1, 0:4, ?EIPMI_RESERVED:2, Lun:2>>) ->
+    [{slave_addr, Addr}, {slave_lun, Lun}];
+decode_addr(<<Addr:7, 0:1, Channel:4, ?EIPMI_RESERVED:2, Lun:2>>) ->
+    [{slave_addr, Addr}, {slave_lun, Lun}, {channel, Channel}];
+decode_addr(<<Id:7, 1:1, 0:4, ?EIPMI_RESERVED:2, 0:2>>) ->
+    [{software_id, Id}];
+decode_addr(<<Id:7, 1:1, Channel:4, ?EIPMI_RESERVED:2, 0:2>>) ->
+    [{software_id, Id}, {channel, Channel}].
 
 %%%=============================================================================
 %%% Internal functions
@@ -79,9 +158,9 @@ decode_data({oem, Type}, Assertion, EventData) ->
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-decode_threshold(Type, Assertion, <<1:2, 0:2, Offset:4, B2:8, _:8>>) ->
+decode_threshold(Type, Assertion, <<1:2, 0:2, Offset:4, _B2:8, _:8>>) ->
     [map(Type, Offset, Assertion, 16#ff, 16#ff)];
-decode_threshold(Type, Assertion, <<1:2, 1:2, Offset:4, B2:8, B3:8>>) ->
+decode_threshold(Type, Assertion, <<1:2, 1:2, Offset:4, _B2:8, _B3:8>>) ->
     [map(Type, Offset, Assertion, 16#ff, 16#ff)];
 decode_threshold(Type, Assertion, <<_:2, _:2, Offset:4, _:8, _:8>>) ->
     [map(Type, Offset, Assertion, 16#ff, 16#ff)].
@@ -487,11 +566,11 @@ map({specific,  16#10}, 16#05, _,     _,  Fill) ->
 map({specific,  16#10}, 16#06, _, 16#ff, 16#ff) ->
     {disabled_all, correctable_machine_check};
 map({specific,  16#10}, 16#06, _,    Id,     0) ->
-    {disabled, {correctable_machine_check, {entity, Id}}};
+    {disabled, {correctable_machine_check, {instance, Id}}};
 map({specific,  16#10}, 16#06, _,    Id, 16#80) ->
     {disabled, {correctable_machine_check, {processor, Id}}};
 map({specific,  16#10}, 16#06, _,    Id,     _) ->
-    {disabled, {correctable_machine_check, {entity, Id}}};
+    {disabled, {correctable_machine_check, {instance, Id}}};
 %% watchdog
 map({specific,  16#11}, 16#00, _,     _,     _) ->
     bios_reset;
@@ -1043,13 +1122,3 @@ maybe_previous(_Type, 16#f, _Assert) ->
     [];
 maybe_previous(Type, Offset, Assert) ->
     [{previous, map(Type, Offset, Assert, 16#ff, 16#ff)}].
-
-%%------------------------------------------------------------------------------
-%% @private
-%%------------------------------------------------------------------------------
-pad_event_data(Data = <<_:1/binary>>) ->
-    <<Data/binary, 16#ff:8, 16#ff:8>>;
-pad_event_data(Data = <<_:2/binary>>) ->
-    <<Data/binary, 16#ff:8>>;
-pad_event_data(Data = <<_:3/binary>>) ->
-    Data.

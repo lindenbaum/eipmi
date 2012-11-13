@@ -190,25 +190,25 @@ decode_header(<<Id:16/little, Version:8, Type:8, L:8>>) ->
 %% @private
 %%------------------------------------------------------------------------------
 decode_body(full, Data) ->
-    [];
+    decode_full_sensor_record(Data);
 decode_body(compact, Data) ->
-    [];
+    decode_compact_sensor_record(Data);
 decode_body(event_only, Data) ->
-    [];
+    decode_event_only_record(Data);
 decode_body(entity_association, Data) ->
-    [];
+    decode_entity_association_record(Data);
 decode_body(device_relative_entity_association, Data) ->
-    [];
+    decode_device_relative_entity_association_record(Data);
 decode_body(generic_device_locator, Data) ->
-    [];
+    decode_generic_device_locator_record(Data);
 decode_body(fru_device_locator, Data) ->
-    [];
+    decode_fru_device_locator_record(Data);
 decode_body(management_controller_device_locator, Data) ->
-    [];
+    decode_management_controller_device_locator_record(Data);
 decode_body(management_controller_confirmation, Data) ->
-    [];
+    decode_management_controller_confirmation_record(Data);
 decode_body(bmc_message_channel_info, Data) ->
-    [];
+    decode_bmc_message_channel_info_record(Data);
 decode_body(_Type, _Data) ->
     [].
 
@@ -231,11 +231,59 @@ get_record_type(_)     -> reserved.
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-get_generator(<<Addr:7, 0:1, 0:4, ?EIPMI_RESERVED:2, Lun:2>>) ->
-    [{slave_addr, Addr}, {slave_lun, Lun}];
-get_generator(<<Addr:7, 0:1, Channel:4, ?EIPMI_RESERVED:2, Lun:2>>) ->
-    [{slave_addr, Addr}, {slave_lun, Lun}, {channel, Channel}];
-get_generator(<<Id:7, 1:1, 0:4, ?EIPMI_RESERVED:2, 0:2>>) ->
-    [{software_id, Id}];
-get_generator(<<Id:7, 1:1, Channel:4, ?EIPMI_RESERVED:2, 0:2>>) ->
-    [{software_id, Id}, {channel, Channel}].
+decode_full_sensor_record(_Data) ->
+    [].
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+decode_compact_sensor_record(_Data) ->
+    [].
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+decode_event_only_record(_Data) ->
+    [].
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+decode_entity_association_record(_Data) ->
+    [].
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+decode_device_relative_entity_association_record(_Data) ->
+    [].
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+decode_generic_device_locator_record(_Data) ->
+    [].
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+decode_fru_device_locator_record(_Data) ->
+    [].
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+decode_management_controller_device_locator_record(_Data) ->
+    [].
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+decode_management_controller_confirmation_record(_Data) ->
+    [].
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+decode_bmc_message_channel_info_record(_Data) ->
+    [].

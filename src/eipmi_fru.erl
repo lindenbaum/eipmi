@@ -55,13 +55,25 @@
         {asset_tag, string()} |
         {custom, term()}.
 
+-type multi_record() ::
+        {power_supply, proplists:proplist()} |
+        {dc_output, proplists:proplist()} |
+        {dc_load, proplists:proplist()} |
+        {management_access, proplists:proplist()} |
+        {base_compatibility, proplists:proplist()} |
+        {extended_compatibility, proplists:proplist()}.
+
 -type info() ::
         [{chassis_area, [chassis_info()]} |
          {board_area, [board_info()]} |
          {product_area, [product_info()]} |
-         {record_area, [term()]}].
+         {record_area, [multi_record()]}].
 
--export_type([chassis_info/0, board_info/0, product_info/0, info/0]).
+-export_type([chassis_info/0,
+              board_info/0,
+              product_info/0,
+              multi_record/0,
+              info/0]).
 
 %%%=============================================================================
 %%% API
@@ -370,7 +382,7 @@ decode_compatibility(<<ManufacturerID:24/little, EntityID:8,
                        CompatibilityBase:8, 0:1, CodeStart:7,
                        CodeRanges/binary>>) ->
     [{manufacturer_id, ManufacturerID},
-     {entity_id, EntityID},
+     {entity, eipmi_sensor:get_entity(EntityID)},
      {compatibility_base, CompatibilityBase},
      {compatible_codes, get_code_ranges(CodeRanges, CodeStart)}].
 
@@ -511,13 +523,12 @@ sum(<<Byte:8, Rest/binary>>, Sum) ->
 -include_lib("eunit/include/eunit.hrl").
 
 decode_compatibility_test() ->
-    ?assertEqual([{manufacturer_id,123},
-                  {entity_id,1},
-                  {compatibility_base,42},
-                  {compatible_codes,[10,11,12,13,14,15,16,22,23]}],
-                 decode_compatibility(<<123:24/little,
-                                        1:8, 42:8, 10:8,
-                                        2#00111111:8,
-                                        2#00011000:8>>)).
+    ?assertEqual(
+       [{manufacturer_id, 16#1122},
+        {entity, other},
+        {compatibility_base, 42},
+        {compatible_codes, [10, 11, 12, 13, 14, 15, 16, 22, 23]}],
+       decode_compatibility(
+         <<16#1122:24/little, 1:8, 42:8, 10:8, 2#00111111:8, 2#00011000:8>>)).
 
 -endif.

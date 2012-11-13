@@ -111,7 +111,7 @@ lan(Ipmi = #rmcp_ipmi{properties = Ps},
                       {rq_seq_nr, RqSeqNr},
                       {rs_addr, RsAddr},
                       {rs_lun, RsLun},
-                      {completion, completion_code(Code)}],
+                      {completion, completion_code(NetFn, Cmd, Code)}],
            cmd = {NetFn, Cmd},
            data = Data}};
 lan(_Ipmi, _Head, _Tail) ->
@@ -134,28 +134,157 @@ sum(<<Byte:8, Rest/binary>>, Sum) ->
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-completion_code(16#00) -> normal;
-completion_code(16#c0) -> node_busy;
-completion_code(16#c1) -> invalid_command;
-completion_code(16#c2) -> invalid_command_for_lun;
-completion_code(16#c3) -> timeout;
-completion_code(16#c4) -> out_of_space;
-completion_code(16#c5) -> reservation_canceled;
-completion_code(16#c6) -> data_truncated;
-completion_code(16#c7) -> data_length_invalid;
-completion_code(16#c8) -> data_length_limit_exceeded;
-completion_code(16#c9) -> parameter_out_of_range;
-completion_code(16#ca) -> cannot_return_number_of_requested_data_bytes;
-completion_code(16#cb) -> requested_sensor_not_present;
-completion_code(16#cc) -> invalid_data_field;
-completion_code(16#cd) -> command_illegal_for_sensor;
-completion_code(16#ce) -> response_not_provided;
-completion_code(16#cf) -> duplicated_request;
-completion_code(16#d0) -> sdr_repository_in_update_mode;
-completion_code(16#d1) -> device_in_firmware_update_mode;
-completion_code(16#d2) -> bmc_initialization_in_progress;
-completion_code(16#d3) -> destination_unavailable;
-completion_code(16#d4) -> insufficient_privilege_level;
-completion_code(16#d5) -> command_not_supported;
-completion_code(16#d6) -> command_disabled;
-completion_code(_) -> unspecified_error.
+completion_code(_,                                 _,                                    16#00) ->
+    normal;
+completion_code(_,                                 _,                                    16#c0) ->
+    node_busy;
+completion_code(_,                                 _,                                    16#c1) ->
+    invalid_command;
+completion_code(_,                                 _,                                    16#c2) ->
+    invalid_command_for_lun;
+completion_code(_,                                 _,                                    16#c3) ->
+    timeout;
+completion_code(_,                                 _,                                    16#c4) ->
+    out_of_space;
+completion_code(_,                                 _,                                    16#c5) ->
+    reservation_canceled;
+completion_code(_,                                 _,                                    16#c6) ->
+    data_truncated;
+completion_code(_,                                 _,                                    16#c7) ->
+    data_length_invalid;
+completion_code(_,                                 _,                                    16#c8) ->
+    data_length_limit_exceeded;
+completion_code(_,                                 _,                                    16#c9) ->
+    parameter_out_of_range;
+completion_code(_,                                 _,                                    16#ca) ->
+    cannot_return_number_of_requested_data_bytes;
+completion_code(_,                                 _,                                    16#cb) ->
+    requested_sensor_not_present;
+completion_code(_,                                 _,                                    16#cc) ->
+    invalid_data_field;
+completion_code(_,                                 _,                                    16#cd) ->
+    command_illegal_for_sensor;
+completion_code(_,                                 _,                                    16#ce) ->
+    response_not_provided;
+completion_code(_,                                 _,                                    16#cf) ->
+    duplicated_request;
+completion_code(_,                                 _,                                    16#d0) ->
+    sdr_repository_in_update_mode;
+completion_code(_,                                 _,                                    16#d1) ->
+    device_in_firmware_update_mode;
+completion_code(_,                                 _,                                    16#d2) ->
+    bmc_initialization_in_progress;
+completion_code(_,                                 _,                                    16#d3) ->
+    destination_unavailable;
+completion_code(_,                                 _,                                    16#d4) ->
+    insufficient_privilege_level;
+completion_code(_,                                 _,                                    16#d5) ->
+    command_not_supported;
+completion_code(_,                                 _,                                    16#d6) ->
+    command_disabled;
+completion_code(?IPMI_NETFN_APPLICATION_RESPONSE,  ?GET_MESSAGE,                         16#80) ->
+    data_not_available;
+completion_code(?IPMI_NETFN_APPLICATION_RESPONSE,  ?SEND_MESSAGE,                        16#80) ->
+    invalid_session_handle;
+completion_code(?IPMI_NETFN_APPLICATION_RESPONSE,  ?GET_SESSION_CHALLENGE,               16#81) ->
+    invalid_user_name;
+completion_code(?IPMI_NETFN_APPLICATION_RESPONSE,  ?GET_SESSION_CHALLENGE,               16#82) ->
+    null_user_name_not_enabled;
+completion_code(?IPMI_NETFN_APPLICATION_RESPONSE,  ?ACTIVATE_SESSION,                    16#81) ->
+    no_session_slot_available;
+completion_code(?IPMI_NETFN_APPLICATION_RESPONSE,  ?ACTIVATE_SESSION,                    16#82) ->
+    no_slot_available_for_user;
+completion_code(?IPMI_NETFN_APPLICATION_RESPONSE,  ?ACTIVATE_SESSION,                    16#83) ->
+    no_slot_available_to_support_user;
+completion_code(?IPMI_NETFN_APPLICATION_RESPONSE,  ?ACTIVATE_SESSION,                    16#84) ->
+    session_sequence_number_out_of_range;
+completion_code(?IPMI_NETFN_APPLICATION_RESPONSE,  ?ACTIVATE_SESSION,                    16#85) ->
+    invalid_session_id;
+completion_code(?IPMI_NETFN_APPLICATION_RESPONSE,  ?ACTIVATE_SESSION,                    16#86) ->
+    requested_privilege_level_exceeds_user_or_channel_limit;
+completion_code(?IPMI_NETFN_APPLICATION_RESPONSE,  ?SET_SESSION_PRIVILEGE_LEVEL,         16#80) ->
+    requested_level_not_available_for_user;
+completion_code(?IPMI_NETFN_APPLICATION_RESPONSE,  ?SET_SESSION_PRIVILEGE_LEVEL,         16#81) ->
+    requested_privilege_level_exceeds_user_or_channel_limit;
+completion_code(?IPMI_NETFN_APPLICATION_RESPONSE,  ?SET_SESSION_PRIVILEGE_LEVEL,         16#82) ->
+    cannot_disable_user_level_authentication;
+completion_code(?IPMI_NETFN_APPLICATION_RESPONSE,  ?CLOSE_SESSION,                       16#87) ->
+    invalid_session_id;
+completion_code(?IPMI_NETFN_APPLICATION_RESPONSE,  ?CLOSE_SESSION,                       16#88) ->
+    invalid_session_handle;
+completion_code(?IPMI_NETFN_APPLICATION_RESPONSE,  ?SET_CHANNEL_ACCESS,                  16#82) ->
+    set_not_supported_on_channel;
+completion_code(?IPMI_NETFN_APPLICATION_RESPONSE,  ?SET_CHANNEL_ACCESS,                  16#83) ->
+    access_mode_not_supported;
+completion_code(?IPMI_NETFN_APPLICATION_RESPONSE,  ?GET_CHANNEL_ACCESS,                  16#82) ->
+    command_not_supported_on_channel;
+completion_code(?IPMI_NETFN_APPLICATION_RESPONSE,  ?SET_USER_PASSWORD,                   16#80) ->
+    password_not_matching;
+completion_code(?IPMI_NETFN_APPLICATION_RESPONSE,  ?SET_USER_PASSWORD,                   16#81) ->
+    wrong_password_size;
+completion_code(?IPMI_NETFN_APPLICATION_RESPONSE,  ?RESET_WATCHDOG_TIMER,                16#80) ->
+    watchdog_uninitialized;
+completion_code(?IPMI_NETFN_TRANSPORT_RESPONSE,    ?SET_LAN_CONFIGURATION_PARAMETERS,    16#80) ->
+    parameter_not_supported;
+completion_code(?IPMI_NETFN_TRANSPORT_RESPONSE,    ?SET_LAN_CONFIGURATION_PARAMETERS,    16#81) ->
+    set_already_in_progress_by_other_party;
+completion_code(?IPMI_NETFN_TRANSPORT_RESPONSE,    ?SET_LAN_CONFIGURATION_PARAMETERS,    16#82) ->
+    write_attempt_on_read_only_parameter;
+completion_code(?IPMI_NETFN_TRANSPORT_RESPONSE,    ?SET_LAN_CONFIGURATION_PARAMETERS,    16#83) ->
+    read_attempt_on_write_only_parameter;
+completion_code(?IPMI_NETFN_TRANSPORT_RESPONSE,    ?GET_LAN_CONFIGURATION_PARAMETERS,    16#80) ->
+    parameter_not_supported;
+completion_code(?IPMI_NETFN_SENSOR_EVENT_RESPONSE, ?SET_PEF_CONFIGURATION_PARAMETERS,    16#80) ->
+    parameter_not_supported;
+completion_code(?IPMI_NETFN_SENSOR_EVENT_RESPONSE, ?SET_PEF_CONFIGURATION_PARAMETERS,    16#81) ->
+    set_already_in_progress_by_other_party;
+completion_code(?IPMI_NETFN_SENSOR_EVENT_RESPONSE, ?SET_PEF_CONFIGURATION_PARAMETERS,    16#82) ->
+    write_attempt_on_read_only_parameter;
+completion_code(?IPMI_NETFN_SENSOR_EVENT_RESPONSE, ?SET_PEF_CONFIGURATION_PARAMETERS,    16#83) ->
+    read_attempt_on_write_only_parameter;
+completion_code(?IPMI_NETFN_SENSOR_EVENT_RESPONSE, ?GET_PEF_CONFIGURATION_PARAMETERS,    16#80) ->
+    parameter_not_supported;
+completion_code(?IPMI_NETFN_SENSOR_EVENT_RESPONSE, ?SET_LAST_PROCESSED_EVENT_ID,         16#81) ->
+    sel_erase_in_progress;
+completion_code(?IPMI_NETFN_SENSOR_EVENT_RESPONSE, ?GET_LAST_PROCESSED_EVENT_ID,         16#81) ->
+    sel_erase_in_progress;
+completion_code(?IPMI_NETFN_SENSOR_EVENT_RESPONSE, ?ALERT_IMMEDIATE,                     16#81) ->
+    alert_already_in_progress;
+completion_code(?IPMI_NETFN_SENSOR_EVENT_RESPONSE, ?ALERT_IMMEDIATE,                     16#82) ->
+    messaging_session_already_active;
+completion_code(?IPMI_NETFN_SENSOR_EVENT_RESPONSE, ?ALERT_IMMEDIATE,                     16#83) ->
+    platform_event_parameters_not_supported;
+completion_code(?IPMI_NETFN_SENSOR_EVENT_RESPONSE, ?GET_DEVICE_SDR,                      16#80) ->
+    record_changed;
+completion_code(?IPMI_NETFN_SENSOR_EVENT_RESPONSE, ?SET_SENSOR_READING_AND_EVENT_STATUS, 16#80) ->
+    corresponding_bits_not_settable;
+completion_code(?IPMI_NETFN_SENSOR_EVENT_RESPONSE, ?SET_SENSOR_READING_AND_EVENT_STATUS, 16#81) ->
+    event_data_bytes_not_settable;
+completion_code(?IPMI_NETFN_STORAGE_RESPONSE,      ?READ_FRU_DATA,                       16#81) ->
+    fru_device_busy;
+completion_code(?IPMI_NETFN_STORAGE_RESPONSE,      ?WRITE_FRU_DATA,                      16#80) ->
+    write_protected_offset;
+completion_code(?IPMI_NETFN_STORAGE_RESPONSE,      ?WRITE_FRU_DATA,                      16#81) ->
+    fru_device_busy;
+completion_code(?IPMI_NETFN_STORAGE_RESPONSE,      ?PARTIAL_ADD_SDR,                     16#80) ->
+    record_rejected;
+completion_code(?IPMI_NETFN_STORAGE_RESPONSE,      ?GET_SEL_INFO,                        16#81) ->
+    sel_erase_in_progress;
+completion_code(?IPMI_NETFN_STORAGE_RESPONSE,      ?RESERVE_SEL,                         16#81) ->
+    sel_erase_in_progress;
+completion_code(?IPMI_NETFN_STORAGE_RESPONSE,      ?GET_SEL_ENTRY,                       16#81) ->
+    sel_erase_in_progress;
+completion_code(?IPMI_NETFN_STORAGE_RESPONSE,      ?ADD_SEL_ENTRY,                       16#80) ->
+    operation_not_supported_for_record;
+completion_code(?IPMI_NETFN_STORAGE_RESPONSE,      ?ADD_SEL_ENTRY,                       16#81) ->
+    sel_erase_in_progress;
+completion_code(?IPMI_NETFN_STORAGE_RESPONSE,      ?PARTIAL_ADD_SEL_ENTRY,               16#80) ->
+    record_rejected;
+completion_code(?IPMI_NETFN_STORAGE_RESPONSE,      ?PARTIAL_ADD_SEL_ENTRY,               16#81) ->
+    sel_erase_in_progress;
+completion_code(?IPMI_NETFN_STORAGE_RESPONSE,      ?DELETE_SEL_ENTRY,                    16#80) ->
+    operation_not_supported_for_record;
+completion_code(?IPMI_NETFN_STORAGE_RESPONSE,      ?DELETE_SEL_ENTRY,                    16#81) ->
+    sel_erase_in_progress;
+completion_code(_,                                 _,                                    _) ->
+    unspecified_error.
