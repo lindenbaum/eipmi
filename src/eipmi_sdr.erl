@@ -16,13 +16,22 @@
 %%% @doc
 %%% A module providing reading and decoding functionality for Sensor Data
 %%% Records (SDRs).
+%%% TODO:
+%%%  * full sensor data record
+%%%  * compact sensor data record
+%%%  * entity_association sensor data record
+%%%  * device_relative_entity_association sensor data record
+%%%  * generic_device_locator sensor data record
+%%%  * fru_device_locator sensor data record
+%%%  * management_controller_device_locator sensor data record
+%%%  * bmc_message_channel_info sensor data record
+%%%  * oem sensor data record
 %%% @end
 %%%=============================================================================
 
 -module(eipmi_sdr).
 
--export([get_info/1,
-         read/1,
+-export([read/1,
          read/2]).
 
 -include("eipmi.hrl").
@@ -67,17 +76,7 @@
 
 %%------------------------------------------------------------------------------
 %% @doc
-%% TODO
-%% @end
-%%------------------------------------------------------------------------------
--spec get_info(pid()) ->
-                      {ok, [info()]} | {error, term()}.
-get_info(SessionPid) ->
-    eipmi_session:request(SessionPid, ?GET_INFO, []).
-
-%%------------------------------------------------------------------------------
-%% @doc
-%% TODO
+%% Read all entries from the sensor data record repository (SDR).
 %% @end
 %%------------------------------------------------------------------------------
 -spec read(pid()) ->
@@ -95,7 +94,7 @@ read(SessionPid) ->
 
 %%------------------------------------------------------------------------------
 %% @doc
-%% TODO
+%% Read one specific entry from the sensor data record repository (SDR).
 %% @end
 %%------------------------------------------------------------------------------
 -spec read(pid(), non_neg_integer()) ->

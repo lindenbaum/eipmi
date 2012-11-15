@@ -71,6 +71,10 @@ will not block each other. However, flow control is performed over all requests
 of a session. If a maximum of 8 pending requests is reached new requests will
 be queued and sent as pending requests get completed.
 
+### Asynchronous Events
+
+TODO
+
 ### Building
 
 If you are using [rebar](http://github.com/basho/rebar) to build your project

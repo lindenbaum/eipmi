@@ -254,7 +254,12 @@ read_fru(Session = {_, _}, FruId) when FruId >= 0 andalso FruId < 255 ->
 
 %%------------------------------------------------------------------------------
 %% @doc
-%% TODO
+%% Return all records contained in the Sensor Data Record (SDR) Repository.
+%%
+%% Reading of the SDR may fail (e.g. return `{error, term()}') when the
+%% reservation for SDR reading with non-zero offsets gets cancelled. This is not
+%% a severe error. It is most likely that the SDR can be read successfully when
+%% retried.
 %% @end
 %%------------------------------------------------------------------------------
 -spec read_sdr(session()) ->
@@ -278,7 +283,10 @@ read_sdr(Session = {_, _}) ->
 %% returned SEL entries are property lists that do only contain the available
 %% and checksum error free fields of the respective entry. Using the second
 %% argument the SEL can optionally be cleared after reading.
-%% TODO
+%%
+%% Clearing the SEL may fail in rare cases when the reservation for SEL
+%% clearance gets cancelled by the BMC. This will be ignored. However in this
+%% case the following read may return duplicates of already read events.
 %% @end
 %%------------------------------------------------------------------------------
 -spec read_sel(session(), boolean()) ->

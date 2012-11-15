@@ -16,7 +16,7 @@
 %%% @doc
 %%% A module providing FRU reading and decoding functionality according to the
 %%% official IPMI Platform Management FRU Information Storage Definition.
-%%% Currently missing features:
+%%% TODO:
 %%% * support for mutli record fields (according to PICMG spec)
 %%% @end
 %%%=============================================================================

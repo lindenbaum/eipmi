@@ -16,7 +16,7 @@
 %%% @doc
 %%% A module providing reading and decoding functionality for the System
 %%% Event Log (SEL).
-%%% TODOs:
+%%% TODO:
 %%% * decode threshold based sensor readings
 %%% * decode oem based sensor readings
 %%% @end
@@ -70,7 +70,7 @@ read(SessionPid, true) ->
     {ok, SelInfo} = eipmi_session:request(SessionPid, ?GET_INFO, []),
     Entries = do_read(SessionPid, eipmi_util:get_val(entries, SelInfo)),
     Operations = eipmi_util:get_val(operations, SelInfo),
-    do_clear(SessionPid, lists:member(reserve, Operations)),
+    ?EIPMI_CATCH(do_clear(SessionPid, lists:member(reserve, Operations))),
     Entries;
 read(SessionPid, false) ->
     do_read(SessionPid, all).

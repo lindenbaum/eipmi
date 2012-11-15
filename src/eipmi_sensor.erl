@@ -185,7 +185,8 @@ get_type({_,          Type}) -> [{sensor_type, Type}].
 
 %%------------------------------------------------------------------------------
 %% @doc
-%% TODO
+%% Returns a (raw) sensor reading. The returned reading may have to be converted
+%% into human readable values (at least for threshold based sensors).
 %% @end
 %%------------------------------------------------------------------------------
 get_value(Type, Offset, Assertion, Value1, Value2) ->

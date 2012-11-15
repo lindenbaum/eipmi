@@ -36,7 +36,8 @@
 %%% there's no need to edit the session but extending these modules when
 %%% support for new requests/responses is added.
 %%%
-%%% @TODO Implement session keep alive.
+%%% TODO:
+%%% * Implement session keep alive.
 %%% @end
 %%%=============================================================================
 -module(eipmi_session).
