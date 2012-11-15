@@ -390,30 +390,30 @@ get_unit(92) -> grams.
 %% @private
 %%------------------------------------------------------------------------------
 %% threshold
-map({threshold, 16#01}, 16#00, _,     _,     _) ->
-    {lower_non_critical, going_low};
-map({threshold, 16#01}, 16#01, _,     _,     _) ->
-    {lower_non_critical, going_high};
-map({threshold, 16#01}, 16#02, _,     _,     _) ->
-    {lower_critical, going_low};
-map({threshold, 16#01}, 16#03, _,     _,     _) ->
-    {lower_critical, going_high};
-map({threshold, 16#01}, 16#04, _,     _,     _) ->
-    {lower_non_recoverable, going_low};
-map({threshold, 16#01}, 16#05, _,     _,     _) ->
-    {lower_non_recoverable, going_high};
-map({threshold, 16#01}, 16#06, _,     _,     _) ->
-    {upper_non_critical, going_low};
-map({threshold, 16#01}, 16#07, _,     _,     _) ->
-    {upper_non_critical, going_high};
-map({threshold, 16#01}, 16#08, _,     _,     _) ->
-    {upper_critical, going_low};
-map({threshold, 16#01}, 16#09, _,     _,     _) ->
-    {upper_critical, going_high};
-map({threshold, 16#01}, 16#0a, _,     _,     _) ->
-    {upper_non_recoverable, going_low};
-map({threshold, 16#01}, 16#0b, _,     _,     _) ->
-    {upper_non_recoverable, going_high};
+map({threshold, 16#01}, 16#00, _,    B2,    B3) ->
+    {lower_non_critical, going_low, B2 ++ B3};
+map({threshold, 16#01}, 16#01, _,    B2,    B3) ->
+    {lower_non_critical, going_high, B2 ++ B3};
+map({threshold, 16#01}, 16#02, _,    B2,    B3) ->
+    {lower_critical, going_low, B2 ++ B3};
+map({threshold, 16#01}, 16#03, _,    B2,    B3) ->
+    {lower_critical, going_high, B2 ++ B3};
+map({threshold, 16#01}, 16#04, _,    B2,    B3) ->
+    {lower_non_recoverable, going_low, B2 ++ B3};
+map({threshold, 16#01}, 16#05, _,    B2,    B3) ->
+    {lower_non_recoverable, going_high, B2 ++ B3};
+map({threshold, 16#01}, 16#06, _,    B2,    B3) ->
+    {upper_non_critical, going_low, B2 ++ B3};
+map({threshold, 16#01}, 16#07, _,    B2,    B3) ->
+    {upper_non_critical, going_high, B2 ++ B3};
+map({threshold, 16#01}, 16#08, _,    B2,    B3) ->
+    {upper_critical, going_low, B2 ++ B3};
+map({threshold, 16#01}, 16#09, _,    B2,    B3) ->
+    {upper_critical, going_high, B2 ++ B3};
+map({threshold, 16#01}, 16#0a, _,    B2,    B3) ->
+    {upper_non_recoverable, going_low, B2 ++ B3};
+map({threshold, 16#01}, 16#0b, _,    B2,    B3) ->
+    {upper_non_recoverable, going_high, B2 ++ B3};
 %% dmi_usage
 map({generic,   16#02}, 16#00, _,     _,     _) ->
     transition_to_idle;
@@ -1055,8 +1055,10 @@ map({specific,  16#2c}, 16#06, _,  Data,     _) ->
     {deactivation_in_progress, get_fru_state_data(Data)};
 map({specific,  16#2c}, 16#07, _,  Data,     _) ->
     {communication_lost, get_fru_state_data(Data)};
-map(                 _,     _, _,     _,     _) ->
-    unknown.
+map(              Type,     O, A,    B2,    B3) ->
+    {unknown, [{type, Type}, {offset, O},
+               {asserted, eipmi_util:get_bool_inv(A)},
+               {data2, B2}, {data3, B3}]}.
 
 %%------------------------------------------------------------------------------
 %% @private

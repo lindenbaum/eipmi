@@ -16,9 +16,6 @@
 %%% @doc
 %%% A module providing reading and decoding functionality for the System
 %%% Event Log (SEL).
-%%% TODO:
-%%% * decode threshold based sensor readings
-%%% * decode oem based sensor readings
 %%% @end
 %%%=============================================================================
 
@@ -189,12 +186,12 @@ decode_event_data({oem, Type}, Assertion, Data) ->
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-decode_threshold(Type, Assertion, <<1:2, 0:2, Offset:4, _B2:8, _:8>>) ->
-    get_value(Type, Offset, Assertion, 16#ff, 16#ff);
-decode_threshold(Type, Assertion, <<1:2, 1:2, Offset:4, _B2:8, _B3:8>>) ->
-    get_value(Type, Offset, Assertion, 16#ff, 16#ff);
+decode_threshold(Type, Assertion, <<1:2, 0:2, Offset:4, B2:8, _:8>>) ->
+    get_value(Type, Offset, Assertion, [{reading, {raw, B2}}], []);
+decode_threshold(Type, Assertion, <<1:2, 1:2, Offset:4, B2:8, B3:8>>) ->
+    get_value(Type, Offset, Assertion, [{reading, {raw, B2}}], [{threshold, {raw, B3}}]);
 decode_threshold(Type, Assertion, <<_:2, _:2, Offset:4, _:8, _:8>>) ->
-    get_value(Type, Offset, Assertion, 16#ff, 16#ff).
+    get_value(Type, Offset, Assertion, [], []).
 
 %%------------------------------------------------------------------------------
 %% @private
@@ -219,8 +216,22 @@ decode_generic(Type, Assertion, <<_:2, _:2, Offset:4, _:8, _:8>>) ->
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-decode_oem(_Type, Asserted, Data) ->
-    [{asserted, eipmi_util:get_bool(Asserted)}, {data, Data}].
+decode_oem(Type, Assertion, <<0:2, 2:2, Offset:4, _:8, B3:8>>) ->
+    get_value(Type, Offset, Assertion, 16#ff, B3);
+decode_oem(Type, Assertion, <<1:2, 0:2, Offset:4, SOff:4, POff:4, _:8>>) ->
+    Severity = maybe_value(severity_value, {generic, 16#07}, SOff, 0),
+    Previous = maybe_value(previous_value, Type, POff, Assertion),
+    get_value(Type, Offset, Assertion, 16#ff, 16#ff) ++ Severity ++ Previous;
+decode_oem(Type, Assertion, <<1:2, 2:2, Offset:4, SOff:4, POff:4, B3:8>>) ->
+    Severity = maybe_value(severity_value, {generic, 16#07}, SOff, 0),
+    Previous = maybe_value(previous_value, Type, POff, Assertion),
+    get_value(Type, Offset, Assertion, 16#ff, B3) ++ Severity ++ Previous;
+decode_oem(Type, Assertion, <<2:2, 0:2, Offset:4, B2:8, _:8>>) ->
+    get_value(Type, Offset, Assertion, B2, 16#ff);
+decode_oem(Type, Assertion, <<2:2, 2:2, Offset:4, B2:8, B3:8>>) ->
+    get_value(Type, Offset, Assertion, B2, B3);
+decode_oem(Type, Assertion, <<_:2, _:2, Offset:4, _:8, _:8>>) ->
+    get_value(Type, Offset, Assertion, 16#ff, 16#ff).
 
 %%------------------------------------------------------------------------------
 %% @private
