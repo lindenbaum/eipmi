@@ -22,7 +22,8 @@
 
 -module(eipmi_response).
 
--export([decode/2]).
+-export([decode/2,
+         get_device_support/1]).
 
 -include("eipmi.hrl").
 
@@ -46,6 +47,24 @@ decode({?IPMI_NETFN_STORAGE_RESPONSE, Cmd}, Data) ->
     decode_storage(Cmd, Data);
 decode({?IPMI_NETFN_TRANSPORT_RESPONSE, Cmd}, Data) ->
     decode_transport(Cmd, Data).
+
+%%------------------------------------------------------------------------------
+%% @doc
+%% Returns a list of supported capabilities of a device (decoded from integer).
+%% @end
+%%------------------------------------------------------------------------------
+-spec get_device_support(non_neg_integer()) ->
+                                [atom()].
+get_device_support(Support) ->
+    A = case Support band 2#10000000 of 2#10000000 -> [chassis]; _ -> [] end,
+    B = case Support band 2#1000000 of 2#1000000 -> [bridge]; _ -> [] end,
+    C = case Support band 2#100000 of 2#100000 -> [event_generator]; _ -> [] end,
+    D = case Support band 2#10000 of 2#10000 -> [event_receiver]; _ -> [] end,
+    E = case Support band 2#1000 of 2#1000 -> [fru_inventory]; _ -> [] end,
+    F = case Support band 2#100 of 2#100 -> [sel]; _ -> [] end,
+    G = case Support band 2#10 of 2#10 -> [sdr]; _ -> [] end,
+    H = case Support band 2#1 of 2#1 -> [sensor]; _ -> [] end,
+    A ++ B ++ C ++ D ++ E ++ F ++ G ++ H.
 
 %%%=============================================================================
 %%% internal functions
@@ -208,20 +227,6 @@ get_device_power_state(16#01) -> d1;
 get_device_power_state(16#02) -> d2;
 get_device_power_state(16#03) -> d3;
 get_device_power_state(_) -> unknown.
-
-%%------------------------------------------------------------------------------
-%% @private
-%%------------------------------------------------------------------------------
-get_device_support(Support) ->
-    A = case Support band 2#10000000 of 2#10000000 -> [chassis]; _ -> [] end,
-    B = case Support band 2#1000000 of 2#1000000 -> [bridge]; _ -> [] end,
-    C = case Support band 2#100000 of 2#100000 -> [event_generator]; _ -> [] end,
-    D = case Support band 2#10000 of 2#10000 -> [event_receiver]; _ -> [] end,
-    E = case Support band 2#1000 of 2#1000 -> [fru_inventory]; _ -> [] end,
-    F = case Support band 2#100 of 2#100 -> [sel]; _ -> [] end,
-    G = case Support band 2#10 of 2#10 -> [sdr]; _ -> [] end,
-    H = case Support band 2#1 of 2#1 -> [sensor]; _ -> [] end,
-    A ++ B ++ C ++ D ++ E ++ F ++ G ++ H.
 
 %%------------------------------------------------------------------------------
 %% @private

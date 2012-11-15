@@ -187,7 +187,8 @@ do_read(Pid, Record, Reservation, Count, {Offset, Acc}) ->
 %%------------------------------------------------------------------------------
 decode_header(<<Id:16/little, Version:1/binary, Type:8, L:8>>) ->
     T = get_record_type(Type),
-    V = lists:reverse(eipmi_util:from_bcd_plus(Version)),
+    [V1 | VRest] = lists:reverse(eipmi_util:from_bcd_plus(Version)),
+    V = [V1 | [$. | VRest]],
     [{record_id, Id}, {sdr_version, V}, {record_type, T}, {record_length, L}].
 
 %%------------------------------------------------------------------------------
@@ -213,8 +214,8 @@ decode_body(management_controller_confirmation, Data) ->
     decode_management_controller_confirmation_record(Data);
 decode_body(bmc_message_channel_info, Data) ->
     decode_bmc_message_channel_info_record(Data);
-decode_body(_Type, _Data) ->
-    [].
+decode_body(oem, Data) ->
+    decode_oem_record(Data).
 
 %%------------------------------------------------------------------------------
 %% @private
@@ -306,9 +307,14 @@ decode_fru_device_locator_record(_Data) ->
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-decode_management_controller_device_locator_record(_Data) ->
-    %% TODO
-    [].
+decode_management_controller_device_locator_record(
+  <<Addr:7, ?EIPMI_RESERVED:5, Channel:4, _PowerStateNotification:4,
+    _GlobalInitialization:4, Capabilities:8, ?EIPMI_RESERVED:24,
+    EntityId:8, EntityInstance:1/binary, _OEM:8, _IdLen:8, Id/binary>>) ->
+    eipmi_sensor:get_addr(<<Addr:7, 0:1, 0:4, Channel:4>>)
+        ++ [{device_support, eipmi_response:get_device_support(Capabilities)}]
+        ++ eipmi_sensor:get_entity(EntityId, EntityInstance)
+        ++ [{id, eipmi_util:binary_to_string(Id)}].
 
 %%------------------------------------------------------------------------------
 %% @private
@@ -326,8 +332,13 @@ decode_management_controller_confirmation_record(
 %% @private
 %%------------------------------------------------------------------------------
 decode_bmc_message_channel_info_record(_Data) ->
-    %% TODO
     [].
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+decode_oem_record(<<Manufacturer:24/little, Data/binary>>) ->
+    [{manufacturer_id, Manufacturer}, {data, Data}].
 
 %%------------------------------------------------------------------------------
 %% @private
