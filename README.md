@@ -68,7 +68,7 @@ BMC supports *anonymous* logins no options need to be set.
 A session may be shared between mutliple processes. While the requests of one
 process will be synchronous and thus ordered, requests from different processes
 will not block each other. However, flow control is performed over all requests
-of a session. If a maximum of 64 pending requests is reached new requests will
+of a session. If a maximum of 8 pending requests is reached new requests will
 be queued and sent as pending requests get completed.
 
 ### Building
@@ -240,7 +240,10 @@ Argument:
 
 Return:
 ```erlang
-[{auth_types, none | pwd | md2 | md5},
+[{channel, non_neg_integer()},
+ {auth_types, none | pwd | md2 | md5},
+ {per_message_authentication_enabled, boolean()},
+ {user_level_authentication_enabled, boolean()},
  {login_status, [null | non_null | anonymous]}]
 ```
 

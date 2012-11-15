@@ -30,7 +30,7 @@ ping({ok, "tirana"}) ->
     application:start(crypto),
     application:start(md2),
     application:start(eipmi),
-    ?assertEqual(pong, eipmi:ping("10.1.31.11"));
+    ?assertEqual(pong, eipmi:ping("10.1.31.10"));
 ping(_) ->
     ok.
 
@@ -42,7 +42,7 @@ open_close({ok, "tirana"}) ->
     application:start(crypto),
     application:start(md2),
     application:start(eipmi),
-    {ok, Session} = eipmi:open("10.1.31.11"),
+    {ok, Session} = eipmi:open("10.1.31.10"),
     Mon = monitor_session(Session),
     receive after 1000 -> ok end,
     ?assertEqual(ok, eipmi:close(Session)),
@@ -59,7 +59,7 @@ parallel_request({ok, "tirana"}) ->
     application:start(crypto),
     application:start(md2),
     application:start(eipmi),
-    {ok, Session} = eipmi:open("10.1.31.11"),
+    {ok, Session} = eipmi:open("10.1.31.10"),
     Mon = monitor_session(Session),
     Action = fun() -> {ok, _} = eipmi:raw(Session, 16#06, 16#3b, []) end,
     Pids = lists:map(fun(_) -> spawn_link(Action) end, lists:seq(1, 10)),
@@ -79,13 +79,30 @@ read_fru({ok, "tirana"}) ->
     application:start(crypto),
     application:start(md2),
     application:start(eipmi),
-    {ok, Session} = eipmi:open("10.1.31.11"),
+    {ok, Session} = eipmi:open("10.1.31.10"),
     Mon = monitor_session(Session),
     Result = eipmi:read_fru(Session, 253),
     error_logger:info_msg("~n~p~n", [Result]),
     ?assertEqual(ok, eipmi:close(Session)),
     ?assertEqual(normal, receive {'DOWN', Mon, _, _, Reason} -> Reason end);
 read_fru(_) ->
+    ok.
+
+read_sdr_test() ->
+    read_sdr(inet:gethostname()).
+
+read_sdr({ok, "tirana"}) ->
+    application:start(sasl),
+    application:start(crypto),
+    application:start(md2),
+    application:start(eipmi),
+    {ok, Session} = eipmi:open("10.1.31.10"),
+    Mon = monitor_session(Session),
+    Result = eipmi:read_sdr(Session),
+    error_logger:info_msg("~n~p~n", [Result]),
+    ?assertEqual(ok, eipmi:close(Session)),
+    ?assertEqual(normal, receive {'DOWN', Mon, _, _, Reason} -> Reason end);
+read_sdr(_) ->
     ok.
 
 read_sel_test() ->
@@ -96,7 +113,7 @@ read_sel({ok, "tirana"}) ->
     application:start(crypto),
     application:start(md2),
     application:start(eipmi),
-    {ok, Session} = eipmi:open("10.1.31.11"),
+    {ok, Session} = eipmi:open("10.1.31.10"),
     Mon = monitor_session(Session),
     Result = eipmi:read_sel(Session, false),
     error_logger:info_msg("~n~p~n", [Result]),

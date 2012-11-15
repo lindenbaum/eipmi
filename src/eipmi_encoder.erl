@@ -53,7 +53,7 @@ ack(Header = #rmcp_header{class = ?RMCP_ASF}) ->
                   binary().
 ping(Header = #rmcp_header{class = ?RMCP_ASF}, #asf_ping{iana = I, tag = T}) ->
     HeaderBin = header(Header, ?RMCP_NORMAL),
-    PingBin = <<I:32, ?ASF_PING:8, T:8, ?EIPMI_RESERVED:8, 0:8>>,
+    PingBin = <<I:32, ?ASF_PING:8, T:8, 0:8, 0:8>>,
     <<HeaderBin/binary, PingBin/binary>>.
 
 %%------------------------------------------------------------------------------
@@ -80,7 +80,7 @@ ipmi(Header = #rmcp_header{class = ?RMCP_IPMI}, Properties, Req, Data) ->
 %% @private
 %%------------------------------------------------------------------------------
 header(#rmcp_header{version = V, seq_nr = S, class = C}, Ack) ->
-    <<V:8, ?EIPMI_RESERVED:8, S:8, Ack:1, ?EIPMI_RESERVED:2, C:5>>.
+    <<V:8, 0:8, S:8, Ack:1, 0:2, C:5>>.
 
 %%------------------------------------------------------------------------------
 %% @private
@@ -99,17 +99,17 @@ session(Properties, Data) ->
 %%------------------------------------------------------------------------------
 session(none, S, I, _P, _Data) ->
     Type = eipmi_auth:encode_type(none),
-    <<?EIPMI_RESERVED:4, Type:4, S:32/little, I:32/little>>;
+    <<0:4, Type:4, S:32/little, I:32/little>>;
 session(pwd, S, I, P, _Data) ->
     Type = eipmi_auth:encode_type(pwd),
     C = eipmi_auth:encrypt(pwd, P),
-    <<?EIPMI_RESERVED:4, Type:4, S:32/little, I:32/little, C/binary>>;
+    <<0:4, Type:4, S:32/little, I:32/little, C/binary>>;
 session(T, S, I, P, Data) ->
     Type = eipmi_auth:encode_type(T),
     C = eipmi_util:normalize(16, P),
     ToEncrypt = <<C/binary, I:32/little, Data/binary, S:32/little, C/binary>>,
     Ci = eipmi_auth:encrypt(T, ToEncrypt),
-    <<?EIPMI_RESERVED:4, Type:4, S:32/little, I:32/little, Ci/binary>>.
+    <<0:4, Type:4, S:32/little, I:32/little, Ci/binary>>.
 
 %%------------------------------------------------------------------------------
 %% @private

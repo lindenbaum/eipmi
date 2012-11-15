@@ -28,7 +28,7 @@
 %%% A session may be shared between mutliple processes. While the requests of
 %%% one process will be synchronous and thus ordered, requests from different
 %%% processes will not block each other. However, flow control is performed over
-%%% all requests of a session. If a maximum of 64 pending requests is reached
+%%% all requests of a session. If a maximum of 8 pending requests is reached
 %%% new requests will be queued and sent as pending requests get completed.
 %%%
 %%% A session will use the modules {@link eipmi_request} and
@@ -296,7 +296,7 @@ maybe_send_ack(Header, State) ->
 process_next_request(_SessionActive, State = #state{queued = []}) ->
     State;
 process_next_request(_SessionActive, State = #state{pending = P})
-  when length(P) == 64 ->
+  when length(P) == 8 ->
     State;
 process_next_request(false, State = #state{queued = [Request | Rest]}) ->
     process_request(Request, State#state{queued = Rest});

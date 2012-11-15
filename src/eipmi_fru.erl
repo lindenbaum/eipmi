@@ -92,7 +92,7 @@
                   {ok, info()} | {error, term()}.
 read(SessionPid, FruId) ->
     FruInfo = eipmi_session:request(SessionPid, ?GET_INFO, [{fru_id, FruId}]),
-    read_fru(FruInfo, SessionPid, FruId).
+    do_read(FruInfo, SessionPid, FruId).
 
 %%%=============================================================================
 %%% Internal functions
@@ -101,35 +101,35 @@ read(SessionPid, FruId) ->
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-read_fru({error, {bmc_error, parameter_out_of_range}}, _SessionPid, _FruId) ->
+do_read({error, {bmc_error, parameter_out_of_range}}, _SessionPid, _FruId) ->
     {ok, []};
-read_fru(Error = {error, _}, _SessionPid, _FruId) ->
+do_read(Error = {error, _}, _SessionPid, _FruId) ->
     Error;
-read_fru({ok, FruInfo}, SessionPid, FruId) ->
+do_read({ok, FruInfo}, SessionPid, FruId) ->
     Access = eipmi_util:get_val(access, FruInfo),
     Divider = case Access of by_words -> 2; by_bytes -> 1 end,
     AreaSize = eipmi_util:get_val(area_size, FruInfo) div Divider,
-    decode(read_fru(SessionPid, FruId, AreaSize, ?MAX_READ_COUNT div Divider)).
+    decode(do_read(SessionPid, FruId, AreaSize, ?MAX_READ_COUNT div Divider)).
 
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-read_fru(SessionPid, FruId, Size, BlockSize) ->
-    read_fru(SessionPid, FruId, Size, BlockSize, {0, <<>>}).
-read_fru(_SessionPid, _FruId, Size, _BlockSize, {Size, Acc}) ->
+do_read(SessionPid, FruId, Size, BlockSize) ->
+    do_read(SessionPid, FruId, Size, BlockSize, {0, <<>>}).
+do_read(_SessionPid, _FruId, Size, _BlockSize, {Size, Acc}) ->
     Acc;
-read_fru(SessionPid, FruId, Size, BlockSize, {Offset, Acc})
+do_read(SessionPid, FruId, Size, BlockSize, {Offset, Acc})
   when Offset + BlockSize =< Size ->
-    NewAcc = do_read_fru(SessionPid, FruId, Offset, BlockSize, Acc),
-    read_fru(SessionPid, FruId, Size, BlockSize, NewAcc);
-read_fru(SessionPid, FruId, Size, BlockSize, {Offset, Acc}) ->
-    NewAcc = do_read_fru(SessionPid, FruId, Offset, Size - Offset, Acc),
-    read_fru(SessionPid, FruId, Size, BlockSize, NewAcc).
+    NewAcc = read_raw(SessionPid, FruId, Offset, BlockSize, Acc),
+    do_read(SessionPid, FruId, Size, BlockSize, NewAcc);
+do_read(SessionPid, FruId, Size, BlockSize, {Offset, Acc}) ->
+    NewAcc = read_raw(SessionPid, FruId, Offset, Size - Offset, Acc),
+    do_read(SessionPid, FruId, Size, BlockSize, NewAcc).
 
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-do_read_fru(SessionPid, FruId, Offset, Count, Acc) ->
+read_raw(SessionPid, FruId, Offset, Count, Acc) ->
     Ps = [{fru_id, FruId}, {offset, Offset}, {count, Count}],
     {ok, R} = eipmi_session:request(SessionPid, ?READ, Ps),
     Data = eipmi_util:get_val(data, R),
@@ -283,66 +283,67 @@ decode_record_field_definition(_Type, _Data) ->
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-decode_power_supply(<<OverallCapacity:16/little, PeakVA:16/little,
+decode_power_supply(<<OCapacity:16/little, PeakVA:16/little,
                       InrushCurrent:8, InrushInterval:8,
                       LowEndInputV1:16/little, HighEndInputV1:16/little,
                       LowEndInputV2:16/little, HighEndInputV2:16/little,
                       LowEndInputFrequency:8, HighEndInputFrequency:8,
-                      ACDropOutTolerance:8, 0:4, FailSignal:1,
+                      ACDropOutTolerance:8, 0:3, FailSignal:1,
                       HotSwap:1, Autoswitch:1, PowerFactor:1,
                       PredictiveFailSupport:1, PeakW:16/little,
                       CombinedWattageV1:4, CombinedWattageV2:4,
                       TotalWattage:16/little,
                       PredictiveFailTachometerLowerThreshold:8>>) ->
-    <<PeakWattageSecs:4, PeakWattage:12>>  = <<PeakW:16>>,
-    [{overall_capacitly, {OverallCapacity, 'W'}},
-     {peak_voltage, maybe_value({PeakVA, 'VA'}, unspecified)},
-     {inrush_current, maybe_value({InrushCurrent, 'A'}, unspecified)},
-     {inrush_interval, maybe_value({InrushInterval, ms}, unspecified)},
-     {low_end_input_voltage_range_110v, {LowEndInputV1 * 10, mV}},
-     {high_end_input_voltage_range_110v, {HighEndInputV1 * 10, mV}},
-     {low_end_input_voltage_range_220v, {LowEndInputV2 * 10, mV}},
-     {high_end_input_voltage_range_220v, {HighEndInputV2 * 10, mV}},
-     {low_end_input_frequency_range, {LowEndInputFrequency, hz}},
-     {high_end_input_frequency_range, {HighEndInputFrequency, hz}},
-     {ac_dropout_tolerance, {ACDropOutTolerance, ms}},
+    <<?EIPMI_RESERVED:4, OverallCapacity:12>> = <<OCapacity:16>>,
+    <<PeakWattageSecs:4, PeakWattage:12>> = <<PeakW:16>>,
+    [{overall_capacitly, {OverallCapacity, eipmi_sensor:get_unit()}},
+     {peak_voltage, maybe_value({PeakVA, unit(9)}, unspecified)},
+     {inrush_current, maybe_value({InrushCurrent, unit(5)}, unspecified)},
+     {inrush_interval, maybe_value({InrushInterval, unit(21)}, unspecified)},
+     {low_end_input_voltage_range_110v, {LowEndInputV1 / 100, unit(4)}},
+     {high_end_input_voltage_range_110v, {HighEndInputV1 / 100, unit(4)}},
+     {low_end_input_voltage_range_220v, {LowEndInputV2 / 100, unit(4)}},
+     {high_end_input_voltage_range_220v, {HighEndInputV2 / 100, unit(4)}},
+     {low_end_input_frequency_range, {LowEndInputFrequency, unit(19)}},
+     {high_end_input_frequency_range, {HighEndInputFrequency, unit(19)}},
+     {ac_dropout_tolerance, {ACDropOutTolerance, unit(21)}},
      {predictive_fail_signal,
       get_power_supply_predictive_fail_signal(FailSignal)},
-     {hot_swap_supported, get_bool(HotSwap)},
-     {autoswitch_supported, get_bool(Autoswitch)},
-     {power_factor_correction_supported, get_bool(PowerFactor)},
-     {predictive_fail_pin_supported, get_bool(PredictiveFailSupport)},
+     {hot_swap_supported, eipmi_util:get_bool(HotSwap)},
+     {autoswitch_supported, eipmi_util:get_bool(Autoswitch)},
+     {power_factor_correction_supported, eipmi_util:get_bool(PowerFactor)},
+     {predictive_fail_pin_supported, eipmi_util:get_bool(PredictiveFailSupport)},
      get_predictive_fail_tachometer_lower_threshold(
        PredictiveFailTachometerLowerThreshold),
-     {peak_wattage_tolerance, {PeakWattageSecs, s}},
-     {peak_wattage, {PeakWattage, 'W'}},
+     {peak_wattage_tolerance, {PeakWattageSecs, unit(22)}},
+     {peak_wattage, {PeakWattage, unit(6)}},
      get_combined_wattage(CombinedWattageV1, CombinedWattageV2, TotalWattage)].
 
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-decode_dc_output(<<Standby:1, 0:3, OutputNumber:4,
+decode_dc_output(<<Standby:1, ?EIPMI_RESERVED:3, OutputNumber:4,
                    NominalVoltage:16/signed-little,
                    MaximumNegativeVoltageDeviation:16/signed-little,
                    MaximumPositiveVoltageDeviation:16/signed-little,
                    RippleAndNoise:16/little,
                    MinimumCurrentDraw:16/little,
                    MaximumCurrentDraw:16/little>>) ->
-    [{provides_standby_output, get_bool(Standby)},
+    [{provides_standby_output, eipmi_util:get_bool(Standby)},
      {output, maybe_value({OutputNumber, number}, unknown)},
-     {nominal_voltage, {NominalVoltage / 100, 'V'}},
+     {nominal_voltage, {NominalVoltage / 100, unit(4)}},
      {maximum_negative_voltage_deviation,
-      {MaximumNegativeVoltageDeviation / 100, 'V'}},
+      {MaximumNegativeVoltageDeviation / 100, unit(4)}},
      {maximum_positive_voltage_deviation,
-      {MaximumPositiveVoltageDeviation / 100, 'V'}},
-     {ripple_and_noise, {RippleAndNoise, mV}},
-     {minimum_current_draw, {MinimumCurrentDraw, mA}},
-     {maximum_current_draw, {MaximumCurrentDraw, mA}}].
+      {MaximumPositiveVoltageDeviation / 100, unit(4)}},
+     {ripple_and_noise, {RippleAndNoise / 1000, unit(4)}},
+     {minimum_current_draw, {MinimumCurrentDraw / 1000, unit(5)}},
+     {maximum_current_draw, {MaximumCurrentDraw / 1000, unit(5)}}].
 
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-decode_dc_load(<<0:4, OutputNumber:4,
+decode_dc_load(<<?EIPMI_RESERVED:4, OutputNumber:4,
                  NominalVoltage:16/signed-little,
                  MinimumVoltage:16/signed-little,
                  MaximumVoltage:16/signed-little,
@@ -350,41 +351,41 @@ decode_dc_load(<<0:4, OutputNumber:4,
                  MinimumCurrentLoad:16/little,
                  MaximumCurrentLoad:16/little>>) ->
     [{output, maybe_value({OutputNumber, number}, unknown)},
-     {nominal_voltage, {NominalVoltage / 100, 'V'}},
-     {minimum_voltage, {MinimumVoltage / 100, 'V'}},
-     {maximum_voltage, {MaximumVoltage / 100, 'V'}},
-     {ripple_and_noise, {RippleAndNoise, mV}},
-     {minimum_current_load, {MinimumCurrentLoad, mA}},
-     {maximum_current_load, {MaximumCurrentLoad, mA}}].
+     {nominal_voltage, {NominalVoltage / 100, unit(4)}},
+     {minimum_voltage, {MinimumVoltage / 100, unit(4)}},
+     {maximum_voltage, {MaximumVoltage / 100, unit(4)}},
+     {ripple_and_noise, {RippleAndNoise / 1000, unit(4)}},
+     {minimum_current_load, {MinimumCurrentLoad / 1000, unit(5)}},
+     {maximum_current_load, {MaximumCurrentLoad / 1000, unit(5)}}].
 
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
 decode_management_access(<<16#01:8, URL/binary>>) ->
-    [{system_management_url, binary_to_list(URL)}];
+    [{system_management_url, eipmi_util:binary_to_string(URL)}];
 decode_management_access(<<16#02:8, Name/binary>>) ->
-    [{system_name, binary_to_list(Name)}];
+    [{system_name, eipmi_util:binary_to_string(Name)}];
 decode_management_access(<<16#03:8, Addr/binary>>) ->
-    [{system_ping_address, binary_to_list(Addr)}];
+    [{system_ping_address, eipmi_util:binary_to_string(Addr)}];
 decode_management_access(<<16#04:8, URL/binary>>) ->
-    [{component_management_url, binary_to_list(URL)}];
+    [{component_management_url, eipmi_util:binary_to_string(URL)}];
 decode_management_access(<<16#05:8, Name/binary>>) ->
-    [{component_name, binary_to_list(Name)}];
+    [{component_name, eipmi_util:binary_to_string(Name)}];
 decode_management_access(<<16#06:8, Addr/binary>>) ->
-    [{component_ping_address, binary_to_list(Addr)}];
+    [{component_ping_address, eipmi_util:binary_to_string(Addr)}];
 decode_management_access(<<16#07:8, Id/binary>>) ->
-    [{system_unique_id, binary_to_list(Id)}].
+    [{system_unique_id, eipmi_util:binary_to_string(Id)}].
 
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
 decode_compatibility(<<ManufacturerID:24/little, EntityID:8,
-                       CompatibilityBase:8, 0:1, CodeStart:7,
-                       CodeRanges/binary>>) ->
-    [{manufacturer_id, ManufacturerID},
-     {entity, eipmi_sensor:get_entity(EntityID)},
-     {compatibility_base, CompatibilityBase},
-     {compatible_codes, get_code_ranges(CodeRanges, CodeStart)}].
+                       CompatibilityBase:8, ?EIPMI_RESERVED:1,
+                       CodeStart:7, CodeRanges/binary>>) ->
+    eipmi_sensor:get_entity_id(EntityID)
+        ++ [{manufacturer_id, ManufacturerID},
+            {compatibility_base, CompatibilityBase},
+            {compatible_codes, get_code_ranges(CodeRanges, CodeStart)}].
 
 %%------------------------------------------------------------------------------
 %% @private
@@ -405,7 +406,7 @@ get_code_ranges(<<0:1, Rest/bitstring>>, CodeStart, BitIndex, Acc) ->
 get_predictive_fail_tachometer_lower_threshold(0) ->
     {predictive_fail_lower_treshold, none};
 get_predictive_fail_tachometer_lower_threshold(Value) ->
-    {predictive_fail_lower_treshold, {Value, rps}}.
+    {predictive_fail_lower_treshold, {60 * Value, unit(18)}}.
 
 %%------------------------------------------------------------------------------
 %% @private
@@ -413,15 +414,15 @@ get_predictive_fail_tachometer_lower_threshold(Value) ->
 get_combined_wattage(0, 0, 0) ->
     {combined_wattage, none};
 get_combined_wattage(A, B, Wattage) ->
-    {combined_wattage, {get_voltage(A), get_voltage(B), {Wattage, 'W'}}}.
+    {combined_wattage, {get_voltage(A), get_voltage(B), {Wattage, unit(6)}}}.
 
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-get_voltage(0) -> {12, 'V'};
-get_voltage(1) -> {-12, 'V'};
-get_voltage(2) -> {5, 'V'};
-get_voltage(3) -> {3.3, 'V'}.
+get_voltage(0) -> {12, unit(4)};
+get_voltage(1) -> {-12, unit(4)};
+get_voltage(2) -> {5, unit(4)};
+get_voltage(3) -> {3.3, unit(4)}.
 
 %%------------------------------------------------------------------------------
 %% @private
@@ -430,12 +431,6 @@ get_power_supply_predictive_fail_signal(0) ->
     one_pulse_per_rotation_or_signal_asserted;
 get_power_supply_predictive_fail_signal(1) ->
     two_pulses_per_rotation_or_signal_deasserted.
-
-%%------------------------------------------------------------------------------
-%% @private
-%%------------------------------------------------------------------------------
-get_bool(0) -> false;
-get_bool(1) -> true.
 
 %%------------------------------------------------------------------------------
 %% @private
@@ -484,7 +479,7 @@ decode_field(Name, _Lang, <<2:2, Len:6, Data:Len/binary, Rest/binary>>) ->
     {[{Name, eipmi_util:from_packed_ascii(Data)}], Rest};
 decode_field(Name, Lang, <<3:2, Len:6, Data:Len/binary, Rest/binary>>)
   when Lang =:= ?ENGLISH orelse Lang =:= ?OLD_ENGLISH ->
-    {[{Name, binary_to_list(Data)}], Rest};
+    {[{Name, eipmi_util:binary_to_string(Data)}], Rest};
 decode_field(Name, _Lang, <<3:2, _Len:6, Data/utf16-little, Rest/binary>>) ->
     {[{Name, Data}], Rest}.
 
@@ -514,6 +509,12 @@ sum(<<>>, Sum) ->
 sum(<<Byte:8, Rest/binary>>, Sum) ->
     sum(Rest, Sum + Byte).
 
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+unit(Unit) ->
+    eipmi_sensor:get_unit(Unit).
+
 %%%=============================================================================
 %%% TESTS
 %%%=============================================================================
@@ -524,8 +525,8 @@ sum(<<Byte:8, Rest/binary>>, Sum) ->
 
 decode_compatibility_test() ->
     ?assertEqual(
-       [{manufacturer_id, 16#1122},
-        {entity, other},
+       [{entity_id, other},
+        {manufacturer_id, 16#1122},
         {compatibility_base, 42},
         {compatible_codes, [10, 11, 12, 13, 14, 15, 16, 22, 23]}],
        decode_compatibility(

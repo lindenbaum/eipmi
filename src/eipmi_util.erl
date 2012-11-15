@@ -28,7 +28,11 @@
          copy_val/3,
          merge_vals/2,
          from_bcd_plus/1,
-         from_packed_ascii/1]).
+         from_packed_ascii/1,
+         from_base26/1,
+         get_bool/1,
+         get_bool_inv/1,
+         binary_to_string/1]).
 
 %%%=============================================================================
 %%% API
@@ -140,10 +144,10 @@ merge_vals(PropList1, PropList2) ->
 %% Decodes a BCD plus encoded binary into a string.
 %% @end
 %%------------------------------------------------------------------------------
--spec from_bcd_plus(binary()) ->
+-spec from_bcd_plus(bitstring()) ->
                            string().
-from_bcd_plus(Binary) ->
-    from_bcd_plus(Binary, "").
+from_bcd_plus(Bitstring) ->
+    from_bcd_plus(Bitstring, "").
 from_bcd_plus(<<>>, Acc) ->
     lists:reverse(Acc);
 from_bcd_plus(<<16#0:4, Rest/bitstring>>, Acc) ->
@@ -200,3 +204,44 @@ from_packed_ascii3(Carry3, <<Char4:6, Char3:2, Rest/bitstring>>, Acc) ->
     from_packed_ascii1(Rest, [Char4 + 32 | [Char3 bsl 4 + Carry3 + 32 | Acc]]);
 from_packed_ascii3(_Carry3, <<>>, Acc) ->
     lists:reverse(Acc).
+
+%%------------------------------------------------------------------------------
+%% @doc
+%% Decodes a string from a base 26 encoded integer where `0' corresponds to
+%% `A' and `25' corresponds to `Z'.
+%% @end
+%%------------------------------------------------------------------------------
+-spec from_base26(non_neg_integer()) ->
+                         string().
+from_base26(Number) ->
+    from_base26(Number, []).
+from_base26(Number, Acc) when Number < 26 ->
+    [65 + Number | Acc];
+from_base26(Number, Acc) ->
+    from_base26((Number div 26) - 1, [65 + Number rem 26 | Acc]).
+
+%%------------------------------------------------------------------------------
+%% @doc
+%% Return `false' if given value is `0', `true' otherwise.
+%% @end
+%%------------------------------------------------------------------------------
+get_bool(0) -> false;
+get_bool(_) -> true.
+
+%%------------------------------------------------------------------------------
+%% @doc
+%% Return `true' if given value is `0', `false' otherwise.
+%% @end
+%%------------------------------------------------------------------------------
+get_bool_inv(0) -> true;
+get_bool_inv(_) -> false.
+
+%%------------------------------------------------------------------------------
+%% @doc
+%% Convert a binary into a string removing all contained zero bytes.
+%% @end
+%%------------------------------------------------------------------------------
+-spec binary_to_string(binary()) ->
+                              string().
+binary_to_string(Binary) ->
+    [C || C <- binary_to_list(Binary), C =/= 0].

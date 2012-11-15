@@ -16,6 +16,9 @@
 %%% @doc
 %%% A module providing reading and decoding functionality for the System
 %%% Event Log (SEL).
+%%% TODOs:
+%%% * decode threshold based sensor readings
+%%% * decode oem based sensor readings
 %%% @end
 %%%=============================================================================
 
@@ -31,27 +34,22 @@
 -define(RESERVE, {?IPMI_NETFN_STORAGE_REQUEST, ?RESERVE_SEL}).
 -define(CLEAR, {?IPMI_NETFN_STORAGE_REQUEST, ?CLEAR_SEL}).
 
--type property() ::
-        eipmi_sensor:property() |
-        {id, non_neg_integer()} |
-        {type, non_neg_integer()} |
-        {time, non_neg_integer()} |
-        {maunfacturer_id, non_neg_integer()} |
-        {data, binary()} |
-        {revision, non_neg_integer()} |
-        {sensor_number, non_neg_integer()} |
-        {slave_addr, non_neg_integer()} |
-        {slave_lun, non_neg_integer()} |
-        {channel, non_neg_integer()} |
-        {software_id, non_neg_integer()}.
-
 -type entry() ::
-        {system_event |
-         oem_timestamped |
-         oem_non_timestamped,
-         [property()]}.
+        [{id, non_neg_integer()} |
+         {type, system_event} |
+         {type, {oem_timestamped | oem_non_timestamped, non_neg_integer()}} |
+         {time, non_neg_integer()} |
+         {maunfacturer_id, non_neg_integer()} |
+         {data, binary()} |
+         {revision, non_neg_integer()} |
+         {sensor_type, eipmi_sensor:type()} |
+         {sensor_number, non_neg_integer()} |
+         {sensor_value, eipmi_sensor:value()} |
+         {previous_value, eipmi_sensor:value()} |
+         {severity_value, eipmi_sensor:value()} |
+         eipmi_sensor:addr()].
 
--export_type([entry/0, property/0]).
+-export_type([entry/0]).
 
 %%%=============================================================================
 %%% API
@@ -70,12 +68,12 @@
                   [entry()].
 read(SessionPid, true) ->
     {ok, SelInfo} = eipmi_session:request(SessionPid, ?GET_INFO, []),
-    Entries = get_sel(SessionPid, eipmi_util:get_val(entries, SelInfo)),
+    Entries = do_read(SessionPid, eipmi_util:get_val(entries, SelInfo)),
     Operations = eipmi_util:get_val(operations, SelInfo),
-    clear_sel(SessionPid, lists:member(reserve, Operations)),
+    do_clear(SessionPid, lists:member(reserve, Operations)),
     Entries;
 read(SessionPid, false) ->
-    get_sel(SessionPid, all).
+    do_read(SessionPid, all).
 
 %%------------------------------------------------------------------------------
 %% @doc
@@ -86,7 +84,7 @@ read(SessionPid, false) ->
 -spec clear(pid()) ->
                    ok | {error, term()}.
 clear(SessionPid) ->
-    clear_sel(SessionPid).
+    do_clear(SessionPid).
 
 %%%=============================================================================
 %%% Internal functions
@@ -95,18 +93,18 @@ clear(SessionPid) ->
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-get_sel(_SessionPid, 0) ->
+do_read(_SessionPid, 0) ->
     [];
-get_sel(SessionPid, _NumEntries) ->
-    get_sel(SessionPid, 16#0000, []).
-get_sel(_SessionPid, 16#ffff, Acc) ->
+do_read(SessionPid, _NumEntries) ->
+    do_read(SessionPid, 16#0000, []).
+do_read(_SessionPid, 16#ffff, Acc) ->
     lists:reverse(Acc);
-get_sel(SessionPid, Id, Acc) ->
+do_read(SessionPid, Id, Acc) ->
     case eipmi_session:request(SessionPid, ?READ, [{record_id, Id}]) of
         {ok, Entry} ->
             NextId = eipmi_util:get_val(next_record_id, Entry),
-            Sel = decode_event(eipmi_util:get_val(data, Entry)),
-            get_sel(SessionPid, NextId, [Sel | Acc]);
+            Sel = decode(eipmi_util:get_val(data, Entry)),
+            do_read(SessionPid, NextId, [Sel | Acc]);
         {error, {bmc_error, _}} ->
             Acc
     end.
@@ -114,51 +112,115 @@ get_sel(SessionPid, Id, Acc) ->
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-clear_sel(SessionPid) ->
+do_clear(SessionPid) ->
     {ok, SelInfo} = eipmi_session:request(SessionPid, ?GET_INFO, []),
     Operations = eipmi_util:get_val(operations, SelInfo),
-    clear_sel(SessionPid, lists:member(reserve, Operations)).
-clear_sel(SessionPid, true) ->
+    do_clear(SessionPid, lists:member(reserve, Operations)).
+do_clear(SessionPid, true) ->
     {ok, Reserve} = eipmi_session:request(SessionPid, ?RESERVE, []),
     ReservationId = eipmi_util:get_val(reservation_id, Reserve),
-    clear_sel(SessionPid, ReservationId, true, false);
-clear_sel(SessionPid, false) ->
-    clear_sel(SessionPid, 16#0000, true, false).
-clear_sel(_SessionPid, _ReservationId, _Initiate, true) ->
+    do_clear(SessionPid, ReservationId, true, false);
+do_clear(SessionPid, false) ->
+    do_clear(SessionPid, 16#0000, true, false).
+do_clear(_SessionPid, _ReservationId, _Initiate, true) ->
     ok;
-clear_sel(SessionPid, ReservationId, Initiate, false) ->
+do_clear(SessionPid, ReservationId, Initiate, false) ->
     Args = [{reservation_id, ReservationId}, {initiate, Initiate}],
     {ok, Clr} = eipmi_session:request(SessionPid, ?CLEAR, Args),
     Completed = eipmi_util:get_val(progress, Clr) =:= completed,
-    clear_sel(SessionPid, ReservationId, false, Completed).
+    do_clear(SessionPid, ReservationId, false, Completed).
 
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-decode_event(<<Id:16/little, 16#02:8, Time:32/little, Rest/binary>>) ->
-    {system_event, [{id, Id}, {time, Time}] ++ decode_system_event(Rest)};
-decode_event(<<Id:16/little, Type:8, Time:32/little, M:24/little, Data/binary>>)
+decode(<<Id:16/little, 16#02:8, Rest/binary>>) ->
+    decode_system_event0([{type, system_event}, {id, Id}], Rest);
+decode(<<Id:16/little, Type:8, Rest/binary>>)
   when Type >= 16#c0 andalso Type =< 16#df ->
-    {oem_timestamped,
-     [{id, Id}, {type, Type}, {time, Time}, {maunfacturer_id, M}, {data, Data}]};
-decode_event(<<Id:16/little, Type:8, Data/binary>>)
+    decode_oem_timestamped([{id, Id}, {type, {oem_timestamped, Type}}], Rest);
+decode(<<Id:16/little, Type:8, Rest/binary>>)
   when Type >= 16#e0 andalso Type =< 16#ff ->
-    {oem_non_timestamped, [{id, Id}, {type, Type}, {data, Data}]}.
+    decode_oem_non_timestamped(
+      [{id, Id}, {type, {oem_non_timestamped, Type}}],
+      Rest).
 
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-decode_system_event(<<Generator:2/binary, 16#04:8, SensorType:8, SensorNum:8,
-                      Assertion:1, EventType:7, EventData/binary>>) ->
-    eipmi_sensor:decode_addr(Generator)
-        ++ [{revision, 16#04}, {sensor_number, SensorNum}]
-        ++ eipmi_sensor:decode_event_data(
-             eipmi_sensor:get_reading(EventType, SensorType),
-             Assertion,
-             pad_event_data(EventData));
-decode_system_event(<<Generator:2/binary, Revision:8, Data/binary>>) ->
-    eipmi_sensor:decode_addr(Generator)
-        ++ [{revision, Revision}, {data, Data}].
+decode_system_event0(Acc, <<Time:32/little, Generator:2/binary, Rest/binary>>) ->
+    NewAcc = Acc ++ [{time, Time}] ++ eipmi_sensor:get_addr(Generator),
+    decode_system_event1(NewAcc, Rest).
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+decode_system_event1(Acc, <<16#04:8, SensorType:8, SensorNum:8, Assertion:1,
+                            EventType:7, EventData/binary>>) ->
+    Reading = {_, Sensor} = eipmi_sensor:get_reading(EventType, SensorType),
+    Acc ++ [{revision, 16#04}]
+        ++ eipmi_sensor:get_type(Sensor)
+        ++ [{sensor_number, SensorNum}]
+        ++ decode_event_data(Reading, Assertion, EventData);
+decode_system_event1(Acc, <<Revision:8, Data/binary>>) ->
+    Acc ++ [{revision, Revision}, {data, Data}].
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+decode_oem_timestamped(Acc, <<Time:32/little, M:24/little, Data/binary>>) ->
+    Acc ++ [{time, Time}, {maunfacturer_id, M}, {data, Data}].
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+decode_oem_non_timestamped(Acc, <<Data/binary>>) ->
+    Acc ++ [{data, Data}].
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+decode_event_data({threshold, Type}, Assertion, Data) ->
+    decode_threshold(Type, Assertion, pad_event_data(Data));
+decode_event_data({discrete, Type}, Assertion, Data) ->
+    decode_generic(Type, Assertion, pad_event_data(Data));
+decode_event_data({oem, Type}, Assertion, Data) ->
+    decode_oem(Type, Assertion, pad_event_data(Data)).
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+decode_threshold(Type, Assertion, <<1:2, 0:2, Offset:4, _B2:8, _:8>>) ->
+    get_value(Type, Offset, Assertion, 16#ff, 16#ff);
+decode_threshold(Type, Assertion, <<1:2, 1:2, Offset:4, _B2:8, _B3:8>>) ->
+    get_value(Type, Offset, Assertion, 16#ff, 16#ff);
+decode_threshold(Type, Assertion, <<_:2, _:2, Offset:4, _:8, _:8>>) ->
+    get_value(Type, Offset, Assertion, 16#ff, 16#ff).
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+decode_generic(Type, Assertion, <<0:2, 3:2, Offset:4, _:8, B3:8>>) ->
+    get_value(Type, Offset, Assertion, 16#ff, B3);
+decode_generic(Type, Assertion, <<1:2, 0:2, Offset:4, SOff:4, POff:4, _:8>>) ->
+    Severity = maybe_value(severity_value, {generic, 16#07}, SOff, 0),
+    Previous = maybe_value(previous_value, Type, POff, Assertion),
+    get_value(Type, Offset, Assertion, 16#ff, 16#ff) ++ Severity ++ Previous;
+decode_generic(Type, Assertion, <<1:2, 3:2, Offset:4, SOff:4, POff:4, B3:8>>) ->
+    Severity = maybe_value(severity_value, {generic, 16#07}, SOff, 0),
+    Previous = maybe_value(previous_value, Type, POff, Assertion),
+    get_value(Type, Offset, Assertion, 16#ff, B3) ++ Severity ++ Previous;
+decode_generic(Type, Assertion, <<3:2, 0:2, Offset:4, B2:8, _:8>>) ->
+    get_value(Type, Offset, Assertion, B2, 16#ff);
+decode_generic(Type, Assertion, <<3:2, 3:2, Offset:4, B2:8, B3:8>>) ->
+    get_value(Type, Offset, Assertion, B2, B3);
+decode_generic(Type, Assertion, <<_:2, _:2, Offset:4, _:8, _:8>>) ->
+    get_value(Type, Offset, Assertion, 16#ff, 16#ff).
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+decode_oem(_Type, Asserted, Data) ->
+    [{asserted, eipmi_util:get_bool(Asserted)}, {data, Data}].
 
 %%------------------------------------------------------------------------------
 %% @private
@@ -170,6 +232,20 @@ pad_event_data(Data = <<_:2/binary>>) ->
 pad_event_data(Data = <<_:3/binary>>) ->
     Data.
 
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+get_value(Type, Offset, Assertion, B2, B3) ->
+    [{sensor_value, eipmi_sensor:get_value(Type, Offset, Assertion, B2, B3)}].
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+maybe_value(_Tag, _Type, 16#f, _Assert) ->
+    [];
+maybe_value(Tag, Type, Offset, Assert) ->
+    [{Tag, eipmi_sensor:get_value(Type, Offset, Assert, 16#ff, 16#ff)}].
+
 %%%=============================================================================
 %%% TESTS
 %%%=============================================================================
@@ -178,11 +254,9 @@ pad_event_data(Data = <<_:3/binary>>) ->
 
 -include_lib("eunit/include/eunit.hrl").
 
-decode_event_1_test() ->
-    Decoded =
-        decode_event(
-          <<16#01, 16#00, 16#02, 16#0a, 16#53, 16#1b, 16#00, 16#20,
-            16#00, 16#04, 16#f3, 16#03, 16#6f, 16#a1, 16#01, 16#0d>>),
+decode_test() ->
+    Decoded = decode(<<16#01, 16#00, 16#02, 16#0a, 16#53, 16#1b, 16#00, 16#20,
+                       16#00, 16#04, 16#f3, 16#03, 16#6f, 16#a1, 16#01, 16#0d>>),
     error_logger:info_msg("~n~p~n", [Decoded]).
 
 -endif.

@@ -67,6 +67,7 @@
 
 %%------------------------------------------------------------------------------
 %% @doc
+%% TODO
 %% @end
 %%------------------------------------------------------------------------------
 -spec get_info(pid()) ->
@@ -76,6 +77,7 @@ get_info(SessionPid) ->
 
 %%------------------------------------------------------------------------------
 %% @doc
+%% TODO
 %% @end
 %%------------------------------------------------------------------------------
 -spec read(pid()) ->
@@ -93,6 +95,7 @@ read(SessionPid) ->
 
 %%------------------------------------------------------------------------------
 %% @doc
+%% TODO
 %% @end
 %%------------------------------------------------------------------------------
 -spec read(pid(), non_neg_integer()) ->
@@ -111,6 +114,8 @@ read(SessionPid, RecordId) ->
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
+-spec maybe_reserve(pid(), function(), [term()], boolean()) ->
+                           [entry()] | {non_neg_integer(), entry()}.
 maybe_reserve(SessionPid, Fun, Args, true) ->
     {ok, Reserve} = eipmi_session:request(SessionPid, ?RESERVE, []),
     ReservationId = eipmi_util:get_val(reservation_id, Reserve),
@@ -181,7 +186,7 @@ do_read(Pid, Record, Reservation, Count, {Offset, Acc}) ->
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-decode_header(<<Id:16/little, Version:8, Type:8, L:8>>) ->
+decode_header(<<Id:16/little, Version:1/binary, Type:8, L:8>>) ->
     T = get_record_type(Type),
     V = lists:reverse(eipmi_util:from_bcd_plus(Version)),
     [{record_id, Id}, {sdr_version, V}, {record_type, T}, {record_length, L}].
@@ -231,59 +236,188 @@ get_record_type(_)     -> reserved.
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-decode_full_sensor_record(_Data) ->
-    [].
+decode_full_sensor_record(
+  <<SensorAddr:2/binary, SensorNumber:8, EntityId:8, EntityInstance:1/binary,
+    _Initialization:8, _Capabilities:8, SensorType:8, ReadingType:8,
+    _AssertionMask:16, _DeassertionMask:16, _ReadingMask:16, Units1:1/binary,
+    Units2:8, Units3:8, ?EIPMI_RESERVED:1, Linearization:7,
+    MAndTolerance:16/little, BAndAccuracy:24/little, R:4, B:4,
+    _AnalogCharacteristics:8, NominalReading:8, NominalMaximum:8,
+    NominalMinimum:8, MaximumReading:8, MinimumReading:8, _Thresholds:64,
+    ?EIPMI_RESERVED:16, _OEM:8, _IdLen:8, Id/binary>>) ->
+    %% TODO
+    {_, Type} = eipmi_sensor:get_reading(ReadingType, SensorType),
+    eipmi_sensor:get_addr(SensorAddr)
+        ++ [{sensor_number, SensorNumber}]
+        ++ eipmi_sensor:get_entity(EntityId, EntityInstance)
+        ++ eipmi_sensor:get_type(Type)
+        ++ get_units(Units1, Units2, Units3)
+        ++ get_linearization(Linearization).
 
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
 decode_compact_sensor_record(_Data) ->
+    %% TODO
     [].
 
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-decode_event_only_record(_Data) ->
-    [].
+decode_event_only_record(
+  <<SensorAddr:2/binary, SensorNumber:8, EntityId:8, EntityInstance:1/binary,
+    SensorType:8, ReadingType:8, Direction:2, Modifier:2, Count:4,
+    Sharing:1/binary, ?EIPMI_RESERVED:8, _OEM:8, _IdLen:8, Id/binary>>) ->
+    {_, Type} = eipmi_sensor:get_reading(ReadingType, SensorType),
+    eipmi_sensor:get_addr(SensorAddr)
+        ++ get_sensor_numbers(SensorNumber, Count)
+        ++ eipmi_sensor:get_entity(EntityId, EntityInstance)
+        ++ eipmi_sensor:get_type(Type)
+        ++ get_direction(Direction)
+        ++ get_id(Count, Sharing, Modifier, eipmi_util:binary_to_string(Id)).
 
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
 decode_entity_association_record(_Data) ->
+    %% TODO
     [].
 
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
 decode_device_relative_entity_association_record(_Data) ->
+    %% TODO
     [].
 
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
 decode_generic_device_locator_record(_Data) ->
+    %% TODO
     [].
 
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
 decode_fru_device_locator_record(_Data) ->
+    %% TODO
     [].
 
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
 decode_management_controller_device_locator_record(_Data) ->
+    %% TODO
     [].
 
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-decode_management_controller_confirmation_record(_Data) ->
-    [].
+decode_management_controller_confirmation_record(
+  <<?EIPMI_RESERVED:1, Major:7, Minor:8, IPMILeast:4, IPMIMost:4,
+    Manufacturer:24/little, Product:16/little, GUID/binary>>) ->
+    [{firmware_version, eipmi_util:format("~B.~B", [Major, Minor])},
+     {ipmi_version, eipmi_util:format("~B.~B", [IPMIMost, IPMILeast])},
+     {manufacturer_id, Manufacturer},
+     {product_id, Product},
+     {guid, eipmi_util:binary_to_string(GUID)}].
 
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
 decode_bmc_message_channel_info_record(_Data) ->
+    %% TODO
     [].
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+get_units(<<Format:2, Rate:3, Modifier:2, Percentage:1>>, Unit2, Unit3) ->
+    get_format(Format)
+        ++ get_rate(Rate)
+        ++ get_unit(Modifier, Unit2, Unit3)
+        ++ [{percentage, eipmi_util:get_bool(Percentage)}].
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+get_format(0) -> [{sensor_format, unsigned}];
+get_format(1) -> [{sensor_format, ones_complement}];
+get_format(2) -> [{sensor_format, twos_complement}];
+get_format(3) -> [].
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+get_rate(0) -> [];
+get_rate(1) -> [{sensor_rate, eipmi_sensor:get_unit(20)}];
+get_rate(2) -> [{sensor_rate, eipmi_sensor:get_unit(21)}];
+get_rate(3) -> [{sensor_rate, eipmi_sensor:get_unit(22)}];
+get_rate(4) -> [{sensor_rate, eipmi_sensor:get_unit(23)}];
+get_rate(5) -> [{sensor_rate, eipmi_sensor:get_unit(24)}];
+get_rate(6) -> [{sensor_rate, eipmi_sensor:get_unit(25)}].
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+get_unit(0, Base, _) ->
+    [{sensor_unit, eipmi_sensor:get_unit(Base)}];
+get_unit(_, Base, 16#00) ->
+    [{sensor_unit, eipmi_sensor:get_unit(Base)}];
+get_unit(1, Base, Mod) ->
+    M = eipmi_sensor:get_unit(Mod),
+    [{sensor_unit, {eipmi_sensor:get_unit(Base), per, M}}];
+get_unit(2, Base, Mod) ->
+    M = eipmi_sensor:get_unit(Mod),
+    [{sensor_unit, {eipmi_sensor:get_unit(Base), M}}].
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+get_linearization(16#00) -> [{sensor_linearization, linear}];
+get_linearization(16#01) -> [{sensor_linearization, ln}];
+get_linearization(16#02) -> [{sensor_linearization, log10}];
+get_linearization(16#03) -> [{sensor_linearization, log2}];
+get_linearization(16#04) -> [{sensor_linearization, e}];
+get_linearization(16#05) -> [{sensor_linearization, exp10}];
+get_linearization(16#06) -> [{sensor_linearization, exp2}];
+get_linearization(16#07) -> [{sensor_linearization, '1/x'}];
+get_linearization(16#08) -> [{sensor_linearization, sqr}];
+get_linearization(16#09) -> [{sensor_linearization, cube}];
+get_linearization(16#0a) -> [{sensor_linearization, sqrt}];
+get_linearization(16#0b) -> [{sensor_linearization, 'cube-1'}];
+get_linearization(16#70) -> [{sensor_linearization, non_linear}];
+get_linearization(L) when L =< 16#7f andalso L >= 16#71 ->
+    [{sensor_linearization, oem_non_linear}].
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+get_sensor_numbers(SensorNumber, 0) ->
+    [{sensor_number, SensorNumber}];
+get_sensor_numbers(SensorNumber, 1) ->
+    [{sensor_number, SensorNumber}];
+get_sensor_numbers(SensorNumber, ShareCount) ->
+    [{sensor_numbers, [SensorNumber + I || I <- lists:seq(0, ShareCount - 1)]}].
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+get_direction(0) -> [];
+get_direction(1) -> [{sensor_direction, input}];
+get_direction(2) -> [{sensor_direction, output}].
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+get_id(0, Sharing, Type, Id) ->
+    get_id(1, Sharing, Type, Id);
+get_id(_, <<0:1, _:7>>, _, Id) ->
+    [{id, Id}];
+get_id(Count, <<1:1, Offset:7>>, 0, Id) ->
+    Is = lists:seq(Offset, Offset + Count - 1),
+    [{id, string:join([Id ++ integer_to_list(I) || I <- Is], ", ")}];
+get_id(Count, <<1:1, Offset:7>>, 1, Id) ->
+    Is = lists:seq(Offset, Offset + Count - 1),
+    [{id, string:join([Id ++ eipmi_util:from_base26(I) || I <- Is], ", ")}].

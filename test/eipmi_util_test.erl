@@ -87,3 +87,16 @@ from_packed_ascii_test() ->
     ?assertEqual("IP", eipmi_util:from_packed_ascii(Bin2)),
     Bin1 = <<2#00101001>>,
     ?assertEqual("I", eipmi_util:from_packed_ascii(Bin1)).
+
+from_base26_test() ->
+    ?assertEqual("A", eipmi_util:from_base26(0)),
+    ?assertEqual("Z", eipmi_util:from_base26(25)),
+    ?assertEqual("AA", eipmi_util:from_base26(26)),
+    ?assertEqual("AZ", eipmi_util:from_base26(51)),
+    ?assertEqual("BA", eipmi_util:from_base26(52)),
+    ?assertEqual("BZ", eipmi_util:from_base26(77)),
+    ?assertEqual("CA", eipmi_util:from_base26(78)),
+    ?assertEqual("ZZ", eipmi_util:from_base26(701)),
+    ?assertEqual("AAA", eipmi_util:from_base26(702)),
+    ?assertEqual("AAZ", eipmi_util:from_base26(727)),
+    ?assertEqual("ZZZ", eipmi_util:from_base26(18277)).

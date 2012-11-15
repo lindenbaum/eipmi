@@ -16,25 +16,68 @@
 %%% @doc
 %%% Sensor-related functions, e.g. mapping of reading/event type codes/offsets,
 %%% sensor name retrieval, etc.
-%%% TODOs:
-%%% * decode threshold based sensor readings
-%%% * decode oem based sensor readings
-%%% * populate property type
 %%% @end
 %%%=============================================================================
 
 -module(eipmi_sensor).
 
--export([get_reading/2,
-         get_entity/1,
-         decode_event_data/3,
-         decode_addr/1]).
+-export([get_addr/1,
+         get_reading/2,
+         get_type/1,
+         get_value/5,
+         get_entity/2,
+         get_entity_id/1,
+         get_unit/1]).
 
 -include("eipmi.hrl").
 
--type property() :: term(). %% TODO
+-type addr() ::
+        {slave_addr, non_neg_integer()} |
+        {slave_lun, non_neg_integer()} |
+        {channel, non_neg_integer()} |
+        {software_id, non_neg_integer()}.
 
--export_type([property/0]).
+-type entity_id() ::
+        unspecified | other | unknown | processor | disk_or_disk_bay |
+        peripheral_bay | system_management_module | system_board |
+        memory_module | processor_module | power_supply | add_in_card |
+        front_panel_board | back_panel_board | power_system_board |
+        drive_backplane | system_internal_expansion_board | other_system_board |
+        processor_board | power_unit | power_module | power_management |
+        chassis_back_panel_board | system_chassis | sub_chassis |
+        other_chassis_board | disk_drive_bay | peripheral_bay | device_bay |
+        cooling_device | cooling_unit | interconnect | memory_device |
+        system_management_software | system_firmware | operating_system |
+        system_bus | group | remote_management_communication_device |
+        external_environment | battery | processing_blade |
+        connectivity_switch | processor_memory_module | io_module |
+        processor_io_module | management_controller_firmware | ipmi_channel |
+        pci_bus | pci_expresstm_bus | scsi_bus | sata_bus | front_side_bus |
+        real_time_clock | air_inlet | air_inlet | processor |
+        main_system_board | non_neg_integer().
+
+-type entity() ::
+        {entity_id, entity_id()} |
+        {entity_type, logical | physical} |
+        {entity_instance, non_neg_integer()}.
+
+-type type() ::
+        threshold | dmi_usage | state | predictive_failure | limit |
+        performance | severity | availability | redundancy | acpi_power_state |
+        temperature | voltage | current | fan | intrusion | violation_attempt |
+        processor | power_supply | power_unit | cooling_unit | other_unit |
+        memory | drive_slot | post_memory_resize | system_firmware |
+        event_logging | watchdog_old | system_event | critical_interrupt |
+        switch | board | microcontroller | add_in_card | chassis | chip_set |
+        other_fru | interconnect | terminator | system_boot | boot_error |
+        os_boot | os_shutdown | slot | system_acpi_power_state | watchdog |
+        platform_alert | entity_presence | monitor_asic_ic | lan |
+        management_subsystem_health | battery | session | version | fru_state |
+        non_neg_integer().
+
+-type value() :: term().
+
+-export_type([addr/0, entity_id/0, entity/0, type/0, value/0]).
 
 %%%=============================================================================
 %%% API
@@ -42,7 +85,24 @@
 
 %%------------------------------------------------------------------------------
 %% @doc
-%% Retrieve the sensor category and reading type from the given sensor and
+%% Decodes the sensor from a 2byte binary according to the encoding provided by
+%% SEL and SDR records.
+%% @end
+%%------------------------------------------------------------------------------
+-spec get_addr(binary()) ->
+                      [addr()].
+get_addr(<<Addr:7, 0:1, 0:4, ?EIPMI_RESERVED:2, Lun:2>>) ->
+    [{slave_addr, Addr}, {slave_lun, Lun}];
+get_addr(<<Addr:7, 0:1, Channel:4, ?EIPMI_RESERVED:2, Lun:2>>) ->
+    [{slave_addr, Addr}, {slave_lun, Lun}, {channel, Channel}];
+get_addr(<<Id:7, 1:1, 0:4, ?EIPMI_RESERVED:2, 0:2>>) ->
+    [{software_id, Id}];
+get_addr(<<Id:7, 1:1, Channel:4, ?EIPMI_RESERVED:2, 0:2>>) ->
+    [{software_id, Id}, {channel, Channel}].
+
+%%------------------------------------------------------------------------------
+%% @doc
+%% Returns the sensor category and reading type from the given sensor and
 %% reading type. See sections 41 and 42 of the IPMI specification for more
 %% information.
 %% @end
@@ -60,136 +120,270 @@ get_reading(ReadingType, SensorType)
 
 %%------------------------------------------------------------------------------
 %% @doc
+%% Returns the type of sensor according to the given sensor reading type which
+%% is actually the second parameter of the result tuple returned by
+%% {@link get_reading/2}.
+%% @end
+%%------------------------------------------------------------------------------
+-spec get_type({threshold | generic | specific | term(), non_neg_integer()}) ->
+                      [{sensor_type, type()}].
+get_type({threshold, 16#01}) -> [{sensor_type, threshold}];
+get_type({generic,   16#02}) -> [{sensor_type, dmi_usage}];
+get_type({generic,   16#03}) -> [{sensor_type, state}];
+get_type({generic,   16#04}) -> [{sensor_type, predictive_failure}];
+get_type({generic,   16#05}) -> [{sensor_type, limit}];
+get_type({generic,   16#06}) -> [{sensor_type, performance}];
+get_type({generic,   16#07}) -> [{sensor_type, severity}];
+get_type({generic,   16#08}) -> [{sensor_type, availability}];
+get_type({generic,   16#0b}) -> [{sensor_type, redundancy}];
+get_type({generic,   16#0c}) -> [{sensor_type, acpi_power_state}];
+get_type({specific,  16#01}) -> [{sensor_type, temperature}];
+get_type({specific,  16#02}) -> [{sensor_type, voltage}];
+get_type({specific,  16#03}) -> [{sensor_type, current}];
+get_type({specific,  16#04}) -> [{sensor_type, fan}];
+get_type({specific,  16#05}) -> [{sensor_type, intrusion}];
+get_type({specific,  16#06}) -> [{sensor_type, violation_attempt}];
+get_type({specific,  16#07}) -> [{sensor_type, processor}];
+get_type({specific,  16#08}) -> [{sensor_type, power_supply}];
+get_type({specific,  16#09}) -> [{sensor_type, power_unit}];
+get_type({specific,  16#0a}) -> [{sensor_type, cooling_unit}];
+get_type({specific,  16#0b}) -> [{sensor_type, other_unit}];
+get_type({specific,  16#0c}) -> [{sensor_type, memory}];
+get_type({specific,  16#0d}) -> [{sensor_type, drive_slot}];
+get_type({specific,  16#0e}) -> [{sensor_type, post_memory_resize}];
+get_type({specific,  16#0f}) -> [{sensor_type, system_firmware}];
+get_type({specific,  16#10}) -> [{sensor_type, event_logging}];
+get_type({specific,  16#11}) -> [{sensor_type, watchdog_old}];
+get_type({specific,  16#12}) -> [{sensor_type, system_event}];
+get_type({specific,  16#13}) -> [{sensor_type, critical_interrupt}];
+get_type({specific,  16#14}) -> [{sensor_type, switch}];
+get_type({specific,  16#15}) -> [{sensor_type, board}];
+get_type({specific,  16#16}) -> [{sensor_type, microcontroller}];
+get_type({specific,  16#17}) -> [{sensor_type, add_in_card}];
+get_type({specific,  16#18}) -> [{sensor_type, chassis}];
+get_type({specific,  16#19}) -> [{sensor_type, chip_set}];
+get_type({specific,  16#1a}) -> [{sensor_type, other_fru}];
+get_type({specific,  16#1b}) -> [{sensor_type, interconnect}];
+get_type({specific,  16#1c}) -> [{sensor_type, terminator}];
+get_type({specific,  16#1d}) -> [{sensor_type, system_boot}];
+get_type({specific,  16#1e}) -> [{sensor_type, boot_error}];
+get_type({specific,  16#1f}) -> [{sensor_type, os_boot}];
+get_type({specific,  16#20}) -> [{sensor_type, os_shutdown}];
+get_type({specific,  16#21}) -> [{sensor_type, slot}];
+get_type({specific,  16#22}) -> [{sensor_type, system_acpi_power_state}];
+get_type({specific,  16#23}) -> [{sensor_type, watchdog}];
+get_type({specific,  16#24}) -> [{sensor_type, platform_alert}];
+get_type({specific,  16#25}) -> [{sensor_type, entity_presence}];
+get_type({specific,  16#26}) -> [{sensor_type, monitor_asic_ic}];
+get_type({specific,  16#27}) -> [{sensor_type, lan}];
+get_type({specific,  16#28}) -> [{sensor_type, management_subsystem_health}];
+get_type({specific,  16#29}) -> [{sensor_type, battery}];
+get_type({specific,  16#2a}) -> [{sensor_type, session}];
+get_type({specific,  16#2b}) -> [{sensor_type, version}];
+get_type({specific,  16#2c}) -> [{sensor_type, fru_state}];
+get_type({_,          Type}) -> [{sensor_type, Type}].
+
+%%------------------------------------------------------------------------------
+%% @doc
+%% TODO
+%% @end
+%%------------------------------------------------------------------------------
+get_value(Type, Offset, Assertion, Value1, Value2) ->
+    map(Type, Offset, Assertion, Value1, Value2).
+
+%%------------------------------------------------------------------------------
+%% @doc
+%% Returns a list containing the decoded (human readable) entity properties. To
+%% retrieve only the entity id use {@link get_entity_id/1}.
+%% @end
+%%------------------------------------------------------------------------------
+-spec get_entity(non_neg_integer(), binary() | non_neg_integer()) ->
+                        [entity()].
+get_entity(Id, Instance) when is_integer(Instance) ->
+    get_entity(Id, <<Instance:8>>);
+get_entity(Id, <<Type:1, Instance:7>>) ->
+    get_entity(get_entity_id(Id), Type, Instance).
+get_entity(Acc, 0, Instance) when Instance < 16#60 ->
+    Acc ++ [{entity_type, physical}, {entity_instance, Instance}];
+get_entity(Acc, 1, Instance) when Instance < 16#60 ->
+    Acc ++ [{entity_type, logical}, {entity_instance, Instance}];
+get_entity(Acc, 0, Instance) ->
+    Acc ++ [{entity_type, physical}, {entity_instance, Instance - 16#60}];
+get_entity(Acc, 1, Instance) ->
+    Acc ++ [{entity_type, logical}, {entity_instance, Instance - 16#60}].
+
+%%------------------------------------------------------------------------------
+%% @doc
 %% Returns the human readable entity for a given entity id according to
-%% section 43.14 from the IPMI specification.
+%% section 43.14 from the IPMI specification. For full entity decoding refer to
+%% {@link get_entity/2}.
 %% @end
 %%------------------------------------------------------------------------------
-get_entity(16#00) -> unspecified;
-get_entity(16#01) -> other;
-get_entity(16#02) -> unknown;
-get_entity(16#03) -> processor;
-get_entity(16#04) -> disk_or_disk_bay;
-get_entity(16#05) -> peripheral_bay;
-get_entity(16#06) -> system_management_module;
-get_entity(16#07) -> system_board;
-get_entity(16#08) -> memory_module;
-get_entity(16#09) -> processor_module;
-get_entity(16#0a) -> power_supply;
-get_entity(16#0b) -> add_in_card;
-get_entity(16#0c) -> front_panel_board;
-get_entity(16#0d) -> back_panel_board;
-get_entity(16#0e) -> power_system_board;
-get_entity(16#0f) -> drive_backplane;
-get_entity(16#10) -> system_internal_expansion_board;
-get_entity(16#11) -> other_system_board;
-get_entity(16#12) -> processor_board;
-get_entity(16#13) -> power_unit;
-get_entity(16#14) -> power_module;
-get_entity(16#15) -> power_management;
-get_entity(16#16) -> chassis_back_panel_board;
-get_entity(16#17) -> system_chassis;
-get_entity(16#18) -> sub_chassis;
-get_entity(16#19) -> other_chassis_board;
-get_entity(16#1a) -> disk_drive_bay;
-get_entity(16#1b) -> peripheral_bay;
-get_entity(16#1c) -> device_bay;
-get_entity(16#1d) -> cooling_device;
-get_entity(16#1e) -> cooling_unit;
-get_entity(16#1f) -> interconnect;
-get_entity(16#20) -> memory_device;
-get_entity(16#21) -> system_management_software;
-get_entity(16#22) -> system_firmware;
-get_entity(16#23) -> operating_system;
-get_entity(16#24) -> system_bus;
-get_entity(16#25) -> group;
-get_entity(16#26) -> remote_management_communication_device;
-get_entity(16#27) -> external_environment;
-get_entity(16#28) -> battery;
-get_entity(16#29) -> processing_blade;
-get_entity(16#2a) -> connectivity_switch;
-get_entity(16#2b) -> processor_memory_module;
-get_entity(16#2c) -> io_module;
-get_entity(16#2d) -> processor_io_module;
-get_entity(16#2e) -> management_controller_firmware;
-get_entity(16#2f) -> ipmi_channel;
-get_entity(16#30) -> pci_bus;
-get_entity(16#31) -> pci_expresstm_bus;
-get_entity(16#32) -> scsi_bus;
-get_entity(16#33) -> sata_bus;
-get_entity(16#34) -> front_side_bus;
-get_entity(16#35) -> real_time_clock;
-get_entity(16#37) -> air_inlet;
-get_entity(16#40) -> air_inlet;
-get_entity(16#41) -> processor;
-get_entity(16#42) -> main_system_board;
-get_entity(Id)    -> Id.
+-spec get_entity_id(non_neg_integer()) ->
+                           [{entity_id, entity_id()}].
+get_entity_id(16#00) -> [{entity_id, unspecified}];
+get_entity_id(16#01) -> [{entity_id, other}];
+get_entity_id(16#02) -> [{entity_id, unknown}];
+get_entity_id(16#03) -> [{entity_id, processor}];
+get_entity_id(16#04) -> [{entity_id, disk_or_disk_bay}];
+get_entity_id(16#05) -> [{entity_id, peripheral_bay}];
+get_entity_id(16#06) -> [{entity_id, system_management_module}];
+get_entity_id(16#07) -> [{entity_id, system_board}];
+get_entity_id(16#08) -> [{entity_id, memory_module}];
+get_entity_id(16#09) -> [{entity_id, processor_module}];
+get_entity_id(16#0a) -> [{entity_id, power_supply}];
+get_entity_id(16#0b) -> [{entity_id, add_in_card}];
+get_entity_id(16#0c) -> [{entity_id, front_panel_board}];
+get_entity_id(16#0d) -> [{entity_id, back_panel_board}];
+get_entity_id(16#0e) -> [{entity_id, power_system_board}];
+get_entity_id(16#0f) -> [{entity_id, drive_backplane}];
+get_entity_id(16#10) -> [{entity_id, system_internal_expansion_board}];
+get_entity_id(16#11) -> [{entity_id, other_system_board}];
+get_entity_id(16#12) -> [{entity_id, processor_board}];
+get_entity_id(16#13) -> [{entity_id, power_unit}];
+get_entity_id(16#14) -> [{entity_id, power_module}];
+get_entity_id(16#15) -> [{entity_id, power_management}];
+get_entity_id(16#16) -> [{entity_id, chassis_back_panel_board}];
+get_entity_id(16#17) -> [{entity_id, system_chassis}];
+get_entity_id(16#18) -> [{entity_id, sub_chassis}];
+get_entity_id(16#19) -> [{entity_id, other_chassis_board}];
+get_entity_id(16#1a) -> [{entity_id, disk_drive_bay}];
+get_entity_id(16#1b) -> [{entity_id, peripheral_bay}];
+get_entity_id(16#1c) -> [{entity_id, device_bay}];
+get_entity_id(16#1d) -> [{entity_id, cooling_device}];
+get_entity_id(16#1e) -> [{entity_id, cooling_unit}];
+get_entity_id(16#1f) -> [{entity_id, interconnect}];
+get_entity_id(16#20) -> [{entity_id, memory_device}];
+get_entity_id(16#21) -> [{entity_id, system_management_software}];
+get_entity_id(16#22) -> [{entity_id, system_firmware}];
+get_entity_id(16#23) -> [{entity_id, operating_system}];
+get_entity_id(16#24) -> [{entity_id, system_bus}];
+get_entity_id(16#25) -> [{entity_id, group}];
+get_entity_id(16#26) -> [{entity_id, remote_management_communication_device}];
+get_entity_id(16#27) -> [{entity_id, external_environment}];
+get_entity_id(16#28) -> [{entity_id, battery}];
+get_entity_id(16#29) -> [{entity_id, processing_blade}];
+get_entity_id(16#2a) -> [{entity_id, connectivity_switch}];
+get_entity_id(16#2b) -> [{entity_id, processor_memory_module}];
+get_entity_id(16#2c) -> [{entity_id, io_module}];
+get_entity_id(16#2d) -> [{entity_id, processor_io_module}];
+get_entity_id(16#2e) -> [{entity_id, management_controller_firmware}];
+get_entity_id(16#2f) -> [{entity_id, ipmi_channel}];
+get_entity_id(16#30) -> [{entity_id, pci_bus}];
+get_entity_id(16#31) -> [{entity_id, pci_expresstm_bus}];
+get_entity_id(16#32) -> [{entity_id, scsi_bus}];
+get_entity_id(16#33) -> [{entity_id, sata_bus}];
+get_entity_id(16#34) -> [{entity_id, front_side_bus}];
+get_entity_id(16#35) -> [{entity_id, real_time_clock}];
+get_entity_id(16#37) -> [{entity_id, air_inlet}];
+get_entity_id(16#40) -> [{entity_id, air_inlet}];
+get_entity_id(16#41) -> [{entity_id, processor}];
+get_entity_id(16#42) -> [{entity_id, main_system_board}];
+get_entity_id(Id)    -> [{entity_id, Id}].
 
 %%------------------------------------------------------------------------------
 %% @doc
-%% Decode the system event log 'event data' fields according to the given
-%% sensor reading type (as returned from {@link get_reading/2}).
+%% Returns the sensor unit from the given type code according to section 43.17
+%% from the IPMI specification.
 %% @end
 %%------------------------------------------------------------------------------
-decode_event_data({threshold, Type}, Assertion, Data) ->
-    [{sensor, get_sensor(Type)}] ++ decode_threshold(Type, Assertion, Data);
-decode_event_data({discrete, Type}, Assertion, Data) ->
-    [{sensor, get_sensor(Type)}] ++ decode_generic(Type, Assertion, Data);
-decode_event_data({oem, Type}, Assertion, Data) ->
-    [{sensor, get_sensor(Type)}] ++ decode_oem(Type, Assertion, Data).
-
-%%------------------------------------------------------------------------------
-%% @doc
-%% Decodes the id, lun and channel from a standard encoded binary.
-%% @end
-%%------------------------------------------------------------------------------
-decode_addr(<<Addr:7, 0:1, 0:4, ?EIPMI_RESERVED:2, Lun:2>>) ->
-    [{slave_addr, Addr}, {slave_lun, Lun}];
-decode_addr(<<Addr:7, 0:1, Channel:4, ?EIPMI_RESERVED:2, Lun:2>>) ->
-    [{slave_addr, Addr}, {slave_lun, Lun}, {channel, Channel}];
-decode_addr(<<Id:7, 1:1, 0:4, ?EIPMI_RESERVED:2, 0:2>>) ->
-    [{software_id, Id}];
-decode_addr(<<Id:7, 1:1, Channel:4, ?EIPMI_RESERVED:2, 0:2>>) ->
-    [{software_id, Id}, {channel, Channel}].
+get_unit(0) ->  unspecified;
+get_unit(1) ->  clesius;
+get_unit(2) ->  fahrenheit;
+get_unit(3) ->  kelvin;
+get_unit(4) ->  volts;
+get_unit(5) ->  amps;
+get_unit(6) ->  watts;
+get_unit(7) ->  joules;
+get_unit(8) ->  coulombs;
+get_unit(9) ->  va;
+get_unit(10) -> nits;
+get_unit(11) -> lumen;
+get_unit(12) -> lux;
+get_unit(13) -> candela;
+get_unit(14) -> kPa;
+get_unit(15) -> psi;
+get_unit(16) -> newton;
+get_unit(17) -> cfm;
+get_unit(18) -> rpm;
+get_unit(19) -> hz;
+get_unit(20) -> microsecond;
+get_unit(21) -> millisecond;
+get_unit(22) -> second;
+get_unit(23) -> minute;
+get_unit(24) -> hour;
+get_unit(25) -> day;
+get_unit(26) -> week;
+get_unit(27) -> mil;
+get_unit(28) -> inches;
+get_unit(29) -> feet;
+get_unit(30) -> cubic_inches;
+get_unit(31) -> cubic_feet;
+get_unit(32) -> mm;
+get_unit(33) -> cm;
+get_unit(34) -> m;
+get_unit(35) -> cubic_cm;
+get_unit(36) -> cubic_m;
+get_unit(37) -> liters;
+get_unit(38) -> fluid_ounce;
+get_unit(39) -> radians;
+get_unit(40) -> steradians;
+get_unit(41) -> revolutions;
+get_unit(42) -> cycles;
+get_unit(43) -> gravities;
+get_unit(44) -> ounce;
+get_unit(45) -> pound;
+get_unit(46) -> ft_lb;
+get_unit(47) -> oz_inch;
+get_unit(48) -> gauss;
+get_unit(49) -> gilberts;
+get_unit(50) -> henry;
+get_unit(51) -> millihenry;
+get_unit(52) -> farad;
+get_unit(53) -> microfarad;
+get_unit(54) -> ohms;
+get_unit(55) -> siemens;
+get_unit(56) -> mole;
+get_unit(57) -> becquerel;
+get_unit(58) -> ppm;
+get_unit(59) -> reserved;
+get_unit(60) -> decibels;
+get_unit(61) -> dBA;
+get_unit(62) -> dBC;
+get_unit(63) -> gray;
+get_unit(64) -> sievert;
+get_unit(65) -> color_temperature_kelvin;
+get_unit(66) -> bit;
+get_unit(67) -> kilobit;
+get_unit(68) -> megabit;
+get_unit(69) -> gigabit;
+get_unit(70) -> byte;
+get_unit(71) -> kilobyte;
+get_unit(72) -> megabyte;
+get_unit(73) -> gigabyte;
+get_unit(74) -> word;
+get_unit(75) -> dword;
+get_unit(76) -> qword;
+get_unit(77) -> memory_line;
+get_unit(78) -> hit;
+get_unit(79) -> miss;
+get_unit(80) -> retry;
+get_unit(81) -> reset;
+get_unit(82) -> overrun;
+get_unit(83) -> underrun;
+get_unit(84) -> collision;
+get_unit(85) -> packets;
+get_unit(86) -> messages;
+get_unit(87) -> characters;
+get_unit(88) -> error;
+get_unit(89) -> correctable_error;
+get_unit(90) -> uncorrectable_error;
+get_unit(91) -> fatal_error;
+get_unit(92) -> grams.
 
 %%%=============================================================================
 %%% Internal functions
 %%%=============================================================================
-
-%%------------------------------------------------------------------------------
-%% @private
-%%------------------------------------------------------------------------------
-decode_threshold(Type, Assertion, <<1:2, 0:2, Offset:4, _B2:8, _:8>>) ->
-    [map(Type, Offset, Assertion, 16#ff, 16#ff)];
-decode_threshold(Type, Assertion, <<1:2, 1:2, Offset:4, _B2:8, _B3:8>>) ->
-    [map(Type, Offset, Assertion, 16#ff, 16#ff)];
-decode_threshold(Type, Assertion, <<_:2, _:2, Offset:4, _:8, _:8>>) ->
-    [map(Type, Offset, Assertion, 16#ff, 16#ff)].
-
-%%------------------------------------------------------------------------------
-%% @private
-%%------------------------------------------------------------------------------
-decode_generic(Type, Assertion, <<0:2, 3:2, Offset:4, _:8, B3:8>>) ->
-    [map(Type, Offset, Assertion, 16#ff, B3)];
-decode_generic(Type, Assertion, <<1:2, 0:2, Offset:4, SOff:4, POff:4, _:8>>) ->
-    Severity = maybe_severity(SOff),
-    Previous = maybe_previous(Type, POff, Assertion),
-    [map(Type, Offset, Assertion, 16#ff, 16#ff)] ++ Severity ++ Previous;
-decode_generic(Type, Assertion, <<1:2, 3:2, Offset:4, SOff:4, POff:4, B3:8>>) ->
-    Severity = maybe_severity(SOff),
-    Previous = maybe_previous(Type, POff, Assertion),
-    [map(Type, Offset, Assertion, 16#ff, B3)] ++ Severity ++ Previous;
-decode_generic(Type, Assertion, <<3:2, 0:2, Offset:4, B2:8, _:8>>) ->
-    [map(Type, Offset, Assertion, B2, 16#ff)];
-decode_generic(Type, Assertion, <<3:2, 3:2, Offset:4, B2:8, B3:8>>) ->
-    [map(Type, Offset, Assertion, B2, B3)];
-decode_generic(Type, Assertion, <<_:2, _:2, Offset:4, _:8, _:8>>) ->
-    [map(Type, Offset, Assertion, 16#ff, 16#ff)].
-
-%%------------------------------------------------------------------------------
-%% @private
-%%------------------------------------------------------------------------------
-decode_oem(_Type, _Asserted, _Data) ->
-    [].
 
 %%------------------------------------------------------------------------------
 %% @private
@@ -866,65 +1060,6 @@ map(                 _,     _, _,     _,     _) ->
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-get_sensor({threshold, 16#01}) -> threshold;
-get_sensor({generic,   16#02}) -> dmi_usage;
-get_sensor({generic,   16#03}) -> state;
-get_sensor({generic,   16#04}) -> predictive_failure;
-get_sensor({generic,   16#05}) -> limit;
-get_sensor({generic,   16#06}) -> performance;
-get_sensor({generic,   16#07}) -> severity;
-get_sensor({generic,   16#08}) -> availability;
-get_sensor({generic,   16#0b}) -> redundancy;
-get_sensor({generic,   16#0c}) -> acpi_power_state;
-get_sensor({specific,  16#01}) -> temperature;
-get_sensor({specific,  16#02}) -> voltage;
-get_sensor({specific,  16#03}) -> current;
-get_sensor({specific,  16#04}) -> fan;
-get_sensor({specific,  16#05}) -> intrusion;
-get_sensor({specific,  16#06}) -> violation_attempt;
-get_sensor({specific,  16#07}) -> processor;
-get_sensor({specific,  16#08}) -> power_supply;
-get_sensor({specific,  16#09}) -> power_unit;
-get_sensor({specific,  16#0a}) -> cooling_unit;
-get_sensor({specific,  16#0b}) -> other_unit;
-get_sensor({specific,  16#0c}) -> memory;
-get_sensor({specific,  16#0d}) -> drive_slot;
-get_sensor({specific,  16#0e}) -> post_memory_resize;
-get_sensor({specific,  16#0f}) -> system_firmware;
-get_sensor({specific,  16#10}) -> event_logging;
-get_sensor({specific,  16#11}) -> watchdog_old;
-get_sensor({specific,  16#12}) -> system_event;
-get_sensor({specific,  16#13}) -> critical_interrupt;
-get_sensor({specific,  16#14}) -> switch;
-get_sensor({specific,  16#15}) -> board;
-get_sensor({specific,  16#16}) -> microcontroller;
-get_sensor({specific,  16#17}) -> add_in_card;
-get_sensor({specific,  16#18}) -> chassis;
-get_sensor({specific,  16#19}) -> chip_set;
-get_sensor({specific,  16#1a}) -> other_fru;
-get_sensor({specific,  16#1b}) -> interconnect;
-get_sensor({specific,  16#1c}) -> terminator;
-get_sensor({specific,  16#1d}) -> system_boot;
-get_sensor({specific,  16#1e}) -> boot_error;
-get_sensor({specific,  16#1f}) -> os_boot;
-get_sensor({specific,  16#20}) -> os_shutdown;
-get_sensor({specific,  16#21}) -> slot;
-get_sensor({specific,  16#22}) -> system_acpi_power_state;
-get_sensor({specific,  16#23}) -> watchdog;
-get_sensor({specific,  16#24}) -> platform_alert;
-get_sensor({specific,  16#25}) -> entity_presence;
-get_sensor({specific,  16#26}) -> monitor_asic_ic;
-get_sensor({specific,  16#27}) -> lan;
-get_sensor({specific,  16#28}) -> management_subsystem_health;
-get_sensor({specific,  16#29}) -> battery;
-get_sensor({specific,  16#2a}) -> session;
-get_sensor({specific,  16#2b}) -> version;
-get_sensor({specific,  16#2c}) -> fru_state;
-get_sensor(_)                  -> unknown.
-
-%%------------------------------------------------------------------------------
-%% @private
-%%------------------------------------------------------------------------------
 get_power_state(16#00) -> {s0_g0, working};
 get_power_state(16#01) -> {s1, clocks_stopped};
 get_power_state(16#02) -> {s2, clocks_stopped};
@@ -1110,15 +1245,7 @@ get_version_change_type(_)     -> unspecified.
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-maybe_severity(16#f) ->
-    [];
-maybe_severity(Offset) ->
-    [map({generic, 16#07}, Offset, 0, 16#ff, 16#ff)].
-
-%%------------------------------------------------------------------------------
-%% @private
-%%------------------------------------------------------------------------------
 maybe_previous(_Type, 16#f, _Assert) ->
     [];
 maybe_previous(Type, Offset, Assert) ->
-    [{previous, map(Type, Offset, Assert, 16#ff, 16#ff)}].
+    [{previous_value, map(Type, Offset, Assert, 16#ff, 16#ff)}].

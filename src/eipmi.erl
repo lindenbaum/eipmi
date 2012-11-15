@@ -37,6 +37,7 @@
          open/2,
          close/1,
          read_fru/2,
+         read_sdr/1,
          read_sel/2,
          raw/4,
          subscribe/2,
@@ -247,6 +248,26 @@ read_fru(Session = {_, _}, FruId) when FruId >= 0 andalso FruId < 255 ->
     case get_session(Session, supervisor:which_children(?MODULE)) of
         {ok, Pid} ->
             ?EIPMI_CATCH(eipmi_fru:read(Pid, FruId));
+        Error ->
+            Error
+    end.
+
+%%------------------------------------------------------------------------------
+%% @doc
+%% TODO
+%% @end
+%%------------------------------------------------------------------------------
+-spec read_sdr(session()) ->
+                      {ok, [eipmi_sdr:entry()]} | {error, term()}.
+read_sdr(Session = {_, _}) ->
+    case get_session(Session, supervisor:which_children(?MODULE)) of
+        {ok, Pid} ->
+            case ?EIPMI_CATCH(eipmi_sdr:read(Pid)) of
+                Error = {error, _} ->
+                    Error;
+                Entries ->
+                    {ok, Entries}
+            end;
         Error ->
             Error
     end.

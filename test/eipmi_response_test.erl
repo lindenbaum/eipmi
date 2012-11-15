@@ -137,7 +137,8 @@ decode_get_sel_info_test() ->
     Bin = <<16#51, 16#01, 16#00, 16#ff, 16#ff, 16#44, 16#33, 16#22, 16#11,
             16#44, 16#33, 16#22, 16#11, 16#8f>>,
     ?assertEqual(
-       [{version, "15"}, {entries, 1}, {free_space, 16#ffff},
+       [{version, "15"}, {entries, 1},
+        {free_space, '65535b_or_more'},
         {most_recent_addition, 16#11223344},
         {most_recent_erase, 16#11223344},
         {overflow, true},
@@ -190,7 +191,8 @@ decode_get_sdr_repository_info_test() ->
     Bin = <<16#51, 16#01, 16#00, 16#ff, 16#ff, 16#44, 16#33, 16#22, 16#11,
             16#44, 16#33, 16#22, 16#11, 16#8f>>,
     ?assertEqual(
-       [{version, "15"}, {entries, 1}, {free_space, 16#ffff},
+       [{version, "15"}, {entries, 1},
+        {free_space, unspecified},
         {most_recent_addition, 16#11223344},
         {most_recent_erase, 16#11223344},
         {overflow, true},

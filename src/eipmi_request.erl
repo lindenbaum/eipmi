@@ -76,20 +76,19 @@ encode_application(?GET_SYSTEM_GUID, _Properties) ->
     <<>>;
 encode_application(?GET_CHANNEL_AUTHENTICATION_CAPABILITIES, Properties) ->
     P = encode_privilege(eipmi_util:get_val(privilege, Properties)),
-    <<0:1, ?EIPMI_RESERVED:3, ?IPMI_REQUESTED_CHANNEL:4, ?EIPMI_RESERVED:4,P:4>>;
+    <<0:1, 0:3, ?IPMI_REQUESTED_CHANNEL:4, 0:4,P:4>>;
 encode_application(?GET_SESSION_CHALLENGE, Properties) ->
     A = eipmi_auth:encode_type(eipmi_util:get_val(auth_type, Properties)),
     U = eipmi_util:normalize(16, eipmi_util:get_val(user, Properties)),
-    <<?EIPMI_RESERVED:4, A:4, U/binary>>;
+    <<0:4, A:4, U/binary>>;
 encode_application(?ACTIVATE_SESSION, Properties) ->
     A = eipmi_auth:encode_type(eipmi_util:get_val(auth_type, Properties)),
     P = encode_privilege(eipmi_util:get_val(privilege, Properties)),
     C = eipmi_util:normalize(16, eipmi_util:get_val(challenge, Properties)),
     S = eipmi_util:get_val(initial_outbound_seq_nr, Properties),
-    <<?EIPMI_RESERVED:4, A:4, ?EIPMI_RESERVED:4, P:4, C/binary, S:32/little>>;
+    <<0:4, A:4, 0:4, P:4, C/binary, S:32/little>>;
 encode_application(?SET_SESSION_PRIVILEGE_LEVEL, Properties) ->
-    P = encode_privilege(eipmi_util:get_val(privilege, Properties)),
-    <<?EIPMI_RESERVED:4, P:4>>;
+    <<0:4, (encode_privilege(eipmi_util:get_val(privilege, Properties))):4>>;
 encode_application(?CLOSE_SESSION, Properties) ->
     <<(eipmi_util:get_val(session_id, Properties)):32/little>>.
 
@@ -135,12 +134,12 @@ encode_storage(?GET_SDR, Properties) ->
 encode_transport(?GET_IP_UDP_RMCP_STATISTICS, Properties) ->
     Clear = eipmi_util:get_val(clear_statistics, Properties, false),
     C = case Clear of true -> 1; false -> 0 end,
-    <<?EIPMI_RESERVED:4, ?IPMI_REQUESTED_CHANNEL:4, ?EIPMI_RESERVED:7, C:1>>;
+    <<0:4, ?IPMI_REQUESTED_CHANNEL:4, 0:7, C:1>>;
 encode_transport(?GET_LAN_CONFIGURATION_PARAMETERS, Properties) ->
     P = eipmi_util:get_val(parameter, Properties),
     S = eipmi_util:get_val(set, Properties, 0),
     B = eipmi_util:get_val(block, Properties, 0),
-    <<1:1, ?EIPMI_RESERVED:3, ?IPMI_REQUESTED_CHANNEL:4, P:8, S:8 , B:8>>.
+    <<1:1, 0:3, ?IPMI_REQUESTED_CHANNEL:4, P:8, S:8 , B:8>>.
 
 %%------------------------------------------------------------------------------
 %% @private

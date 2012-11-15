@@ -84,13 +84,18 @@ decode_application(?GET_ACPI_POWER_STATE, <<_:1, System:7, _:1, Device:7>>) ->
     [{system, get_system_power_state(System)},
      {device, get_device_power_state(Device)}];
 decode_application(?GET_DEVICE_GUID, <<GUID/binary>>) ->
-    [{guid, binary_to_list(GUID)}];
+    [{guid, eipmi_util:binary_to_string(GUID)}];
 decode_application(?GET_SYSTEM_GUID, <<GUID/binary>>) ->
-    [{guid, binary_to_list(GUID)}];
+    [{guid, eipmi_util:binary_to_string(GUID)}];
 decode_application(?GET_CHANNEL_AUTHENTICATION_CAPABILITIES,
-                   <<_:8, 0:1, _:1, A:6, ?EIPMI_RESERVED:3, _:1, _:1, L:3,
+                   <<Channel:8, 0:1, ?EIPMI_RESERVED:1, A:6,
+                     ?EIPMI_RESERVED:3, P:1, U:1, L:3,
                      ?EIPMI_RESERVED:40>>) ->
-    [{auth_types, get_auth_types(A)}, {login_status, get_login_status(L)}];
+    [{channel, Channel},
+     {auth_types, get_auth_types(A)},
+     {per_message_authentication_enabled, eipmi_util:get_bool_inv(P)},
+     {user_level_authentication_enabled, eipmi_util:get_bool_inv(U)},
+     {login_status, get_login_status(L)}];
 decode_application(?GET_SESSION_CHALLENGE, <<I:32/little, C/binary>>) ->
     [{session_id, I}, {challenge, C}];
 decode_application(?ACTIVATE_SESSION,
@@ -117,11 +122,11 @@ decode_storage(?READ_FRU_DATA, <<Count:8, Data/binary>>) ->
 decode_storage(Cmd,
                <<Version:1/binary, Entries:16/little, Free:16/little,
                  Addition:32/little, Erase:32/little,
-                 Overflow:1, ?EIPMI_RESERVED:3, Operations:4>>)
+                 Overflow:1, _:3, Operations:4>>)
   when Cmd =:= ?GET_SEL_INFO orelse Cmd =:= ?GET_SDR_REPOSITORY_INFO ->
     [{version, lists:reverse(eipmi_util:from_bcd_plus(Version))},
      {entries, Entries},
-     {free_space, Free},
+     {free_space, get_free_space(Cmd, Free)},
      {most_recent_addition, Addition},
      {most_recent_erase, Erase},
      {overflow, case Overflow of 1 -> true; 0 -> false end},
@@ -244,6 +249,20 @@ decode_privilege(1) -> callback;
 decode_privilege(2) -> user;
 decode_privilege(3) -> operator;
 decode_privilege(4) -> administrator.
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+get_free_space(?GET_SEL_INFO, 16#ffff) ->
+    '65535b_or_more';
+get_free_space(?GET_SEL_INFO, Free) ->
+    {Free, b};
+get_free_space(?GET_SDR_REPOSITORY_INFO, 16#ffff) ->
+    unspecified;
+get_free_space(?GET_SDR_REPOSITORY_INFO, 16#fffe) ->
+    '64kb_or_more';
+get_free_space(?GET_SDR_REPOSITORY_INFO, Free) ->
+    {Free, b}.
 
 %%------------------------------------------------------------------------------
 %% @private
