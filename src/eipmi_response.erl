@@ -81,15 +81,15 @@ decode_sensor_event(_Cmd, _Data) ->
 %%------------------------------------------------------------------------------
 decode_application(?GET_DEVICE_ID,
                    <<Id:8, _:1, ?EIPMI_RESERVED:3, Revision:4,
-                     Operation:1, Major:7, Minor:8,
-                     IPMILeast:4, IPMIMost:4,
+                     Operation:1, Major:7, Minor:8, IPMIVersion:1/binary,
                      Support:8, Manufacterer:24/little,
                      Product:16/little, _/binary>>) ->
+    [Iv1 | IvRest] = lists:reverse(eipmi_util:from_bcd_plus(IPMIVersion)),
     [{device_id, Id},
      {device_revision, Revision},
      {operation, case Operation of 0 -> normal; 1 -> progress end},
      {firmware_version, eipmi_util:format("~B.~B", [Major, Minor])},
-     {ipmi_version, eipmi_util:format("~B.~B", [IPMIMost, IPMILeast])},
+     {ipmi_version, [Iv1 | [$. | IvRest]]},
      {device_support, get_device_support(Support)},
      {manufacturer_id, Manufacterer},
      {product_id, Product}];

@@ -320,10 +320,11 @@ decode_management_controller_device_locator_record(
 %% @private
 %%------------------------------------------------------------------------------
 decode_management_controller_confirmation_record(
-  <<?EIPMI_RESERVED:1, Major:7, Minor:8, IPMILeast:4, IPMIMost:4,
+  <<?EIPMI_RESERVED:1, Major:7, Minor:8, IPMIVersion:1/binary,
     Manufacturer:24/little, Product:16/little, GUID/binary>>) ->
+    [Iv1 | IvRest] = lists:reverse(eipmi_util:from_bcd_plus(IPMIVersion)),
     [{firmware_version, eipmi_util:format("~B.~B", [Major, Minor])},
-     {ipmi_version, eipmi_util:format("~B.~B", [IPMIMost, IPMILeast])},
+     {ipmi_version, [Iv1 | [$. | IvRest]]},
      {manufacturer_id, Manufacturer},
      {product_id, Product},
      {guid, eipmi_util:binary_to_string(GUID)}].
@@ -331,8 +332,20 @@ decode_management_controller_confirmation_record(
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-decode_bmc_message_channel_info_record(_Data) ->
-    [].
+decode_bmc_message_channel_info_record(
+  <<C0:1/binary, C1:1/binary, C2:1/binary, C3:1/binary, C4:1/binary,
+    C5:1/binary, C6:1/binary, C7:1/binary, MsgInterrupt:8, EventInterrupt:8,
+    ?EIPMI_RESERVED:8>>) ->
+    [{msg_channel_info0, get_message_channel_info(C0)},
+     {msg_channel_info0, get_message_channel_info(C1)},
+     {msg_channel_info0, get_message_channel_info(C2)},
+     {msg_channel_info0, get_message_channel_info(C3)},
+     {msg_channel_info0, get_message_channel_info(C4)},
+     {msg_channel_info0, get_message_channel_info(C5)},
+     {msg_channel_info0, get_message_channel_info(C6)},
+     {msg_channel_info0, get_message_channel_info(C7)}]
+        ++ get_interrupt_type(messaging_interrupt, MsgInterrupt)
+        ++ get_interrupt_type(event_message_buffer_interrupt, EventInterrupt).
 
 %%------------------------------------------------------------------------------
 %% @private
@@ -431,3 +444,41 @@ get_id(Count, <<1:1, Offset:7>>, 0, Id) ->
 get_id(Count, <<1:1, Offset:7>>, 1, Id) ->
     Is = lists:seq(Offset, Offset + Count - 1),
     [{id, string:join([Id ++ eipmi_util:from_base26(I) || I <- Is], ", ")}].
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+get_lun(<<0:1, Lun:2>>) -> [{lun, Lun}];
+get_lun(_) -> [].
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+get_protocol(16#1) -> [{protocol, ipmb}];
+get_protocol(16#2) -> [{protocol, {icmb, 1.0}}];
+get_protocol(16#3) -> [{protocol, {icmb, 0.9}}];
+get_protocol(16#4) -> [{protocol, {sm_bus, 1.0}}];
+get_protocol(16#5) -> [{protocol, system_format}];
+get_protocol(16#c) -> [{protocol, {oem, 1}}];
+get_protocol(16#d) -> [{protocol, {oem, 2}}];
+get_protocol(16#e) -> [{protocol, {oem, 3}}];
+get_protocol(16#f) -> [{protocol, {oem, 4}}];
+get_protocol(_) -> [].
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+get_message_channel_info(<<T:1, Lun:3/bitstring, Protocol:4>>) ->
+    [{transmit_support, eipmi_util:get_bool(T)}]
+        ++ get_lun(Lun) ++ get_protocol(Protocol).
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+get_interrupt_type(Tag, IRQ) when IRQ < 16#10 -> [{Tag, {irq, IRQ}}];
+get_interrupt_type(Tag, PCI) when PCI < 16#14 -> [{Tag, {pci, [49 + PCI]}}];
+get_interrupt_type(Tag, 16#14) -> [{Tag, smi}];
+get_interrupt_type(Tag, 16#15) -> [{Tag, sci}];
+get_interrupt_type(Tag, I) when I < 16#5f-> [{Tag, {interrupt, I - 16#20}}];
+get_interrupt_type(Tag, 16#60) -> [{Tag, assigned}];
+get_interrupt_type(_Tag, _) -> [].
