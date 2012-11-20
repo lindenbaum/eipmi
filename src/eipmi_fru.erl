@@ -296,7 +296,7 @@ decode_power_supply(<<OCapacity:16/little, PeakVA:16/little,
                       PredictiveFailTachometerLowerThreshold:8>>) ->
     <<?EIPMI_RESERVED:4, OverallCapacity:12>> = <<OCapacity:16>>,
     <<PeakWattageSecs:4, PeakWattage:12>> = <<PeakW:16>>,
-    [{overall_capacitly, {OverallCapacity, eipmi_sensor:get_unit()}},
+    [{overall_capacitly, {OverallCapacity, eipmi_sensor:get_unit(6)}},
      {peak_voltage, maybe_value({PeakVA, unit(9)}, unspecified)},
      {inrush_current, maybe_value({InrushCurrent, unit(5)}, unspecified)},
      {inrush_interval, maybe_value({InrushInterval, unit(21)}, unspecified)},

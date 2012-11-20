@@ -32,8 +32,11 @@
 -include("eipmi.hrl").
 
 -type addr() ::
-        {slave_addr, non_neg_integer()} |
-        {slave_lun, non_neg_integer()} |
+        {fru_id, non_neg_integer()} |
+        {fru_lun, non_neg_integer()} |
+        {sensor_addr, non_neg_integer()} |
+        {sensor_lun, non_neg_integer()} |
+        {bus_id, non_neg_integer()} |
         {channel, non_neg_integer()} |
         {software_id, non_neg_integer()}.
 
@@ -77,7 +80,28 @@
 
 -type value() :: term().
 
--export_type([addr/0, entity_id/0, entity/0, type/0, value/0]).
+-type unit() ::
+        celsius | fahrenheit | kelvin | volts | amps | watts | joules |
+        coulombs | va | nits | lumen | lux | candela | kPa | psi | newton |
+        cfm | rpm | hz | microsecond | millisecond | second | minute | hour |
+        day | week | mil | inches | feet | cubic_inches | cubic_feet | mm | cm |
+        m | cubic_cm | cubic_m | liters | fluid_ounce | radians | steradians |
+        revolutions | cycles | gravities | ounce | pound | ft_lb | oz_inch |
+        gauss | gilberts | henry | millihenry | farad | microfarad | ohms |
+        siemens | mole | becquerel | ppm | reserved | decibels | dBA | dBC |
+        gray | sievert | color_temperature_kelvin | bit | kilobit | megabit |
+        gigabit | byte | kilobyte | megabyte | gigabyte | word | dword | qword |
+        memory_line | hit | miss | retry | reset | overrun | underrun |
+        collision | packets | messages | characters | error |
+        correctable_error | uncorrectable_error | fatal_error | grams |
+        unspecified.
+
+-export_type([addr/0,
+              entity_id/0,
+              entity/0,
+              type/0,
+              value/0,
+              unit/0]).
 
 %%%=============================================================================
 %%% API
@@ -85,20 +109,26 @@
 
 %%------------------------------------------------------------------------------
 %% @doc
-%% Decodes the sensor from a 2byte binary according to the encoding provided by
-%% SEL and SDR records.
+%% Decodes the sensor from a 2 or 3 byte binary according to the encoding
+%% provided by SEL and SDR records.
 %% @end
 %%------------------------------------------------------------------------------
 -spec get_addr(binary()) ->
                       [addr()].
-get_addr(<<Addr:7, 0:1, 0:4, ?EIPMI_RESERVED:2, Lun:2>>) ->
-    [{slave_addr, Addr}, {slave_lun, Lun}];
-get_addr(<<Addr:7, 0:1, Channel:4, ?EIPMI_RESERVED:2, Lun:2>>) ->
-    [{slave_addr, Addr}, {slave_lun, Lun}, {channel, Channel}];
-get_addr(<<Id:7, 1:1, 0:4, ?EIPMI_RESERVED:2, 0:2>>) ->
-    [{software_id, Id}];
-get_addr(<<Id:7, 1:1, Channel:4, ?EIPMI_RESERVED:2, 0:2>>) ->
-    [{software_id, Id}, {channel, Channel}].
+get_addr(<<FruId:8, 1:1, _:2, Lun:2, _:3, C:4, _:4>>) ->
+    [{fru_id, FruId}, {sensor_lun, Lun}] ++ get_channel(C);
+get_addr(<<Addr:7, _:1, 0:1, _:2, Lun:2, 0:3, C:4, _:4>>) ->
+    [{sensor_addr, Addr}, {sensor_lun, Lun}] ++ get_channel(C);
+get_addr(<<Addr:7, _:1, 0:1, _:2, Lun:2, Bus:3, C:4, _:4>>) ->
+    [{sensor_addr, Addr}, {sensor_lun, Lun}, {bus_id, Bus}] ++ get_channel(C);
+get_addr(<<Addr:7, 0:1, C:4, 0:2, Lun:2>>) ->
+    [{sensor_addr, Addr}, {sensor_lun, Lun}] ++ get_channel(C);
+get_addr(<<Addr:7, 0:1, C:4, FLun:2, Lun:2>>) ->
+    [{sensor_addr, Addr}, {sensor_lun, Lun}, {fru_lun, FLun}] ++ get_channel(C);
+get_addr(<<Id:7, 1:1, C:4, 0:2, 0:2>>) ->
+    [{software_id, Id}] ++ get_channel(C);
+get_addr(<<Id:7, 1:1, C:4, FLun:2, 0:2>>) ->
+    [{software_id, Id}, {fru_lun, FLun}] ++ get_channel(C).
 
 %%------------------------------------------------------------------------------
 %% @doc
@@ -288,8 +318,9 @@ get_entity_id(Id)    -> [{entity_id, Id}].
 %% from the IPMI specification.
 %% @end
 %%------------------------------------------------------------------------------
-get_unit(0) ->  unspecified;
-get_unit(1) ->  clesius;
+-spec get_unit(non_neg_integer()) ->
+                      unit().
+get_unit(1) ->  celsius;
 get_unit(2) ->  fahrenheit;
 get_unit(3) ->  kelvin;
 get_unit(4) ->  volts;
@@ -380,7 +411,8 @@ get_unit(88) -> error;
 get_unit(89) -> correctable_error;
 get_unit(90) -> uncorrectable_error;
 get_unit(91) -> fatal_error;
-get_unit(92) -> grams.
+get_unit(92) -> grams;
+get_unit(_)  ->  unspecified.
 
 %%%=============================================================================
 %%% Internal functions
@@ -1063,6 +1095,12 @@ map(              Type,     O, A,    B2,    B3) ->
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
+get_channel(0) -> [];
+get_channel(Channel) -> [{channel, Channel}].
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
 get_power_state(16#00) -> {s0_g0, working};
 get_power_state(16#01) -> {s1, clocks_stopped};
 get_power_state(16#02) -> {s2, clocks_stopped};
@@ -1209,13 +1247,13 @@ get_session_data(16#ff, 16#ff) ->
 get_session_data(A, B) ->
     get_session_data_(<<A:8>>, <<B:8>>).
 get_session_data_(<<_:2, UserId:6>>, <<_:2, 0:2, Channel:4>>) ->
-    [{user_id, UserId}, {channel, Channel}];
+    [{user_id, UserId}] ++ get_channel(Channel);
 get_session_data_(<<_:2, UserId:6>>, <<_:2, 1:2, Channel:4>>) ->
-    [{user_id, UserId}, {channel, Channel}, {cause, close_session_command}];
+    [{user_id, UserId}, {cause, close_session_command}] ++ get_channel(Channel);
 get_session_data_(<<_:2, UserId:6>>, <<_:2, 2:2, Channel:4>>) ->
-    [{user_id, UserId}, {channel, Channel}, {cause, timeout}];
+    [{user_id, UserId}, {cause, timeout}] ++ get_channel(Channel);
 get_session_data_(<<_:2, UserId:6>>, <<_:2, 3:2, Channel:4>>) ->
-    [{user_id, UserId}, {channel, Channel}, {cause, configuration_change}].
+    [{user_id, UserId}, {cause, configuration_change}] ++ get_channel(Channel).
 
 %%------------------------------------------------------------------------------
 %% @private

@@ -1,3 +1,4 @@
+
 %%%=============================================================================
 %%% Copyright (c) 2012 Lindenbaum GmbH
 %%%
@@ -16,23 +17,14 @@
 %%% @doc
 %%% A module providing reading and decoding functionality for Sensor Data
 %%% Records (SDRs).
-%%% TODO:
-%%%  * full sensor data record
-%%%  * compact sensor data record
-%%%  * entity_association sensor data record
-%%%  * device_relative_entity_association sensor data record
-%%%  * generic_device_locator sensor data record
-%%%  * fru_device_locator sensor data record
-%%%  * management_controller_device_locator sensor data record
-%%%  * bmc_message_channel_info sensor data record
-%%%  * oem sensor data record
 %%% @end
 %%%=============================================================================
 
 -module(eipmi_sdr).
 
 -export([read/1,
-         read/2]).
+         read/2,
+         convert/2]).
 
 -include("eipmi.hrl").
 
@@ -41,15 +33,6 @@
 -define(READ, {?IPMI_NETFN_STORAGE_REQUEST, ?GET_SDR}).
 -define(GET_INFO, {?IPMI_NETFN_STORAGE_REQUEST, ?GET_SDR_REPOSITORY_INFO}).
 -define(RESERVE, {?IPMI_NETFN_STORAGE_REQUEST, ?RESERVE_SDR_REPOSITORY}).
-
--type info() ::
-        {version, string()} |
-        {entries, non_neg_integer()} |
-        {free_space, non_neg_integer()} |
-        {most_recent_addition, non_neg_integer()} |
-        {most_recent_erase, non_neg_integer()} |
-        {overflow, boolean()} |
-        {operations, [delete | partial_add | reserve | get_allocation_info]}.
 
 -type record_type() ::
         full |
@@ -65,10 +48,73 @@
         oem |
         reserved.
 
--type entry() ::
-        {record_type(), [term()]}.
+-type property() ::
+        eipmi_sensor:addr() |
+        {record_id, non_neg_integer()} |
+        {sdr_version, string()} |
+        {record_type, record_type()} |
+        {record_length, non_neg_integer()} |
+        {nominal_reading, non_neg_integer()} |
+        {nominal_maximum, non_neg_integer()} |
+        {nominal_minimum, non_neg_integer()} |
+        {maximum_reading, non_neg_integer()} |
+        {minimum_reading, non_neg_integer()} |
+        {container, [eipmi_sensor:entity()]} |
+        {containee, [eipmi_sensor:entity() | eipmi_sensor:addr()]} |
+        {linked_records_exist, boolean()} |
+        {presence_sensor_always_accessible, boolean()} |
+        {access_addr, non_neg_integer()} |
+        {device_type, non_neg_integer()} |
+        {device_type_modifier, non_neg_integer()} |
+        {id, string()} |
+        {device_support, [atom()]} |
+        {firmware_version, string()} |
+        {ipmi_version, string()} |
+        {manufacturer_id, non_neg_integer()} |
+        {product_id, non_neg_integer()} |
+        {guid, string()} |
+        {msg_channel_info,
+         [{transmit_support, boolean()} |
+          {sensor_lun, non_neg_integer()} |
+          {protocol, ipmb | {icmb, number()} | {sm_bus, number()} |
+           system_format | {oem, number()}}]} |
+        {messaging_interrupt,
+         {irq, non_neg_integer()} |
+         {pci, string()} |
+         smi |
+         sci |
+         {interrupt, non_neg_integer()} |
+         assigned} |
+        {event_message_buffer_interrupt,
+         {irq, non_neg_integer()} |
+         {pci, string()} |
+         smi |
+         sci |
+         {interrupt, non_neg_integer()} |
+         assigned} |
+        {data, binary()} |
+        {percentage, boolean()} |
+        {sensor_format, unsigned | ones_complement | twos_complement} |
+        {sensor_rate,
+         eipmi_sensor:unit() |
+         {eipmi_sensor:unit(), eipmi_sensor:unit()} |
+         {eipmi_sensor:unit(), per, eipmi_sensor:unit()}} |
+        {sensor_unit, eipmi_sensor:unit()} |
+        {sensor_tolerance, {number(), eipmi_sensor:unit()}} |
+        {sensor_resolution, {number(), eipmi_sensor:unit()}} |
+        {sensor_accuracy, {number(), percent}} |
+        {sensor_coefficients,
+         {linear | ln | log10 | log2 | e | exp10 | exp2 | '1/x' | sqr | cube |
+          sqrt | 'cube-1' | non_linear | oem_non_linear,
+          integer(), integer(), integer(), integer()}} |
+        {sensor_number, non_neg_integer()} |
+        {sensor_numbers, [non_neg_integer()]} |
+        {sensor_direction, input | output}.
 
--export_type([info/0, record_type/0, entry/0]).
+-type entry() ::
+        {record_type(), [property()]}.
+
+-export_type([record_type/0, property/0, entry/0]).
 
 %%%=============================================================================
 %%% API
@@ -105,6 +151,24 @@ read(SessionPid, RecordId) ->
     Reserve = lists:member(reserve, eipmi_util:get_val(operations, SdrInfo)),
     {_, Entry} = maybe_reserve(SessionPid, fun read_one/3, Args, Reserve),
     Entry.
+
+%%------------------------------------------------------------------------------
+%% @doc
+%% Convert a raw sensor reading into a meaningful value, using the sensors
+%% full SDR record.
+%% @end
+%%------------------------------------------------------------------------------
+-spec convert(binary(), {full, [property()]}) ->
+                     {ok, {number(), eipmi_sensor:unit() }} | {error, term()}.
+convert(Raw, {full, Properties}) when is_binary(Raw) ->
+    case get_reading(result, Raw, Properties) of
+        [{result, Result}] ->
+            {ok, Result};
+        _ ->
+            {error, sensor_does_not_return_numeric_reading}
+    end;
+convert(_Raw, {full, _Properties}) ->
+    {error, invalid_sensor_reading}.
 
 %%%=============================================================================
 %%% Internal functions
@@ -238,28 +302,42 @@ get_record_type(_)     -> reserved.
 %%------------------------------------------------------------------------------
 decode_full_sensor_record(
   <<SensorAddr:2/binary, SensorNumber:8, EntityId:8, EntityInstance:1/binary,
-    _Initialization:8, _Capabilities:8, SensorType:8, ReadingType:8,
-    _AssertionMask:16, _DeassertionMask:16, _ReadingMask:16, Units1:1/binary,
-    Units2:8, Units3:8, ?EIPMI_RESERVED:1, Linearization:7,
-    MAndTolerance:16/little, BAndAccuracy:24/little, R:4, B:4,
-    _AnalogCharacteristics:8, NominalReading:8, NominalMaximum:8,
-    NominalMinimum:8, MaximumReading:8, MinimumReading:8, _Thresholds:64,
-    ?EIPMI_RESERVED:16, _OEM:8, _IdLen:8, Id/binary>>) ->
-    %% TODO
+    _:16, SensorType:8, ReadingType:8, _:48, SensorUnit:3/binary,
+    SensorProperties:7/binary, _:8, NominalReading:1/binary,
+    NominalMaximum:1/binary, NominalMinimum:1/binary, MaximumReading:1/binary,
+    MinimumReading:1/binary, _:64, ?EIPMI_RESERVED:16, _OEM:8, _IdLen:8,
+    Id/binary>>) ->
     {_, Type} = eipmi_sensor:get_reading(ReadingType, SensorType),
+    Units = get_units(SensorUnit),
+    Properties = get_sensor_properties(SensorProperties, Units),
     eipmi_sensor:get_addr(SensorAddr)
-        ++ [{sensor_number, SensorNumber}]
+        ++ get_sensor_numbers(SensorNumber, 0)
         ++ eipmi_sensor:get_entity(EntityId, EntityInstance)
         ++ eipmi_sensor:get_type(Type)
-        ++ get_units(Units1, Units2, Units3)
-        ++ get_linearization(Linearization).
+        ++ Units ++ Properties
+        ++ get_reading(nominal_reading, NominalReading, Units ++ Properties)
+        ++ get_reading(nominal_maximum, NominalMaximum, Units ++ Properties)
+        ++ get_reading(nominal_minimum, NominalMinimum, Units ++ Properties)
+        ++ get_reading(maximum_reading, MaximumReading, Units ++ Properties)
+        ++ get_reading(minimum_reading, MinimumReading, Units ++ Properties)
+        ++ [{id, eipmi_util:binary_to_string(Id)}].
 
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-decode_compact_sensor_record(_Data) ->
-    %% TODO
-    [].
+decode_compact_sensor_record(
+  <<SensorAddr:2/binary, SensorNumber:8, EntityId:8, EntityInstance:1/binary,
+    _:16, SensorType:8, ReadingType:8, _:48, SensorUnit:3/binary, Direction:2,
+    Modifier:2, Count:4, Sharing:1/binary, _:16, ?EIPMI_RESERVED:24, _OEM:8,
+    _IdLen:8, Id/binary>>) ->
+    {_, Type} = eipmi_sensor:get_reading(ReadingType, SensorType),
+    eipmi_sensor:get_addr(SensorAddr)
+        ++ get_sensor_numbers(SensorNumber, Count)
+        ++ eipmi_sensor:get_entity(EntityId, EntityInstance)
+        ++ eipmi_sensor:get_type(Type)
+        ++ get_units(SensorUnit)
+        ++ get_direction(Direction)
+        ++ get_id(Count, Sharing, Modifier, eipmi_util:binary_to_string(Id)).
 
 %%------------------------------------------------------------------------------
 %% @private
@@ -279,30 +357,50 @@ decode_event_only_record(
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-decode_entity_association_record(_Data) ->
-    %% TODO
-    [].
+decode_entity_association_record(
+  <<Id:8, Instance:1/binary, Range:1, RecordLink:1, Presence:1,
+    ?EIPMI_RESERVED:5, Data/binary>>) ->
+    [{container, eipmi_sensor:get_entity(Id, Instance)},
+     {linked_records_exist, eipmi_util:get_bool(RecordLink)},
+     {presence_sensor_always_accessible, eipmi_util:get_bool(Presence)}]
+        ++ get_contained(Range, direct, Data).
 
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-decode_device_relative_entity_association_record(_Data) ->
-    %% TODO
-    [].
+decode_device_relative_entity_association_record(
+  <<Id:8, Inst:1/binary, Addr:2/binary, Range:1, RecordLink:1, Presence:1,
+    ?EIPMI_RESERVED:5, Data:16/binary, _/binary>>) ->
+    [{container, eipmi_sensor:get_entity(Id, Inst) ++ get_relative_addr(Addr)},
+     {linked_records_exist, eipmi_util:get_bool(RecordLink)},
+     {presence_sensor_always_accessible, eipmi_util:get_bool(Presence)}]
+        ++ get_contained(Range, relative, Data).
 
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-decode_generic_device_locator_record(_Data) ->
-    %% TODO
-    [].
+decode_generic_device_locator_record(
+  <<AccessAddr:7, ?EIPMI_RESERVED:1, Addr:3/binary, ?EIPMI_RESERVED:8,
+    Type:8, TypeModifier:8, EntityId:8, EntityInstance:1/binary, _OEM:8,
+    _IdLen:8, Id/binary>>) ->
+    [{access_addr, AccessAddr}]
+        ++ get_generic_addr(Addr)
+        ++ [{device_type, Type}, {device_type_modifier, TypeModifier}]
+        ++ eipmi_sensor:get_entity(EntityId, EntityInstance)
+        ++ [{id, eipmi_util:binary_to_string(Id)}].
 
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-decode_fru_device_locator_record(_Data) ->
-    %% TODO
-    [].
+decode_fru_device_locator_record(
+  <<AccessAddr:7, ?EIPMI_RESERVED:1, DeviceAddr:3/binary, ?EIPMI_RESERVED:8,
+    Type:8, TypeModifier:8, EntityId:8, EntityInstance:1/binary, _OEM:8,
+    _IdLen:8, Id/binary>>) ->
+    [{access_addr, AccessAddr}]
+        ++ eipmi_sensor:get_addr(DeviceAddr)
+        ++ [{device_type, Type}, {device_type_modifier, TypeModifier}]
+        ++ eipmi_sensor:get_entity(EntityId, EntityInstance)
+        ++ [{id, eipmi_util:binary_to_string(Id)}].
 
 %%------------------------------------------------------------------------------
 %% @private
@@ -336,14 +434,14 @@ decode_bmc_message_channel_info_record(
   <<C0:1/binary, C1:1/binary, C2:1/binary, C3:1/binary, C4:1/binary,
     C5:1/binary, C6:1/binary, C7:1/binary, MsgInterrupt:8, EventInterrupt:8,
     ?EIPMI_RESERVED:8>>) ->
-    [{msg_channel_info0, get_message_channel_info(C0)},
-     {msg_channel_info0, get_message_channel_info(C1)},
-     {msg_channel_info0, get_message_channel_info(C2)},
-     {msg_channel_info0, get_message_channel_info(C3)},
-     {msg_channel_info0, get_message_channel_info(C4)},
-     {msg_channel_info0, get_message_channel_info(C5)},
-     {msg_channel_info0, get_message_channel_info(C6)},
-     {msg_channel_info0, get_message_channel_info(C7)}]
+    [{msg_channel_info, get_message_channel_info(C0)},
+     {msg_channel_info, get_message_channel_info(C1)},
+     {msg_channel_info, get_message_channel_info(C2)},
+     {msg_channel_info, get_message_channel_info(C3)},
+     {msg_channel_info, get_message_channel_info(C4)},
+     {msg_channel_info, get_message_channel_info(C5)},
+     {msg_channel_info, get_message_channel_info(C6)},
+     {msg_channel_info, get_message_channel_info(C7)}]
         ++ get_interrupt_type(messaging_interrupt, MsgInterrupt)
         ++ get_interrupt_type(event_message_buffer_interrupt, EventInterrupt).
 
@@ -356,10 +454,10 @@ decode_oem_record(<<Manufacturer:24/little, Data/binary>>) ->
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-get_units(<<Format:2, Rate:3, Modifier:2, Percentage:1>>, Unit2, Unit3) ->
+get_units(<<Format:2, Rate:3, Modifier:2, Percentage:1, Base:8, Mod:8>>) ->
     get_format(Format)
         ++ get_rate(Rate)
-        ++ get_unit(Modifier, Unit2, Unit3)
+        ++ get_unit(Modifier, Base, Mod)
         ++ [{percentage, eipmi_util:get_bool(Percentage)}].
 
 %%------------------------------------------------------------------------------
@@ -373,13 +471,13 @@ get_format(3) -> [].
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-get_rate(0) -> [];
 get_rate(1) -> [{sensor_rate, eipmi_sensor:get_unit(20)}];
 get_rate(2) -> [{sensor_rate, eipmi_sensor:get_unit(21)}];
 get_rate(3) -> [{sensor_rate, eipmi_sensor:get_unit(22)}];
 get_rate(4) -> [{sensor_rate, eipmi_sensor:get_unit(23)}];
 get_rate(5) -> [{sensor_rate, eipmi_sensor:get_unit(24)}];
-get_rate(6) -> [{sensor_rate, eipmi_sensor:get_unit(25)}].
+get_rate(6) -> [{sensor_rate, eipmi_sensor:get_unit(25)}];
+get_rate(_) -> [].
 
 %%------------------------------------------------------------------------------
 %% @private
@@ -398,21 +496,67 @@ get_unit(2, Base, Mod) ->
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-get_linearization(16#00) -> [{sensor_linearization, linear}];
-get_linearization(16#01) -> [{sensor_linearization, ln}];
-get_linearization(16#02) -> [{sensor_linearization, log10}];
-get_linearization(16#03) -> [{sensor_linearization, log2}];
-get_linearization(16#04) -> [{sensor_linearization, e}];
-get_linearization(16#05) -> [{sensor_linearization, exp10}];
-get_linearization(16#06) -> [{sensor_linearization, exp2}];
-get_linearization(16#07) -> [{sensor_linearization, '1/x'}];
-get_linearization(16#08) -> [{sensor_linearization, sqr}];
-get_linearization(16#09) -> [{sensor_linearization, cube}];
-get_linearization(16#0a) -> [{sensor_linearization, sqrt}];
-get_linearization(16#0b) -> [{sensor_linearization, 'cube-1'}];
-get_linearization(16#70) -> [{sensor_linearization, non_linear}];
-get_linearization(L) when L =< 16#7f andalso L >= 16#71 ->
-    [{sensor_linearization, oem_non_linear}].
+get_linearization(16#00) -> linear;
+get_linearization(16#01) -> ln;
+get_linearization(16#02) -> log10;
+get_linearization(16#03) -> log2;
+get_linearization(16#04) -> e;
+get_linearization(16#05) -> exp10;
+get_linearization(16#06) -> exp2;
+get_linearization(16#07) -> '1/x';
+get_linearization(16#08) -> sqr;
+get_linearization(16#09) -> cube;
+get_linearization(16#0a) -> sqrt;
+get_linearization(16#0b) -> 'cube-1';
+get_linearization(16#70) -> non_linear;
+get_linearization(L) when L =< 16#7f andalso L >= 16#71 -> oem_non_linear.
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+get_linearization_fun(ln) -> fun(X) -> math:log(X) end;
+get_linearization_fun(log10) -> fun(X) -> math:log10(X) end;
+get_linearization_fun(log2) -> fun(X) -> math:log(X) / math:log(2) end;
+get_linearization_fun(e) -> fun(X) -> math:exp(X) end;
+get_linearization_fun(exp10) -> fun(X) -> math:pow(10, X) end;
+get_linearization_fun(exp2) -> fun(X) -> math:pow(2, X) end;
+get_linearization_fun('1/x') -> fun(X) -> 1 / X end;
+get_linearization_fun(sqr) -> fun(X) -> X * X end;
+get_linearization_fun(cube) -> fun(X) -> X * X * X end;
+get_linearization_fun(sqrt) -> fun(X) -> math:sqrt(X) end;
+get_linearization_fun('cube-1') -> fun(X) -> math:pow(X, 1 / 3) end;
+get_linearization_fun(_) -> fun(X) -> X end.
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+get_sensor_properties(Binary, Properties) ->
+    Unit = eipmi_util:get_val(sensor_unit, Properties),
+    get_sensor_properties(Unit =/= unspecified, Binary, Unit).
+get_sensor_properties(
+  true,
+  <<?EIPMI_RESERVED:1, Linearization:7, MLS:8/bitstring, MMS:2/bitstring,
+    Tolerance:6, BLS:8/bitstring, BMS:2/bitstring, ALS:6/bitstring,
+    AMS:4/bitstring, AccuracyExp:2, Direction:2, ResultExp:4/signed,
+    BExp:4/signed>>, Unit) ->
+    get_sensor_properties(
+      <<MMS:2/bitstring, MLS:8/bitstring>>,
+      <<BMS:2/bitstring, BLS:8/bitstring>>,
+      <<AMS:4/bitstring, ALS:6/bitstring>>,
+      Linearization, Tolerance, AccuracyExp,
+      Direction, ResultExp, BExp, Unit);
+get_sensor_properties(false, _, _) ->
+    [].
+get_sensor_properties(
+  <<M:10/signed>>, <<B:10/signed>>, <<Accuracy:10>>, Linearization,
+  Tolerance, AccuracyExp, Direction, ResultExp, BExp, Unit) ->
+    L = get_linearization(Linearization),
+    LFun = get_linearization_fun(L),
+    [{sensor_tolerance, {LFun(M * Tolerance / 2 * math:pow(10, ResultExp)), Unit}},
+     {sensor_resolution, {abs(M * math:pow(10, ResultExp)), Unit}},
+     {sensor_accuracy, {math:pow(Accuracy, AccuracyExp) / 100, percent}},
+     {sensor_coefficients, {L, M, B, BExp, ResultExp}}]
+        ++ get_direction(Direction).
 
 %%------------------------------------------------------------------------------
 %% @private
@@ -448,8 +592,33 @@ get_id(Count, <<1:1, Offset:7>>, 1, Id) ->
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-get_lun(<<0:1, Lun:2>>) -> [{lun, Lun}];
+get_lun(<<0:1, Lun:2>>) -> [{sensor_lun, Lun}];
 get_lun(_) -> [].
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+get_generic_addr(<<Addr:7, 0:4, Lun:2, 0:3, ?EIPMI_RESERVED:5, Span:3>>) ->
+    get_generic_addr(Addr, Span) ++ [{sensor_lun, Lun}];
+get_generic_addr(<<Addr:7, 0:4, Lun:2, Bus:3, ?EIPMI_RESERVED:5, Span:3>>) ->
+    get_generic_addr(Addr, Span) ++ [{sensor_lun, Lun}, {bus_id, Bus}];
+get_generic_addr(<<Addr:7, Chan:4, Lun:2, 0:3, ?EIPMI_RESERVED:5, Span:3>>) ->
+    get_generic_addr(Addr, Span) ++ [{channel, Chan}, {sensor_lun, Lun}];
+get_generic_addr(<<Addr:7, Chan:4, Lun:2, Bus:3, ?EIPMI_RESERVED:5, Span:3>>) ->
+    get_generic_addr(Addr, Span)
+        ++ [{channel, Chan}, {sensor_lun, Lun}, {bus_id, Bus}].
+get_generic_addr(Addr, Span) ->
+    [{sensor_addr, Addr + I} || I <- lists:seq(0, Span)].
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+get_relative_addr(<<0:7, ?EIPMI_RESERVED:1, 0:4, ?EIPMI_RESERVED:4>>) ->
+    [];
+get_relative_addr(<<Addr:7, ?EIPMI_RESERVED:1, 0:4, ?EIPMI_RESERVED:4>>) ->
+    [{sensor_addr, Addr}];
+get_relative_addr(<<Addr:7, ?EIPMI_RESERVED:1, Chan:4, ?EIPMI_RESERVED:4>>) ->
+    [{sensor_addr, Addr}, {channel, Chan}].
 
 %%------------------------------------------------------------------------------
 %% @private
@@ -482,3 +651,91 @@ get_interrupt_type(Tag, 16#15) -> [{Tag, sci}];
 get_interrupt_type(Tag, I) when I < 16#5f-> [{Tag, {interrupt, I - 16#20}}];
 get_interrupt_type(Tag, 16#60) -> [{Tag, assigned}];
 get_interrupt_type(_Tag, _) -> [].
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+get_contained(0, direct, Binary) ->
+    get_contained_from_list(Binary, []);
+get_contained(0, relative, Binary) ->
+    get_rel_contained_from_list(Binary, []);
+get_contained(1, direct, Binary) ->
+    get_contained_from_range(Binary, []);
+get_contained(1, relative, Binary) ->
+    get_rel_contained_from_range(Binary, []).
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+get_contained_from_list(<<>>, Acc) ->
+    lists:reverse(Acc);
+get_contained_from_list(<<0:16, Rest/binary>>, Acc) ->
+    get_contained_from_list(Rest, Acc);
+get_contained_from_list(<<Id:8, I:1/binary, R/binary>>, Acc) ->
+    Entity = {containee, eipmi_sensor:get_entity(Id, I)},
+    get_contained_from_list(R, [Entity | Acc]).
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+get_contained_from_range(<<>>, Acc) ->
+    Acc;
+get_contained_from_range(<<0:32, Rest/binary>>, Acc) ->
+    get_contained_from_range(Rest, Acc);
+get_contained_from_range(<<Id:8, I0:8, Id:8, I1:8, Rest/binary>>, Acc) ->
+    Es = [{containee, eipmi_sensor:get_entity(Id, I)} || I <- lists:seq(I0, I1)],
+    get_contained_from_range(Rest, Acc ++ Es).
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+get_rel_contained_from_list(<<>>, Acc) ->
+    lists:reverse(Acc);
+get_rel_contained_from_list(<<0:32, Rest/binary>>, Acc) ->
+    get_rel_contained_from_list(Rest, Acc);
+get_rel_contained_from_list(<<A:2/binary, Id:8, I:1/binary, R/binary>>, Acc) ->
+    Entity = {containee, eipmi_sensor:get_entity(Id, I) ++ get_relative_addr(A)},
+    get_rel_contained_from_list(R, [Entity | Acc]).
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+get_rel_contained_from_range(<<>>, Acc) ->
+    Acc;
+get_rel_contained_from_range(<<0:64, Rest/binary>>, Acc) ->
+    get_rel_contained_from_range(Rest, Acc);
+get_rel_contained_from_range(
+  <<A:2/binary, Id:8, I0:8, _:16, Id:8, I1:8, R/binary>>, Acc) ->
+    Es = [{containee, eipmi_sensor:get_entity(Id, I) ++ get_relative_addr(A)}
+          || I <- lists:seq(I0, I1)],
+    get_rel_contained_from_range(R, Acc ++ Es).
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+get_reading(Tag, Raw, Properties) ->
+    Unit = eipmi_util:get_val(sensor_unit, Properties),
+    Format = eipmi_util:get_val(sensor_format, Properties),
+    Coefficients = eipmi_util:get_val(sensor_coefficients, Properties),
+    get_reading(Tag, Unit, Format, Raw, Coefficients).
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+get_reading(_, unspecified, _, _, _) ->
+    [];
+get_reading(Tag, Unit, unsigned, <<Value:8/unsigned>>, Coefficients) ->
+    [{Tag, calc_reading(Unit, Value, Coefficients)}];
+get_reading(Tag, Unit, ones_complement, <<1:1, Raw:7>>, Coefficients) ->
+    [{Tag, calc_reading(Unit, (bnot Raw) * -1, Coefficients)}];
+get_reading(Tag, Unit, ones_complement, <<0:1, Value:7>>, Coefficients) ->
+    [{Tag, calc_reading(Unit, Value, Coefficients)}];
+get_reading(Tag, Unit, twos_complement, <<Value:8/signed>>, Coefficients) ->
+    [{Tag, calc_reading(Unit, Value, Coefficients)}].
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+calc_reading(Unit, X, {L, M, B, BExp, ResultExp}) ->
+    Fun = get_linearization_fun(L),
+    {Fun((M * X + B * math:pow(10, BExp)) * math:pow(10, ResultExp)), Unit}.

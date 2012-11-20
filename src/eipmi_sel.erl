@@ -44,6 +44,8 @@
          {sensor_value, eipmi_sensor:value()} |
          {previous_value, eipmi_sensor:value()} |
          {severity_value, eipmi_sensor:value()} |
+         {reading, binary()} |
+         {threshold, binary()} |
          eipmi_sensor:addr()].
 
 -export_type([entry/0]).
@@ -186,10 +188,10 @@ decode_event_data({oem, Type}, Assertion, Data) ->
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-decode_threshold(Type, Assertion, <<1:2, 0:2, Offset:4, B2:8, _:8>>) ->
-    get_value(Type, Offset, Assertion, [{reading, {raw, B2}}], []);
-decode_threshold(Type, Assertion, <<1:2, 1:2, Offset:4, B2:8, B3:8>>) ->
-    get_value(Type, Offset, Assertion, [{reading, {raw, B2}}], [{threshold, {raw, B3}}]);
+decode_threshold(Type, Assertion, <<1:2, 0:2, Offset:4, B2:1/binary, _:8>>) ->
+    get_value(Type, Offset, Assertion, [{reading, B2}], []);
+decode_threshold(Type, Assertion, <<1:2, 1:2, Offset:4, B2:1/binary, B3:1/binary>>) ->
+    get_value(Type, Offset, Assertion, [{reading, B2}], [{threshold, B3}]);
 decode_threshold(Type, Assertion, <<_:2, _:2, Offset:4, _:8, _:8>>) ->
     get_value(Type, Offset, Assertion, [], []).
 
