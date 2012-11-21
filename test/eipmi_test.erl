@@ -90,21 +90,39 @@ read_fru({ok, "tirana"}) ->
 read_fru(_) ->
     ok.
 
-read_sdr_test() ->
-    read_sdr(inet:gethostname()).
+read_sdr_repository_test() ->
+    read_sdr_repository(inet:gethostname()).
 
-read_sdr({ok, "tirana"}) ->
+read_sdr_repository({ok, "tirana"}) ->
     application:start(sasl),
     application:start(crypto),
     application:start(md2),
     application:start(eipmi),
     {ok, Session} = eipmi:open(?IP),
     Mon = monitor_session(Session),
-    Result = eipmi:read_sdr(Session),
+    Result = eipmi:read_sdr_repository(Session),
     error_logger:info_msg("~n~p~n", [Result]),
     ?assertEqual(ok, eipmi:close(Session)),
     ?assertEqual(normal, receive {'DOWN', Mon, _, _, Reason} -> Reason end);
-read_sdr(_) ->
+read_sdr_repository(_) ->
+    ok.
+
+read_fru_inventory_test() ->
+    read_fru_inventory(inet:gethostname()).
+
+read_fru_inventory({ok, "tirana"}) ->
+    application:start(sasl),
+    application:start(crypto),
+    application:start(md2),
+    application:start(eipmi),
+    {ok, Session} = eipmi:open(?IP),
+    Mon = monitor_session(Session),
+    {ok, SDRRepository} = eipmi:read_sdr_repository(Session),
+    Result = eipmi:read_fru_inventory(Session, SDRRepository),
+    error_logger:info_msg("~n~p~n", [Result]),
+    ?assertEqual(ok, eipmi:close(Session)),
+    ?assertEqual(normal, receive {'DOWN', Mon, _, _, Reason} -> Reason end);
+read_fru_inventory(_) ->
     ok.
 
 read_sel_test() ->

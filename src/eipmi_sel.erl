@@ -31,22 +31,25 @@
 -define(RESERVE, {?IPMI_NETFN_STORAGE_REQUEST, ?RESERVE_SEL}).
 -define(CLEAR, {?IPMI_NETFN_STORAGE_REQUEST, ?CLEAR_SEL}).
 
+-type record_type() :: system_event | oem_timestamped | oem_non_timestamped.
+
 -type entry() ::
-        [{id, non_neg_integer()} |
-         {type, system_event} |
-         {type, {oem_timestamped | oem_non_timestamped, non_neg_integer()}} |
-         {time, non_neg_integer()} |
-         {maunfacturer_id, non_neg_integer()} |
-         {data, binary()} |
-         {revision, non_neg_integer()} |
-         {sensor_type, eipmi_sensor:type()} |
-         {sensor_number, non_neg_integer()} |
-         {sensor_value, eipmi_sensor:value()} |
-         {previous_value, eipmi_sensor:value()} |
-         {severity_value, eipmi_sensor:value()} |
-         {reading, binary()} |
-         {threshold, binary()} |
-         eipmi_sensor:addr()].
+        {record_type(),
+         [{record_id, non_neg_integer()} |
+          {type, record_type()} |
+          {oem_type, non_neg_integer()} |
+          {time, non_neg_integer()} |
+          {maunfacturer_id, non_neg_integer()} |
+          {data, binary()} |
+          {revision, non_neg_integer()} |
+          {sensor_type, eipmi_sensor:type()} |
+          {sensor_number, non_neg_integer()} |
+          {sensor_value, eipmi_sensor:value()} |
+          {previous_value, eipmi_sensor:value()} |
+          {severity_value, eipmi_sensor:value()} |
+          {reading, binary()} |
+          {threshold, binary()} |
+          eipmi_sensor:addr()]}.
 
 -export_type([entry/0]).
 
@@ -133,15 +136,18 @@ do_clear(SessionPid, ReservationId, Initiate, false) ->
 %% @private
 %%------------------------------------------------------------------------------
 decode(<<Id:16/little, 16#02:8, Rest/binary>>) ->
-    decode_system_event0([{type, system_event}, {id, Id}], Rest);
+    {system_event,
+     decode_system_event0([{record_id, Id}, {type, system_event}], Rest)};
 decode(<<Id:16/little, Type:8, Rest/binary>>)
   when Type >= 16#c0 andalso Type =< 16#df ->
-    decode_oem_timestamped([{id, Id}, {type, {oem_timestamped, Type}}], Rest);
+    {oem_timestamped,
+     decode_oem_timestamped(
+       [{record_id, Id}, {type, oem_timestamped}, {oem_type, Type}], Rest)};
 decode(<<Id:16/little, Type:8, Rest/binary>>)
   when Type >= 16#e0 andalso Type =< 16#ff ->
-    decode_oem_non_timestamped(
-      [{id, Id}, {type, {oem_non_timestamped, Type}}],
-      Rest).
+    {oem_non_timestamped,
+     decode_oem_non_timestamped(
+       [{record_id, Id}, {type, oem_non_timestamped}, {oem_type, Type}], Rest)}.
 
 %%------------------------------------------------------------------------------
 %% @private

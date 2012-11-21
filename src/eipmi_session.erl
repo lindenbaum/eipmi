@@ -103,7 +103,7 @@
          {port, ?RMCP_PORT_NUMBER},
          {privilege, administrator},
          {rq_addr, 16#81},
-         {timeout, 1000},
+         {timeout, 2000},
          {user, ""},
          %% unmodifyable session defaults
          {auth_type, none},    %% initial packets are not authenticated

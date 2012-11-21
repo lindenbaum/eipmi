@@ -64,10 +64,12 @@
         {extended_compatibility, proplists:proplist()}.
 
 -type info() ::
-        [{chassis_area, [chassis_info()]} |
-         {board_area, [board_info()]} |
-         {product_area, [product_info()]} |
-         {record_area, [multi_record()]}].
+        {fru_data,
+         [{fru_id, 0..255} |
+          {chassis_area, [chassis_info()]} |
+          {board_area, [board_info()]} |
+          {product_area, [product_info()]} |
+          {record_area, [multi_record()]}]}.
 
 -export_type([chassis_info/0,
               board_info/0,
@@ -107,9 +109,9 @@ do_read(Error = {error, _}, _SessionPid, _FruId) ->
     Error;
 do_read({ok, FruInfo}, SessionPid, FruId) ->
     Access = eipmi_util:get_val(access, FruInfo),
-    Divider = case Access of by_words -> 2; by_bytes -> 1 end,
-    AreaSize = eipmi_util:get_val(area_size, FruInfo) div Divider,
-    decode(do_read(SessionPid, FruId, AreaSize, ?MAX_READ_COUNT div Divider)).
+    Div = case Access of by_words -> 2; by_bytes -> 1 end,
+    AreaSize = eipmi_util:get_val(area_size, FruInfo) div Div,
+    decode(FruId, do_read(SessionPid, FruId, AreaSize, ?MAX_READ_COUNT div Div)).
 
 %%------------------------------------------------------------------------------
 %% @private
@@ -138,25 +140,26 @@ read_raw(SessionPid, FruId, Offset, Count, Acc) ->
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-decode(<<>>) ->
-    {ok, []};
-decode(FruData = <<?EIPMI_RESERVED:4,?FRU_VERSION:4, Offsets:5/binary, _/binary>>) ->
-    OffsetTuple = list_to_tuple(binary_to_list(Offsets)),
-    decode(is_header_sane(FruData), OffsetTuple, FruData);
-decode(_FruData) ->
+decode(FruId, <<>>) ->
+    {ok, {fru_data, [{fru_id, FruId}]}};
+decode(FruId, D = <<?EIPMI_RESERVED:4, ?FRU_VERSION:4, O:5/binary, _/binary>>) ->
+    OffsetTuple = list_to_tuple(binary_to_list(O)),
+    decode(is_header_sane(D), OffsetTuple, FruId, D);
+decode(_FruId, _FruData) ->
     {error, unsupported_fru_data}.
 
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-decode(false, _Offsets, _FruData) ->
+decode(false, _Offsets, _FruId, _FruData) ->
     {error, incorrect_header_checksum};
-decode(true, {_, C, B, P, M}, FruData) ->
-    {ok,
-     decode_chassis(get_area(C, non_zero([B, P, M]), FruData))
-     ++ decode_board(get_area(B, non_zero([P, M]), FruData))
-     ++ decode_product(get_area(P, non_zero([M]), FruData))
-     ++ decode_multi_record(get_area(M, [], FruData))}.
+decode(true, {_, C, B, P, M}, FruId, FruData) ->
+    {ok, {fru_data,
+          [{fru_id, FruId}]
+          ++ decode_chassis(get_area(C, non_zero([B, P, M]), FruData))
+          ++ decode_board(get_area(B, non_zero([P, M]), FruData))
+          ++ decode_product(get_area(P, non_zero([M]), FruData))
+          ++ decode_multi_record(get_area(M, [], FruData))}}.
 
 %%------------------------------------------------------------------------------
 %% @private

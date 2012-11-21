@@ -37,9 +37,13 @@
          open/2,
          close/1,
          read_fru/2,
-         read_sdr/1,
+         read_fru_inventory/2,
+         read_sdr/2,
+         read_sdr_repository/1,
          read_sel/2,
          raw/4,
+         resolve_sdr/2,
+         resolve_fru/3,
          subscribe/2,
          unsubscribe/2,
          stats/0]).
@@ -190,7 +194,7 @@ open(IPAddress) ->
 %%   <dt>`{timeout, non_neg_integer()}'</dt>
 %%   <dd>
 %%     <p>
-%%     the timeout for IPMI requests, default is `1000ms'
+%%     the timeout for IPMI requests, default is `2000ms'
 %%     </p>
 %%   </dd>
 %%   <dt>`{user, string() with length <= 16bytes}'</dt>
@@ -254,6 +258,43 @@ read_fru(Session = {_, _}, FruId) when FruId >= 0 andalso FruId < 255 ->
 
 %%------------------------------------------------------------------------------
 %% @doc
+%% Return the FRU inventory data for all FRU represented by a FRU Device Locator
+%% Record in the Sensor Data Record (SDR) Repository.
+%% @see read_fru/2
+%% @end
+%%------------------------------------------------------------------------------
+-spec read_fru_inventory(session(), [eipmi_sdr:entry()]) ->
+                                {ok, [eipmi_fru:info()]} | {error, [term()]}.
+read_fru_inventory(Session = {_, _}, SdrRepository) ->
+    collect([read_fru(Session, FruId) || FruId <- get_fru_ids(SdrRepository)]).
+
+%%------------------------------------------------------------------------------
+%% @doc
+%% Return a specific record from the Sensor Data Record (SDR) Repository.
+%%
+%% Reading of the SDR may fail (e.g. return `{error, term()}') when the
+%% reservation for SDR reading with non-zero offsets gets cancelled. This is not
+%% a severe error. It is most likely that the SDR can be read successfully when
+%% retried.
+%% @end
+%%------------------------------------------------------------------------------
+-spec read_sdr(session(), non_neg_integer()) ->
+                      {ok, eipmi_sdr:entry()} | {error, term()}.
+read_sdr(Session = {_, _}, RecordId) ->
+    case get_session(Session, supervisor:which_children(?MODULE)) of
+        {ok, Pid} ->
+            case ?EIPMI_CATCH(eipmi_sdr:read(Pid, RecordId)) of
+                Error = {error, _} ->
+                    Error;
+                Entries ->
+                    {ok, Entries}
+            end;
+        Error ->
+            Error
+    end.
+
+%%------------------------------------------------------------------------------
+%% @doc
 %% Return all records contained in the Sensor Data Record (SDR) Repository.
 %%
 %% Reading of the SDR may fail (e.g. return `{error, term()}') when the
@@ -262,9 +303,9 @@ read_fru(Session = {_, _}, FruId) when FruId >= 0 andalso FruId < 255 ->
 %% retried.
 %% @end
 %%------------------------------------------------------------------------------
--spec read_sdr(session()) ->
-                      {ok, [eipmi_sdr:entry()]} | {error, term()}.
-read_sdr(Session = {_, _}) ->
+-spec read_sdr_repository(session()) ->
+                                 {ok, [eipmi_sdr:entry()]} | {error, term()}.
+read_sdr_repository(Session = {_, _}) ->
     case get_session(Session, supervisor:which_children(?MODULE)) of
         {ok, Pid} ->
             case ?EIPMI_CATCH(eipmi_sdr:read(Pid)) of
@@ -319,6 +360,43 @@ raw(Session = {_, _}, NetFn, Command, Properties) ->
         Error ->
             Error
     end.
+
+%%------------------------------------------------------------------------------
+%% @doc
+%% Returns the Sensor Data Record (SDR) from the SDR repository associated with
+%% an entry in the System Event Log (SEL).
+%% @end
+%%------------------------------------------------------------------------------
+-spec resolve_sdr(eipmi_sel:entry(), [eipmi_sdr:entry()]) ->
+                         {ok, eipmi_sdr:entry()} | {error, term()}.
+resolve_sdr({_, SelEntryProps}, SdrRepository) ->
+    get_element_by_properties(
+      maybe(lists:keyfind(sensor_number, 1, SelEntryProps))
+      ++ maybe(lists:keyfind(sensor_addr, 1, SelEntryProps))
+      ++ maybe(lists:keyfind(software_id, 1, SelEntryProps)),
+      SdrRepository).
+
+%%------------------------------------------------------------------------------
+%% @doc
+%% Return the FRU inventory data associated with a specific sensor from the
+%% Sensor Data Record (SDR) repository.
+%% @end
+%%------------------------------------------------------------------------------
+-spec resolve_fru(eipmi_sdr:entry(), [eipmi_sdr:entry()], [eipmi_fru:info()]) ->
+                         {ok, eipmi_fru:info()} | {error, term()}.
+resolve_fru({_, SensorProps}, SdrRepository, FruInventory) ->
+    resolve_fru(
+      FruInventory,
+      get_element_by_properties(
+        maybe(lists:keyfind(entity_id, 1, SensorProps))
+        ++ maybe(lists:keyfind(entity_instance, 1, SensorProps)),
+        filter_by_key(fru_device_locator, SdrRepository))).
+resolve_fru(FruInventory, {ok, {fru_device_locator, Properties}}) ->
+    get_element_by_properties(
+      maybe(lists:keyfind(fru_id, 1, Properties)),
+      FruInventory);
+resolve_fru(_FruInventory, Error = {error, _}) ->
+    Error.
 
 %%------------------------------------------------------------------------------
 %% @doc
@@ -455,3 +533,54 @@ do_ping_receive(IPAddress, Timeout, Socket) ->
             gen_udp:send(Socket, IPAddress, ?RMCP_PORT_NUMBER, Ack),
             Es =:= [ipmi]
     end.
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+get_fru_ids(SdrRepository) ->
+    FruRecords = filter_by_key(fru_device_locator, SdrRepository),
+    [FruId || FruId <- [eipmi_util:get_val(fru_id, Ps) || {_, Ps} <- FruRecords],
+              FruId =/= undefined].
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+get_element_by_properties([], _List) ->
+    {error, unresolvable};
+get_element_by_properties(Props, List) ->
+    Pred = fun(Ps) -> lists:all(fun(P) -> lists:member(P, Ps) end, Props) end,
+    case [Element || Element = {_, Ps} <- List, Pred(Ps)] of
+        [] ->
+            {error, {not_found, Props}};
+        [Element | _] ->
+            {ok, Element}
+    end.
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+filter_by_key(Key, List) ->
+    [Element || Element = {K, _} <- List, K =:= Key].
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+collect(Results) ->
+    lists:foldl(
+      fun({error, Error}, {ok, _}) ->
+              {error, [Error]};
+         ({error, Error}, {error, Errors}) ->
+              {error, [Error | Errors]};
+         ({ok, _}, Error = {error, _}) ->
+              Error;
+         ({ok, Ok}, {ok, Oks}) ->
+              {ok, [Ok | Oks]}
+      end,
+      {ok, []},
+      Results).
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+maybe(false) -> [];
+maybe(Otherwise) -> Otherwise.
