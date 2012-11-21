@@ -265,7 +265,7 @@ read_fru(Session = {_, _}, FruId) when FruId >= 0 andalso FruId < 255 ->
 %%------------------------------------------------------------------------------
 -spec read_fru_inventory(session(), [eipmi_sdr:entry()]) ->
                                 {ok, [eipmi_fru:info()]} | {error, [term()]}.
-read_fru_inventory(Session = {_, _}, SdrRepository) ->
+read_fru_inventory(Session, SdrRepository) ->
     collect([read_fru(Session, FruId) || FruId <- get_fru_ids(SdrRepository)]).
 
 %%------------------------------------------------------------------------------
@@ -583,4 +583,4 @@ collect(Results) ->
 %% @private
 %%------------------------------------------------------------------------------
 maybe(false) -> [];
-maybe(Otherwise) -> Otherwise.
+maybe(Otherwise) -> [Otherwise].
