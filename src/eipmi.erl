@@ -42,8 +42,9 @@
          read_sdr_repository/1,
          read_sel/2,
          raw/4,
-         resolve_sdr/2,
-         resolve_fru/3,
+         sel_to_sdr/2,
+         sel_to_fru/3,
+         sdr_to_fru/3,
          subscribe/2,
          unsubscribe/2,
          stats/0]).
@@ -364,38 +365,52 @@ raw(Session = {_, _}, NetFn, Command, Properties) ->
 %%------------------------------------------------------------------------------
 %% @doc
 %% Returns the Sensor Data Record (SDR) from the SDR repository associated with
-%% an entry in the System Event Log (SEL).
+%% an entry in the System Event Log (SEL), if any.
 %% @end
 %%------------------------------------------------------------------------------
--spec resolve_sdr(eipmi_sel:entry(), [eipmi_sdr:entry()]) ->
-                         {ok, eipmi_sdr:entry()} | {error, term()}.
-resolve_sdr({_, SelEntryProps}, SdrRepository) ->
+-spec sel_to_sdr(eipmi_sel:entry(), [eipmi_sdr:entry()]) ->
+                        {ok, eipmi_sdr:entry()} | {error, term()}.
+sel_to_sdr({_, SelEntryProps}, SdrRepository) ->
     get_element_by_properties(
-      maybe(lists:keyfind(sensor_number, 1, SelEntryProps))
-      ++ maybe(lists:keyfind(sensor_addr, 1, SelEntryProps))
-      ++ maybe(lists:keyfind(software_id, 1, SelEntryProps)),
+      maybe_keyfind(sensor_number, 1, SelEntryProps)
+      ++ maybe_keyfind(sensor_addr, 1, SelEntryProps)
+      ++ maybe_keyfind(software_id, 1, SelEntryProps),
       SdrRepository).
 
 %%------------------------------------------------------------------------------
 %% @doc
-%% Return the FRU inventory data associated with a specific sensor from the
-%% Sensor Data Record (SDR) repository.
+%% Returns the FRU inventory data associated with an entry in the System
+%% Event Log (SEL), if any.
 %% @end
 %%------------------------------------------------------------------------------
--spec resolve_fru(eipmi_sdr:entry(), [eipmi_sdr:entry()], [eipmi_fru:info()]) ->
-                         {ok, eipmi_fru:info()} | {error, term()}.
-resolve_fru({_, SensorProps}, SdrRepository, FruInventory) ->
-    resolve_fru(
+-spec sel_to_fru(eipmi_sel:entry(), [eipmi_sdr:entry()], [eipmi_fru:info()]) ->
+                        {ok, eipmi_fru:info()} | {error, term()}.
+sel_to_fru(SelEntry, SdrRepository, FruInventory) ->
+    case sel_to_sdr(SelEntry, SdrRepository) of
+        {ok, Sdr} ->
+            sdr_to_fru(Sdr, SdrRepository, FruInventory);
+        Error ->
+            Error
+    end.
+
+%%------------------------------------------------------------------------------
+%% @doc
+%% Returns the FRU inventory data associated with a specific sensor from the
+%% Sensor Data Record (SDR) repository, if any.
+%% @end
+%%------------------------------------------------------------------------------
+-spec sdr_to_fru(eipmi_sdr:entry(), [eipmi_sdr:entry()], [eipmi_fru:info()]) ->
+                        {ok, eipmi_fru:info()} | {error, term()}.
+sdr_to_fru({_, SensorProps}, SdrRepository, FruInventory) ->
+    sdr_to_fru(
       FruInventory,
       get_element_by_properties(
-        maybe(lists:keyfind(entity_id, 1, SensorProps))
-        ++ maybe(lists:keyfind(entity_instance, 1, SensorProps)),
+        maybe_keyfind(entity_id, 1, SensorProps)
+        ++ maybe_keyfind(entity_instance, 1, SensorProps),
         filter_by_key(fru_device_locator, SdrRepository))).
-resolve_fru(FruInventory, {ok, {fru_device_locator, Properties}}) ->
-    get_element_by_properties(
-      maybe(lists:keyfind(fru_id, 1, Properties)),
-      FruInventory);
-resolve_fru(_FruInventory, Error = {error, _}) ->
+sdr_to_fru(FruInventory, {ok, {fru_device_locator, Props}}) ->
+    get_element_by_properties(maybe_keyfind(fru_id, 1, Props), FruInventory);
+sdr_to_fru(_FruInventory, Error = {error, _}) ->
     Error.
 
 %%------------------------------------------------------------------------------
@@ -582,5 +597,9 @@ collect(Results) ->
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-maybe(false) -> [];
-maybe(Otherwise) -> [Otherwise].
+maybe_keyfind(Key, N, List) ->
+    maybe_keyfind(lists:keyfind(Key, N, List)).
+maybe_keyfind(false) ->
+    [];
+maybe_keyfind(Otherwise) ->
+    [Otherwise].
