@@ -42,7 +42,7 @@
 %%% support for new requests/responses is added.
 %%%
 %%% TODO:
-%%% * Implement session keep alive.
+%%% * Use Activate Session requests for session keep-alive
 %%% @end
 %%%=============================================================================
 -module(eipmi_session).
@@ -162,7 +162,8 @@ stop(Pid) ->
 
 -record(state, {
           active = false :: boolean(),
-          queue = []     :: [term()],
+          last_send      :: non_neg_integer(),
+          queue = []     :: [{eipmi:request(), proplists:proplist(), term()}],
           requests = []  :: [{rpc | internal, 0..63, reference(), term()}],
           session        :: eipmi:session(),
           address        :: inet:ip_address() | inet:hostname(),
@@ -211,6 +212,8 @@ handle_info({udp, Socket, _, _, Bin}, S) when S#state.socket =:= Socket ->
 handle_info({timeout, RqSeqNr}, State) ->
     {Requests, NewState} = unregister_request(RqSeqNr, State),
     {noreply, lists:foldl(reply({error, timeout}), NewState, Requests)};
+handle_info(keep_alive, State) ->
+    {noreply, keep_alive(to_millis(os:timestamp()), State)};
 handle_info(Info, State) ->
     {noreply, fire({unhandled, {info, Info}}, State)}.
 
@@ -342,7 +345,7 @@ maybe_send_ack(Header, State) ->
 udp_send(Bin, S = #state{socket = Socket, address = IPAddress}) ->
     Port = eipmi_util:get_val(port, S#state.properties),
     ok = gen_udp:send(Socket, IPAddress, Port, Bin),
-    S.
+    S#state{last_send = to_millis(os:timestamp())}.
 
 %%------------------------------------------------------------------------------
 %% @private
@@ -421,7 +424,31 @@ handle_set_session_privilege_response({ok, Fields}, State) ->
       Fields, State).
 handle_set_session_privilege_response(true, _, State = #state{queue = Q}) ->
     NewState = State#state{active = true, queue = []},
-    fire(established, lists:foldl(fun process_request/2, NewState, Q)).
+    keep_alive(
+      to_millis(os:timestamp()),
+      fire(established, lists:foldl(fun process_request/2, NewState, Q))).
+
+%%------------------------------------------------------------------------------
+%% @private
+%% According to spec we need to send a request at least every 60000ms, so we do
+%% it at least every 50000ms. Since our target does not support session keep
+%% alive by resending Activate Session requests, we just query the current
+%% privilege level.
+%%------------------------------------------------------------------------------
+keep_alive(Now, State = #state{last_send = Last}) when Now - Last >= 50000 ->
+    process_request(
+      {{?IPMI_NETFN_APPLICATION_REQUEST, ?SET_SESSION_PRIVILEGE_LEVEL},
+       [], fun handle_keep_alive/2}, State);
+keep_alive(Now, State = #state{last_send = Last}) ->
+    erlang:send_after(50000 - (Now - Last), self(), keep_alive),
+    State.
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+handle_keep_alive({ok, _Fields}, State) ->
+    erlang:send_after(50000, self(), keep_alive),
+    State.
 
 %%------------------------------------------------------------------------------
 %% @private
@@ -443,6 +470,12 @@ reply(Message, internal, Fun, State) ->
 fire(Event, State = #state{session = Session}) ->
     eipmi_events:fire(Session, Event),
     State.
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+to_millis({MegaSecs, Secs, MicroSecs}) ->
+    MegaSecs * 1000000000 + Secs * 1000 + MicroSecs div 1000.
 
 %%------------------------------------------------------------------------------
 %% @private
