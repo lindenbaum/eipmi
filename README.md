@@ -86,35 +86,35 @@ and be prepared to receive the following events on the `handle_event/2`
 callback:
 
 ```erlang
-{Session :: eipmi:session(), established}
+{ipmi, Session :: eipmi:session(), established}
 ```
 The session was successfully established and activated.
 ```erlang
-{Session :: eipmi:session(), {closed, Reason :: term()}}
+{ipmi, Session :: eipmi:session(), {closed, Reason :: term()}}
 ```
 The session was closed with the provided reason.
 ```erlang
-{Session :: eipmi:session(), {decode_error, Reason :: term()}}
+{ipmi, Session :: eipmi:session(), {decode_error, Reason :: term()}}
 ```
 A received packet could not be decoded.
 ```erlang
-{Session :: eipmi:session(), {timeout, RqSeqNr :: 0..63}}
+{ipmi, Session :: eipmi:session(), {timeout, RqSeqNr :: 0..63}}
 ```
 The corresponding request timed out.
 ```erlang
-{Session :: eipmi:session(), {unhandled, {call, Request :: term()}}}
+{ipmi, Session :: eipmi:session(), {unhandled, {call, Request :: term()}}}
 ```
 The session received an invalid `gen_server` call.
 ```erlang
-{Session :: eipmi:session(), {unhandled, {cast, Request :: term()}}}
+{ipmi, Session :: eipmi:session(), {unhandled, {cast, Request :: term()}}}
 ```
 The session received an invalid `gen_server` cast.
 ```erlang
-{Session :: eipmi:session(), {unhandled, {info, Info :: term()}}}
+{ipmi, Session :: eipmi:session(), {unhandled, {info, Info :: term()}}}
 ```
 The session received an invalid message.
 ```erlang
-{Session :: eipmi:session(), {unhandled, {ipmi, {ok | error, term()}}}}
+{ipmi, Session :: eipmi:session(), {unhandled, {ipmi, {ok | error, term()}}}}
 ```
 The session received an IPMI response but no handler was found for it.
 

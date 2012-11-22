@@ -90,7 +90,7 @@ swap(OldHandler, OldArgs, NewHandler, NewArgs) ->
 -spec fire(eipmi:session(), term()) ->
                   ok.
 fire(Session, Event) ->
-    gen_event:notify(?MODULE, {Session, Event}).
+    gen_event:notify(?MODULE, {ipmi, Session, Event}).
 
 %%------------------------------------------------------------------------------
 %% @doc

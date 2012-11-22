@@ -421,35 +421,35 @@ sdr_to_fru(_FruInventory, Error = {error, _}) ->
 %% The event handling module should be prepared to receive the following events
 %% on the `handle_event/2' callback:
 %% <dl>
-%%   <dt>`{Session :: session(), established}'</dt>
+%%   <dt>`{ipmi, Session :: session(), established}'</dt>
 %%   <dd>
 %%     <p>the session was successfully established and activated</p>
 %%   </dd>
-%%   <dt>`{Session :: session(), {closed, Reason :: term()}}'</dt>
+%%   <dt>`{ipmi, Session :: session(), {closed, Reason :: term()}}'</dt>
 %%   <dd>
 %%     <p>the session was closed with the provided reason</p>
 %%   </dd>
-%%   <dt>`{Session :: session(), {decode_error, Reason :: term()}}'</dt>
+%%   <dt>`{ipmi, Session :: session(), {decode_error, Reason :: term()}}'</dt>
 %%   <dd>
 %%     <p>a received packet could not be decoded</p>
 %%   </dd>
-%%   <dt>`{Session :: session(), {timeout, RqSeqNr :: 0..63}}'</dt>
+%%   <dt>`{ipmi, Session :: session(), {timeout, RqSeqNr :: 0..63}}'</dt>
 %%   <dd>
 %%     <p>the corresponding request timed out</p>
 %%   </dd>
-%%   <dt>`{Session :: session(), {unhandled, {call, term()}}}'</dt>
+%%   <dt>`{ipmi, Session :: session(), {unhandled, {call, term()}}}'</dt>
 %%   <dd>
 %%     <p>the session received an invalid `gen_server' call</p>
 %%   </dd>
-%%   <dt>`{Session :: session(), {unhandled, {cast, term()}}}'</dt>
+%%   <dt>`{ipmi, Session :: session(), {unhandled, {cast, term()}}}'</dt>
 %%   <dd>
 %%     <p>the session received an invalid `gen_server' cast</p>
 %%   </dd>
-%%   <dt>`{Session :: session(), {unhandled, {info, term()}}}'</dt>
+%%   <dt>`{ipmi, Session :: session(), {unhandled, {info, term()}}}'</dt>
 %%   <dd>
 %%     <p>the session received an invalid message</p>
 %%   </dd>
-%%   <dt>`{Session :: session(), {unhandled, {ipmi, {ok | error, term()}}}}'</dt>
+%%   <dt>`{ipmi, Session :: session(), {unhandled, {ipmi, {ok | error, term()}}}}'</dt>
 %%   <dd>
 %%     <p>the session received an IPMI response but no handler was found for it</p>
 %%   </dd>
