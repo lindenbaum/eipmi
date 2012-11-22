@@ -16,8 +16,6 @@
 %%% @doc
 %%% A module providing FRU reading and decoding functionality according to the
 %%% official IPMI Platform Management FRU Information Storage Definition.
-%%% TODO:
-%%% * support for mutli record fields (according to PICMG spec)
 %%% @end
 %%%=============================================================================
 
@@ -61,7 +59,8 @@
         {dc_load, proplists:proplist()} |
         {management_access, proplists:proplist()} |
         {base_compatibility, proplists:proplist()} |
-        {extended_compatibility, proplists:proplist()}.
+        {extended_compatibility, proplists:proplist()} |
+        {oem, proplists:proplist()}.
 
 -type info() ::
         {fru_data,
@@ -279,9 +278,9 @@ decode_record_field_definition(16#04, Data) ->
     [{base_compatibility, decode_compatibility(Data)}];
 decode_record_field_definition(16#05, Data) ->
     [{extended_compatibility, decode_compatibility(Data)}];
-decode_record_field_definition(_Type, _Data) ->
-    %% oem multi records go here
-    [].
+decode_record_field_definition(Type, Data)
+  when Type >= 16#c0 andalso Type =< 16#ff ->
+    [{oem, [{type, Type}, {data, Data}]}].
 
 %%------------------------------------------------------------------------------
 %% @private
