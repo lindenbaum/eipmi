@@ -107,7 +107,7 @@ read_sdr_repository({ok, "tirana"}) ->
 read_sdr_repository(_) ->
     ok.
 
-read_fru_inventory_test() ->
+read_fru_inventory_test_() ->
     {timeout, 30000, [fun() -> read_fru_inventory(inet:gethostname()) end]}.
 
 read_fru_inventory({ok, "tirana"}) ->
