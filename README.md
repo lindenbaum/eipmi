@@ -85,36 +85,37 @@ EIPMI events using `eipmi:subscribe/2`. Subscription can be cancelled using
 and be prepared to receive the following events on the `handle_event/2`
 callback:
 
-#### {session(), established}
-
+```erlang
+{Session :: eipmi:session(), established}
+```
 The session was successfully established and activated.
-
-#### {session(), {closed, Reason}}
-
+```erlang
+{Session :: eipmi:session(), {closed, Reason :: term()}}
+```
 The session was closed with the provided reason.
-
-#### {session(), {decode_error, Reason}}
-
+```erlang
+{Session :: eipmi:session(), {decode_error, Reason :: term()}}
+```
 A received packet could not be decoded.
-
-#### {session(), {timeout, RqSeqNr}}
-
+```erlang
+{Session :: eipmi:session(), {timeout, RqSeqNr :: 0..63}}
+```
 The corresponding request timed out.
-
-#### {session(), {unhandled, {call, Request}}}
-
+```erlang
+{Session :: eipmi:session(), {unhandled, {call, Request :: term()}}}
+```
 The session received an invalid `gen_server` call.
-
-#### {session(), {unhandled, {cast, Request}}}
-
+```erlang
+{Session :: eipmi:session(), {unhandled, {cast, Request :: term()}}}
+```
 The session received an invalid `gen_server` cast.
-
-#### {session(), {unhandled, {info, Info}}}
-
+```erlang
+{Session :: eipmi:session(), {unhandled, {info, Info :: term()}}}
+```
 The session received an invalid message.
-
-#### {session(), {unhandled, {ipmi, {ok | error, Response}}}}
-
+```erlang
+{Session :: eipmi:session(), {unhandled, {ipmi, {ok | error, term()}}}}
+```
 The session received an IPMI response but no handler was found for it.
 
 ### Building
