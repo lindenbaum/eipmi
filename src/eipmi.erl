@@ -419,7 +419,7 @@ sdr_to_fru(_FruInventory, Error = {error, _}) ->
 %% implement the {@link gen_event} behaviour. For more information on the
 %% arguments `Handler' and `Args' refer to {@link gen_event:add_handler/3}.
 %% The event handling module should be prepared to receive the following events
-%% on the `handle_call/2' callback:
+%% on the `handle_event/2' callback:
 %% <dl>
 %%   <dt>`{Session :: session(), established}'</dt>
 %%   <dd>
@@ -433,15 +433,25 @@ sdr_to_fru(_FruInventory, Error = {error, _}) ->
 %%   <dd>
 %%     <p>a received packet could not be decoded</p>
 %%   </dd>
-%%   <dt>`{Session :: session(), {request_timeout,
-%%                                RqSeqNr :: non_neg_integer()}}'</dt>
+%%   <dt>`{Session :: session(), {timeout, RqSeqNr :: 0..63}}'</dt>
 %%   <dd>
 %%     <p>the corresponding request timed out</p>
 %%   </dd>
-%%   <dt>`{Session :: session(), {no_requestor, {RqSeqNr :: non_neg_integer(),
-%%                                               Response}}}'</dt>
+%%   <dt>`{Session :: session(), {unhandled, {call, term()}}}'</dt>
 %%   <dd>
-%%     <p>no requestor could be found for the corresponding request</p>
+%%     <p>the session received an invalid `gen_server' call</p>
+%%   </dd>
+%%   <dt>`{Session :: session(), {unhandled, {cast, term()}}}'</dt>
+%%   <dd>
+%%     <p>the session received an invalid `gen_server' cast</p>
+%%   </dd>
+%%   <dt>`{Session :: session(), {unhandled, {info, term()}}}'</dt>
+%%   <dd>
+%%     <p>the session received an invalid message</p>
+%%   </dd>
+%%   <dt>`{Session :: session(), {unhandled, {ipmi, {ok | error, term()}}}}'</dt>
+%%   <dd>
+%%     <p>the session received an IPMI response but no handler was found for it</p>
 %%   </dd>
 %% </dl>
 %% @end

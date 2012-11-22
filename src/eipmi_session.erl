@@ -210,8 +210,9 @@ handle_info({udp_closed, Socket}, S) when S#state.socket =:= Socket ->
 handle_info({udp, Socket, _, _, Bin}, S) when S#state.socket =:= Socket ->
     {noreply, handle_rmcp(eipmi_decoder:packet(Bin), S)};
 handle_info({timeout, RqSeqNr}, State) ->
-    {Requests, NewState} = unregister_request(RqSeqNr, State),
-    {noreply, lists:foldl(reply({error, timeout}), NewState, Requests)};
+    NewState1 = fire({timeout, RqSeqNr}, State),
+    {Requests, NewState2} = unregister_request(RqSeqNr, NewState1),
+    {noreply, lists:foldl(reply({error, timeout}), NewState2, Requests)};
 handle_info(keep_alive, State) ->
     {noreply, keep_alive(to_millis(os:timestamp()), State)};
 handle_info(Info, State) ->
@@ -255,7 +256,7 @@ handle_ipmi(Packet = #rmcp_ipmi{properties = Properties}, State) ->
     RqSeqNr = eipmi_util:get_val(rq_seq_nr, Properties),
     handle_ipmi_(get_response(Packet), unregister_request(RqSeqNr, State)).
 handle_ipmi_(Message, {[], State}) ->
-    fire({unhandled, Message}, State);
+    fire({unhandled, {ipmi, Message}}, State);
 handle_ipmi_(Message, {Requests, State}) ->
     lists:foldl(reply(Message), State, Requests).
 

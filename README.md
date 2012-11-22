@@ -73,7 +73,49 @@ be queued and sent as pending requests get completed.
 
 ### Asynchronous Events
 
-TODO
+The API of EIPMI has been designed to be as similar as possible to existing
+erlang protocol implementations (e.g. `gen_udp`). However, since sessions may be
+share between multiple processes it is not possible to send asynchronous events
+to a specific process.
+
+Therefore, EIPMI provides the possibility to distribute asynchronous events for
+all currently existing sessions through a `gen_event`. User can subscribe to
+EIPMI events using `eipmi:subscribe/2`. Subscription can be cancelled using
+`eipmi:unsubscribe/2`. The subscriber must implement the `gen_event` behaviour
+and be prepared to receive the following events on the `handle_event/2`
+callback:
+
+#### {session(), established}
+
+The session was successfully established and activated.
+
+#### {session(), {closed, Reason}}
+
+The session was closed with the provided reason.
+
+#### {session(), {decode_error, Reason}}
+
+A received packet could not be decoded.
+
+#### {session(), {timeout, RqSeqNr}}
+
+The corresponding request timed out.
+
+#### {session(), {unhandled, {call, Request}}}
+
+The session received an invalid `gen_server` call.
+
+#### {session(), {unhandled, {cast, Request}}}
+
+The session received an invalid `gen_server` cast.
+
+#### {session(), {unhandled, {info, Info}}}
+
+The session received an invalid message.
+
+#### {session(), {unhandled, {ipmi, {ok | error, Response}}}}
+
+The session received an IPMI response but no handler was found for it.
 
 ### Building
 
