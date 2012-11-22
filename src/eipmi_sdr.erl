@@ -128,7 +128,7 @@
 -spec read(pid()) ->
                   [entry()].
 read(SessionPid) ->
-    {ok, SdrInfo} = eipmi_session:request(SessionPid, ?GET_INFO, []),
+    {ok, SdrInfo} = eipmi_session:rpc(SessionPid, ?GET_INFO, []),
     case eipmi_util:get_val(entries, SdrInfo) of
         0 ->
             [];
@@ -146,7 +146,7 @@ read(SessionPid) ->
 -spec read(pid(), non_neg_integer()) ->
                   entry().
 read(SessionPid, RecordId) ->
-    {ok, SdrInfo} = eipmi_session:request(SessionPid, ?GET_INFO, []),
+    {ok, SdrInfo} = eipmi_session:rpc(SessionPid, ?GET_INFO, []),
     Args = [SessionPid, RecordId],
     Reserve = lists:member(reserve, eipmi_util:get_val(operations, SdrInfo)),
     {_, Entry} = maybe_reserve(SessionPid, fun read_one/3, Args, Reserve),
@@ -180,7 +180,7 @@ convert(_Raw, {full, _Properties}) ->
 -spec maybe_reserve(pid(), function(), [term()], boolean()) ->
                            [entry()] | {non_neg_integer(), entry()}.
 maybe_reserve(SessionPid, Fun, Args, true) ->
-    {ok, Reserve} = eipmi_session:request(SessionPid, ?RESERVE, []),
+    {ok, Reserve} = eipmi_session:rpc(SessionPid, ?RESERVE, []),
     ReservationId = eipmi_util:get_val(reservation_id, Reserve),
     erlang:apply(Fun, Args ++ [ReservationId]);
 maybe_reserve(_SessionPid, Fun, Args, false) ->
@@ -213,7 +213,7 @@ read_one(SessionPid, RecordId, ReservationId) ->
 read_header(Pid, Record, Reservation) ->
     Ps = [{reservation_id, Reservation}, {record_id, Record},
           {offset, 0}, {count, 5}],
-    {ok, Read} = eipmi_session:request(Pid, ?READ, Ps),
+    {ok, Read} = eipmi_session:rpc(Pid, ?READ, Ps),
     NextRecordId = eipmi_util:get_val(next_record_id, Read),
     {NextRecordId, decode_header(eipmi_util:get_val(data, Read))}.
 
@@ -243,7 +243,7 @@ read_body(Pid, Record, Reservation, Len, Count, Acc = {Offset, _}) ->
 do_read(Pid, Record, Reservation, Count, {Offset, Acc}) ->
     Ps = [{reservation_id, Reservation}, {record_id, Record},
           {offset, 5 + Offset}, {count, Count}],
-    {ok, Read} = eipmi_session:request(Pid, ?READ, Ps),
+    {ok, Read} = eipmi_session:rpc(Pid, ?READ, Ps),
     {Offset + Count, <<Acc/binary, (eipmi_util:get_val(data, Read))/binary>>}.
 
 %%------------------------------------------------------------------------------

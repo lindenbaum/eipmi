@@ -46,7 +46,7 @@ open_close({ok, "tirana"}) ->
     application:start(eipmi),
     {ok, Session} = eipmi:open(?IP),
     Mon = monitor_session(Session),
-    receive after 1000 -> ok end,
+    receive after 2000 -> ok end,
     ?assertEqual(ok, eipmi:close(Session)),
     ?assertEqual(normal, receive {'DOWN', Mon, _, _, Reason} -> Reason end);
 open_close(_) ->
@@ -108,7 +108,7 @@ read_sdr_repository(_) ->
     ok.
 
 read_fru_inventory_test() ->
-    read_fru_inventory(inet:gethostname()).
+    {timeout, 30000, [fun() -> read_fru_inventory(inet:gethostname()) end]}.
 
 read_fru_inventory({ok, "tirana"}) ->
     application:start(sasl),

@@ -93,7 +93,7 @@
 -spec read(pid(), 0..254) ->
                   {ok, info()} | {error, term()}.
 read(SessionPid, FruId) ->
-    FruInfo = eipmi_session:request(SessionPid, ?GET_INFO, [{fru_id, FruId}]),
+    FruInfo = eipmi_session:rpc(SessionPid, ?GET_INFO, [{fru_id, FruId}]),
     do_read(FruInfo, SessionPid, FruId).
 
 %%%=============================================================================
@@ -133,7 +133,7 @@ do_read(SessionPid, FruId, Size, BlockSize, {Offset, Acc}) ->
 %%------------------------------------------------------------------------------
 read_raw(SessionPid, FruId, Offset, Count, Acc) ->
     Ps = [{fru_id, FruId}, {offset, Offset}, {count, Count}],
-    {ok, R} = eipmi_session:request(SessionPid, ?READ, Ps),
+    {ok, R} = eipmi_session:rpc(SessionPid, ?READ, Ps),
     Data = eipmi_util:get_val(data, R),
     {Offset + eipmi_util:get_val(count, R), <<Acc/binary, Data/binary>>}.
 

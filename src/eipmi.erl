@@ -195,7 +195,7 @@ open(IPAddress) ->
 %%   <dt>`{timeout, non_neg_integer()}'</dt>
 %%   <dd>
 %%     <p>
-%%     the timeout for IPMI requests, default is `2000ms'
+%%     the timeout for IPMI requests, default is `1000ms'
 %%     </p>
 %%   </dd>
 %%   <dt>`{user, string() with length <= 16bytes}'</dt>
@@ -357,7 +357,7 @@ read_sel(Session = {_, _}, Clear) ->
 raw(Session = {_, _}, NetFn, Command, Properties) ->
     case get_session(Session, supervisor:which_children(?MODULE)) of
         {ok, Pid} ->
-            eipmi_session:request(Pid, {NetFn, Command}, Properties);
+            eipmi_session:rpc(Pid, {NetFn, Command}, Properties);
         Error ->
             Error
     end.

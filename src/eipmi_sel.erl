@@ -69,7 +69,7 @@
 -spec read(pid(), boolean()) ->
                   [entry()].
 read(SessionPid, true) ->
-    {ok, SelInfo} = eipmi_session:request(SessionPid, ?GET_INFO, []),
+    {ok, SelInfo} = eipmi_session:rpc(SessionPid, ?GET_INFO, []),
     Entries = do_read(SessionPid, eipmi_util:get_val(entries, SelInfo)),
     Operations = eipmi_util:get_val(operations, SelInfo),
     ?EIPMI_CATCH(do_clear(SessionPid, lists:member(reserve, Operations))),
@@ -102,7 +102,7 @@ do_read(SessionPid, _NumEntries) ->
 do_read(_SessionPid, 16#ffff, Acc) ->
     lists:reverse(Acc);
 do_read(SessionPid, Id, Acc) ->
-    case eipmi_session:request(SessionPid, ?READ, [{record_id, Id}]) of
+    case eipmi_session:rpc(SessionPid, ?READ, [{record_id, Id}]) of
         {ok, Entry} ->
             NextId = eipmi_util:get_val(next_record_id, Entry),
             Sel = decode(eipmi_util:get_val(data, Entry)),
@@ -115,11 +115,11 @@ do_read(SessionPid, Id, Acc) ->
 %% @private
 %%------------------------------------------------------------------------------
 do_clear(SessionPid) ->
-    {ok, SelInfo} = eipmi_session:request(SessionPid, ?GET_INFO, []),
+    {ok, SelInfo} = eipmi_session:rpc(SessionPid, ?GET_INFO, []),
     Operations = eipmi_util:get_val(operations, SelInfo),
     do_clear(SessionPid, lists:member(reserve, Operations)).
 do_clear(SessionPid, true) ->
-    {ok, Reserve} = eipmi_session:request(SessionPid, ?RESERVE, []),
+    {ok, Reserve} = eipmi_session:rpc(SessionPid, ?RESERVE, []),
     ReservationId = eipmi_util:get_val(reservation_id, Reserve),
     do_clear(SessionPid, ReservationId, true, false);
 do_clear(SessionPid, false) ->
@@ -128,7 +128,7 @@ do_clear(_SessionPid, _ReservationId, _Initiate, true) ->
     ok;
 do_clear(SessionPid, ReservationId, Initiate, false) ->
     Args = [{reservation_id, ReservationId}, {initiate, Initiate}],
-    {ok, Clr} = eipmi_session:request(SessionPid, ?CLEAR, Args),
+    {ok, Clr} = eipmi_session:rpc(SessionPid, ?CLEAR, Args),
     Completed = eipmi_util:get_val(progress, Clr) =:= completed,
     do_clear(SessionPid, ReservationId, false, Completed).
 
