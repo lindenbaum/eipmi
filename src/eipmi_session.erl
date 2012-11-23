@@ -468,8 +468,8 @@ reply(Message, internal, Fun, State) ->
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-fire(Event, State = #state{session = Session}) ->
-    eipmi_events:fire(Session, Event),
+fire(Event, State = #state{session = Session, address = Address}) ->
+    eipmi_events:fire(Session, Address, Event),
     State.
 
 %%------------------------------------------------------------------------------

@@ -86,35 +86,59 @@ and be prepared to receive the following events on the `handle_event/2`
 callback:
 
 ```erlang
-{ipmi, Session :: eipmi:session(), established}
+{ipmi,
+ Session :: eipmi:session(),
+ Address :: inet:ip_address() | inet:hostname(),
+ established}
 ```
 The session was successfully established and activated.
 ```erlang
-{ipmi, Session :: eipmi:session(), {closed, Reason :: term()}}
+{ipmi,
+ Session :: eipmi:session(),
+ Address :: inet:ip_address() | inet:hostname(),
+ {closed, Reason :: term()}}
 ```
 The session was closed with the provided reason.
 ```erlang
-{ipmi, Session :: eipmi:session(), {decode_error, Reason :: term()}}
+{ipmi,
+ Session :: eipmi:session(),
+ Address :: inet:ip_address() | inet:hostname(),
+ {decode_error, Reason :: term()}}
 ```
 A received packet could not be decoded.
 ```erlang
-{ipmi, Session :: eipmi:session(), {timeout, RqSeqNr :: 0..63}}
+{ipmi,
+ Session :: eipmi:session(),
+ Address :: inet:ip_address() | inet:hostname(),
+ {timeout, RqSeqNr :: 0..63}}
 ```
 The corresponding request timed out.
 ```erlang
-{ipmi, Session :: eipmi:session(), {unhandled, {call, Request :: term()}}}
+{ipmi,
+ Session :: eipmi:session(),
+ Address :: inet:ip_address() | inet:hostname(),
+ {unhandled, {call, Request :: term()}}}
 ```
 The session received an invalid `gen_server` call.
 ```erlang
-{ipmi, Session :: eipmi:session(), {unhandled, {cast, Request :: term()}}}
+{ipmi,
+ Session :: eipmi:session(),
+ Address :: inet:ip_address() | inet:hostname(),
+ {unhandled, {cast, Request :: term()}}}
 ```
 The session received an invalid `gen_server` cast.
 ```erlang
-{ipmi, Session :: eipmi:session(), {unhandled, {info, Info :: term()}}}
+{ipmi,
+ Session :: eipmi:session(),
+ Address :: inet:ip_address() | inet:hostname(),
+ {unhandled, {info, Info :: term()}}}
 ```
 The session received an invalid message.
 ```erlang
-{ipmi, Session :: eipmi:session(), {unhandled, {ipmi, {ok | error, term()}}}}
+{ipmi,
+ Session :: eipmi:session(),
+ Address :: inet:ip_address() | inet:hostname(),
+ {unhandled, {ipmi, {ok | error, term()}}}}
 ```
 The session received an IPMI response but no handler was found for it.
 

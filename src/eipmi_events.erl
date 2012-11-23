@@ -26,7 +26,7 @@
          subscribe/2,
          unsubscribe/2,
          swap/4,
-         fire/2,
+         fire/3,
          list_handlers/0]).
 
 %%%=============================================================================
@@ -87,10 +87,10 @@ swap(OldHandler, OldArgs, NewHandler, NewArgs) ->
 %% {@link eipmi_session} to publish new events asynchronously.
 %% @end
 %%------------------------------------------------------------------------------
--spec fire(eipmi:session(), term()) ->
+-spec fire(eipmi:session(), inet:ip_address() | inet:hostname(), term()) ->
                   ok.
-fire(Session, Event) ->
-    gen_event:notify(?MODULE, {ipmi, Session, Event}).
+fire(Session, Address, Event) ->
+    gen_event:notify(?MODULE, {ipmi, Session, Address, Event}).
 
 %%------------------------------------------------------------------------------
 %% @doc
