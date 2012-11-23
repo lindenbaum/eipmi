@@ -23,6 +23,7 @@
 -module(eipmi_sdr).
 
 -export([read/1,
+         maybe_read/2,
          read/2,
          convert/2]).
 
@@ -112,7 +113,16 @@
         {sensor_direction, input | output}.
 
 -type entry() ::
-        {record_type(), [property()]}.
+        {record_type(), [property()]} |
+        {sdr_info,
+         [{version, string()} |
+          {entries, non_neg_integer()} |
+          {free_space, non_neg_integer()} |
+          {most_recent_addition, non_neg_integer()} |
+          {most_recent_erase, non_neg_integer()} |
+          {overflow, boolean()} |
+          {operations,
+           [delete | partial_add | reserve | get_allocation_info]}]}.
 
 -export_type([record_type/0, property/0, entry/0]).
 
@@ -128,15 +138,31 @@
 -spec read(pid()) ->
                   [entry()].
 read(SessionPid) ->
+    maybe_read(SessionPid, []).
+
+%%------------------------------------------------------------------------------
+%% @doc
+%% Read all entries from the sensor data record repository (SDR) *only* when
+%% the SDR repository changed since the last read.
+%% @end
+%%------------------------------------------------------------------------------
+maybe_read(SessionPid, OldSdrRepository) ->
     {ok, SdrInfo} = eipmi_session:rpc(SessionPid, ?GET_INFO, []),
-    case eipmi_util:get_val(entries, SdrInfo) of
-        0 ->
-            [];
-        _ ->
-            Operations = eipmi_util:get_val(operations, SdrInfo),
-            Reserve = lists:member(reserve, Operations),
-            maybe_reserve(SessionPid, fun read_all/2,  [SessionPid], Reserve)
+    OldSdrInfo = eipmi_util:get_val(sdr_info, OldSdrRepository, []),
+    LastRecentActionTimestamp = get_recent_action_timestamp(OldSdrInfo),
+    CurrentRecentActionTimestamp = get_recent_action_timestamp(SdrInfo),
+    case CurrentRecentActionTimestamp > LastRecentActionTimestamp of
+        true ->
+            Reserve = needs_reservation(SdrInfo),
+            Entries = eipmi_util:get_val(entries, SdrInfo),
+            maybe_read(Entries, SessionPid, Reserve, [{sdr_info, SdrInfo}]);
+        false ->
+            OldSdrRepository
     end.
+maybe_read(0, _SessionPid, _Reserve, _Acc) ->
+    [];
+maybe_read(_, SessionPid, Reserve, Acc) ->
+    Acc ++ maybe_reserve(SessionPid, fun read_all/2, [SessionPid], Reserve).
 
 %%------------------------------------------------------------------------------
 %% @doc
@@ -739,3 +765,17 @@ get_reading(Tag, Unit, twos_complement, <<Value:8/signed>>, Coefficients) ->
 calc_reading(Unit, X, {L, M, B, BExp, ResultExp}) ->
     Fun = get_linearization_fun(L),
     {Fun((M * X + B * math:pow(10, BExp)) * math:pow(10, ResultExp)), Unit}.
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+needs_reservation(SdrInfo) ->
+    lists:member(reserve, eipmi_util:get_val(operations, SdrInfo)).
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+get_recent_action_timestamp(SdrInfo) ->
+    erlang:max(
+      eipmi_util:get_val(most_recent_addition, SdrInfo, 0),
+      eipmi_util:get_val(most_recent_erase, SdrInfo, 0)).

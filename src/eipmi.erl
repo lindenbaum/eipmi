@@ -40,6 +40,7 @@
          read_fru_inventory/2,
          read_sdr/2,
          read_sdr_repository/1,
+         read_sdr_repository/2,
          read_sel/2,
          raw/4,
          sel_to_sdr/2,
@@ -310,6 +311,8 @@ read_sdr(Session = {_, _}, RecordId) ->
 %%------------------------------------------------------------------------------
 %% @doc
 %% Return all records contained in the Sensor Data Record (SDR) Repository.
+%% Please note that reading the complete SDR repository may take a significant
+%% amount of time since there may be lots of sensor available.
 %%
 %% Reading of the SDR may fail (e.g. return `{error, term()}') when the
 %% reservation for SDR reading with non-zero offsets gets cancelled. This is not
@@ -323,6 +326,34 @@ read_sdr_repository(Session = {_, _}) ->
     case get_session(Session, supervisor:which_children(?MODULE)) of
         {ok, Pid} ->
             case ?EIPMI_CATCH(eipmi_sdr:read(Pid)) of
+                Error = {error, _} ->
+                    Error;
+                Entries ->
+                    {ok, Entries}
+            end;
+        Error ->
+            Error
+    end.
+
+%%------------------------------------------------------------------------------
+%% @doc
+%% Basically the same as {@link read_sdr_repository/1} but the SDR will only be
+%% read when there were changes compared to the given SDR repository (regarding)
+%% modification timestamps. In case the SDR repository did not receive any
+%% updates the given old SDR repository is returned.
+%%
+%% Reading of the SDR may fail (e.g. return `{error, term()}') when the
+%% reservation for SDR reading with non-zero offsets gets cancelled. This is not
+%% a severe error. It is most likely that the SDR can be read successfully when
+%% retried.
+%% @end
+%%------------------------------------------------------------------------------
+-spec read_sdr_repository(session(), sdr_repository()) ->
+                                 {ok, sdr_repository()} | {error, term()}.
+read_sdr_repository(Session = {_, _}, SdrRepository) ->
+    case get_session(Session, supervisor:which_children(?MODULE)) of
+        {ok, Pid} ->
+            case ?EIPMI_CATCH(eipmi_sdr:maybe_read(Pid, SdrRepository)) of
                 Error = {error, _} ->
                     Error;
                 Entries ->
