@@ -43,7 +43,9 @@
          read_sel/2,
          raw/4,
          sel_to_sdr/2,
+         sel_to_fru/2,
          sel_to_fru/3,
+         sdr_to_fru/2,
          sdr_to_fru/3,
          subscribe/2,
          unsubscribe/2,
@@ -379,6 +381,22 @@ sel_to_sdr({_, SelEntryProps}, SdrRepository) ->
 
 %%------------------------------------------------------------------------------
 %% @doc
+%% Returns the FRU Device Locator Record associated with an entry in the System
+%% Event Log (SEL), if any.
+%% @end
+%%------------------------------------------------------------------------------
+-spec sel_to_fru(eipmi_sel:entry(), [eipmi_sdr:entry()]) ->
+                        {ok, eipmi_sdr:entry()} | {error, term()}.
+sel_to_fru(SelEntry, SdrRepository) ->
+    case sel_to_sdr(SelEntry, SdrRepository) of
+        {ok, Sdr} ->
+            sdr_to_fru(Sdr, SdrRepository);
+        Error ->
+            Error
+    end.
+
+%%------------------------------------------------------------------------------
+%% @doc
 %% Returns the FRU inventory data associated with an entry in the System
 %% Event Log (SEL), if any.
 %% @end
@@ -395,23 +413,35 @@ sel_to_fru(SelEntry, SdrRepository, FruInventory) ->
 
 %%------------------------------------------------------------------------------
 %% @doc
+%% Returns the FRU Device Locator Record associated with a specific sensor from
+%% the Sensor Data Record (SDR) repository, if any.
+%% @end
+%%------------------------------------------------------------------------------
+-spec sdr_to_fru(eipmi_sdr:entry(), [eipmi_sdr:entry()]) ->
+                        {ok, eipmi_sdr:entry()} | {error, term()}.
+sdr_to_fru({_, SensorProps}, SdrRepository) ->
+    get_element_by_properties(
+      maybe_keyfind(entity_id, 1, SensorProps)
+      ++ maybe_keyfind(entity_instance, 1, SensorProps),
+      filter_by_key(fru_device_locator, SdrRepository)).
+
+%%------------------------------------------------------------------------------
+%% @doc
 %% Returns the FRU inventory data associated with a specific sensor from the
 %% Sensor Data Record (SDR) repository, if any.
 %% @end
 %%------------------------------------------------------------------------------
 -spec sdr_to_fru(eipmi_sdr:entry(), [eipmi_sdr:entry()], [eipmi_fru:info()]) ->
                         {ok, eipmi_fru:info()} | {error, term()}.
-sdr_to_fru({_, SensorProps}, SdrRepository, FruInventory) ->
-    sdr_to_fru(
-      FruInventory,
-      get_element_by_properties(
-        maybe_keyfind(entity_id, 1, SensorProps)
-        ++ maybe_keyfind(entity_instance, 1, SensorProps),
-        filter_by_key(fru_device_locator, SdrRepository))).
-sdr_to_fru(FruInventory, {ok, {fru_device_locator, Props}}) ->
-    get_element_by_properties(maybe_keyfind(fru_id, 1, Props), FruInventory);
-sdr_to_fru(_FruInventory, Error = {error, _}) ->
-    Error.
+sdr_to_fru(Sdr, SdrRepository, FruInventory) ->
+    case sdr_to_fru(Sdr, SdrRepository) of
+        {ok, {fru_device_locator, Props}} ->
+            get_element_by_properties(
+              maybe_keyfind(fru_id, 1, Props),
+              FruInventory);
+        Error ->
+            Error
+    end.
 
 %%------------------------------------------------------------------------------
 %% @doc
@@ -564,8 +594,8 @@ do_ping_receive(IPAddress, Timeout, Socket) ->
 %%------------------------------------------------------------------------------
 get_fru_ids(SdrRepository) ->
     FruRecords = filter_by_key(fru_device_locator, SdrRepository),
-    [FruId || FruId <- [eipmi_util:get_val(fru_id, Ps) || {_, Ps} <- FruRecords],
-              FruId =/= undefined].
+    FruIds = [eipmi_util:get_val(fru_id, Ps) || {_, Ps} <- FruRecords],
+    [FruId || FruId <- FruIds, FruId =/= undefined].
 
 %%------------------------------------------------------------------------------
 %% @private

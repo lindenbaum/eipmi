@@ -83,8 +83,8 @@ read_fru({ok, "tirana"}) ->
     application:start(eipmi),
     {ok, Session} = eipmi:open(?IP),
     Mon = monitor_session(Session),
-    Result = eipmi:read_fru(Session, 253),
-    error_logger:info_msg("~n~p~n", [Result]),
+    {ok, Fru} = eipmi:read_fru(Session, 253),
+    error_logger:info_msg("~n~p~n", [Fru]),
     ?assertEqual(ok, eipmi:close(Session)),
     ?assertEqual(normal, receive {'DOWN', Mon, _, _, Reason} -> Reason end);
 read_fru(_) ->
@@ -100,8 +100,8 @@ read_sdr_repository({ok, "tirana"}) ->
     application:start(eipmi),
     {ok, Session} = eipmi:open(?IP),
     Mon = monitor_session(Session),
-    Result = eipmi:read_sdr_repository(Session),
-    error_logger:info_msg("~n~p~n", [Result]),
+    {ok, SDRRepository} = eipmi:read_sdr_repository(Session),
+    error_logger:info_msg("~n~p~n", [SDRRepository]),
     ?assertEqual(ok, eipmi:close(Session)),
     ?assertEqual(normal, receive {'DOWN', Mon, _, _, Reason} -> Reason end);
 read_sdr_repository(_) ->
@@ -118,8 +118,8 @@ read_fru_inventory({ok, "tirana"}) ->
     {ok, Session} = eipmi:open(?IP),
     Mon = monitor_session(Session),
     {ok, SDRRepository} = eipmi:read_sdr_repository(Session),
-    Result = eipmi:read_fru_inventory(Session, SDRRepository),
-    error_logger:info_msg("~n~p~n", [Result]),
+    {ok, FruInventory} = eipmi:read_fru_inventory(Session, SDRRepository),
+    error_logger:info_msg("~n~p~n", [FruInventory]),
     ?assertEqual(ok, eipmi:close(Session)),
     ?assertEqual(normal, receive {'DOWN', Mon, _, _, Reason} -> Reason end);
 read_fru_inventory(_) ->
@@ -135,8 +135,8 @@ read_sel({ok, "tirana"}) ->
     application:start(eipmi),
     {ok, Session} = eipmi:open(?IP),
     Mon = monitor_session(Session),
-    Result = eipmi:read_sel(Session, false),
-    error_logger:info_msg("~n~p~n", [Result]),
+    {ok, Sel} = eipmi:read_sel(Session, false),
+    error_logger:info_msg("~n~p~n", [Sel]),
     ?assertEqual(ok, eipmi:close(Session)),
     ?assertEqual(normal, receive {'DOWN', Mon, _, _, Reason} -> Reason end);
 read_sel(_) ->
