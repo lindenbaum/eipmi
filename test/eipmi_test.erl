@@ -32,7 +32,8 @@ ping({ok, "tirana"}) ->
     application:start(crypto),
     application:start(md2),
     application:start(eipmi),
-    ?assertEqual(pong, eipmi:ping(?IP));
+    ?assertEqual(pong, eipmi:ping(?IP)),
+    application:stop(eipmi);
 ping(_) ->
     ok.
 
@@ -48,7 +49,8 @@ open_close({ok, "tirana"}) ->
     Mon = monitor_session(Session),
     receive after 2000 -> ok end,
     ?assertEqual(ok, eipmi:close(Session)),
-    ?assertEqual(normal, receive {'DOWN', Mon, _, _, Reason} -> Reason end);
+    ?assertEqual(shutdown, receive {'DOWN', Mon, _, _, Reason} -> Reason end),
+    application:stop(eipmi);
 open_close(_) ->
     ok.
 
@@ -69,7 +71,8 @@ parallel_request({ok, "tirana"}) ->
     Results = lists:map(Receive, Pids),
     ?assert(lists:all(fun(E) -> E =:= normal end, Results)),
     ?assertEqual(ok, eipmi:close(Session)),
-    ?assertEqual(normal, receive {'DOWN', Mon, _, _, Reason} -> Reason end);
+    ?assertEqual(shutdown, receive {'DOWN', Mon, _, _, Reason} -> Reason end),
+    application:stop(eipmi);
 parallel_request(_) ->
     ok.
 
@@ -86,7 +89,8 @@ read_fru({ok, "tirana"}) ->
     {ok, Fru} = eipmi:read_fru(Session, 253),
     error_logger:info_msg("~n~p~n", [Fru]),
     ?assertEqual(ok, eipmi:close(Session)),
-    ?assertEqual(normal, receive {'DOWN', Mon, _, _, Reason} -> Reason end);
+    ?assertEqual(shutdown, receive {'DOWN', Mon, _, _, Reason} -> Reason end),
+    application:stop(eipmi);
 read_fru(_) ->
     ok.
 
@@ -103,7 +107,8 @@ read_sdr_repository({ok, "tirana"}) ->
     {ok, SDRRepository} = eipmi:read_sdr_repository(Session),
     error_logger:info_msg("~n~p~n", [SDRRepository]),
     ?assertEqual(ok, eipmi:close(Session)),
-    ?assertEqual(normal, receive {'DOWN', Mon, _, _, Reason} -> Reason end);
+    ?assertEqual(shutdown, receive {'DOWN', Mon, _, _, Reason} -> Reason end),
+    application:stop(eipmi);
 read_sdr_repository(_) ->
     ok.
 
@@ -121,7 +126,8 @@ read_fru_inventory({ok, "tirana"}) ->
     {ok, FruInventory} = eipmi:read_fru_inventory(Session, SDRRepository),
     error_logger:info_msg("~n~p~n", [FruInventory]),
     ?assertEqual(ok, eipmi:close(Session)),
-    ?assertEqual(normal, receive {'DOWN', Mon, _, _, Reason} -> Reason end);
+    ?assertEqual(shutdown, receive {'DOWN', Mon, _, _, Reason} -> Reason end),
+    application:stop(eipmi);
 read_fru_inventory(_) ->
     ok.
 
@@ -138,8 +144,26 @@ read_sel({ok, "tirana"}) ->
     {ok, Sel} = eipmi:read_sel(Session, false),
     error_logger:info_msg("~n~p~n", [Sel]),
     ?assertEqual(ok, eipmi:close(Session)),
-    ?assertEqual(normal, receive {'DOWN', Mon, _, _, Reason} -> Reason end);
+    ?assertEqual(shutdown, receive {'DOWN', Mon, _, _, Reason} -> Reason end),
+    application:stop(eipmi);
 read_sel(_) ->
+    ok.
+
+auto_read_sel_test() ->
+    auto_read_sel(inet:gethostname()).
+
+auto_read_sel({ok, "tirana"}) ->
+    application:start(sasl),
+    application:start(crypto),
+    application:start(md2),
+    application:start(eipmi),
+    {ok, Session} = eipmi:open(?IP, [{poll_sel, 500}, {clear_sel, false}]),
+    Mon = monitor_session(Session),
+    receive after 2000 -> ok end,
+    ?assertEqual(ok, eipmi:close(Session)),
+    ?assertEqual(shutdown, receive {'DOWN', Mon, _, _, Reason} -> Reason end),
+    application:stop(eipmi);
+auto_read_sel(_) ->
     ok.
 
 %%%=============================================================================

@@ -54,8 +54,7 @@
 %% API
 -export([start_link/3,
          rpc/3,
-         rpc/4,
-         stop/1]).
+         rpc/4]).
 
 %% gen_server callbacks
 -export([init/1,
@@ -93,7 +92,6 @@
 
 -export_type([property/0, property_name/0]).
 
--define(RETRANSMITS, 2).
 -define(KEEP_ALIVE_TIMER, 45000).
 
 %%------------------------------------------------------------------------------
@@ -103,7 +101,7 @@
         [
          %% default values modifyable through eipmi:open/2
          {initial_outbound_seq_nr, 16#1337},
-         {keep_alive_retransmits, ?RETRANSMITS},
+         {keep_alive_retransmits, ?IPMI_RETRANSMITS},
          {password, ""},
          {port, ?RMCP_PORT_NUMBER},
          {privilege, administrator},
@@ -153,7 +151,7 @@ start_link(Session, IPAddress, Options) ->
 -spec rpc(pid(), eipmi:request(), proplists:proplist()) ->
                  {ok, proplists:proplist()} | {error, term()}.
 rpc(Pid, Request, Properties) ->
-    Retransmits = eipmi_util:get_env(retransmits, ?RETRANSMITS),
+    Retransmits = eipmi_util:get_env(retransmits, ?IPMI_RETRANSMITS),
     rpc(Pid, Request, Properties, Retransmits).
 
 %%------------------------------------------------------------------------------
@@ -173,16 +171,6 @@ rpc_({error, timeout}, Fun, Retransmits) when Retransmits > 0 ->
     rpc_(Fun(), Fun, Retransmits - 1);
 rpc_(Result, _Fun, _Retransmits) ->
     Result.
-
-%%------------------------------------------------------------------------------
-%% @doc
-%% Stop the server, close the session.
-%% @end
-%%------------------------------------------------------------------------------
--spec stop(pid()) ->
-                  ok.
-stop(Pid) ->
-    gen_server:cast(Pid, stop).
 
 %%%=============================================================================
 %%% gen_server Callbacks
@@ -226,8 +214,6 @@ handle_call(Request, _From, State) ->
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-handle_cast(stop, State) ->
-    {stop, normal, State};
 handle_cast(Request, State) ->
     {noreply, fire({unhandled, {cast, Request}}, State)}.
 

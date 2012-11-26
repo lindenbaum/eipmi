@@ -65,7 +65,7 @@
 
 -type target() :: {inet:ip_address() | inet:hostname(), inet:port_number()}.
 
--opaque session() :: {target(), reference()}.
+-opaque session() :: {session, {target(), reference()}}.
 
 -type req_net_fn()  :: 16#04 | 16#06 | 16#a | 16#c.
 -type resp_net_fn() :: 16#05 | 16#07 | 16#b | 16#d.
@@ -74,9 +74,11 @@
 -type response() :: {resp_net_fn(), Command :: 0..255}.
 
 -type option() ::
+        {clear_sel, boolean()} |
         {initial_outbound_seq_nr, non_neg_integer()} |
         {keep_alive_retransmits, non_neg_integer()} |
         {password, string()} |
+        {poll_sel, integer()} |
         {port, inet:port_number()} |
         {privilege, callback | user | operator | administrator} |
         {rq_addr, 16#81..16#8d} |
@@ -84,9 +86,11 @@
         {user, string()}.
 
 -type option_name() ::
+        clear_sel |
         initial_outbound_seq_nr |
         keep_alive_retransmits |
         password |
+        poll_sel |
         port |
         privilege |
         rq_addr |
@@ -173,59 +177,77 @@ open(IPAddress) ->
 %% Same as {@link open/1} but allows the specification of the following custom
 %% options:
 %% <dl>
+%%   <dt>`{clear_sel, boolean()}'</dt>
+%%   <dd>
+%%     <p>
+%%     Indicates whether the System Event Log is to be cleared after read when
+%%     SEL polling is enabled using `poll_sel', default is `true'.
+%%     </p>
+%%  </dd>
 %%   <dt>`{initial_outbound_seq_nr, non_neg_integer()}'</dt>
 %%   <dd>
 %%     <p>
-%%     the initial outbound sequence number that will be requested on the BMC,
-%%     default is `16#1337'
+%%     The initial outbound sequence number that will be requested on the BMC,
+%%     default is `16#1337'.
 %%     </p>
 %%  </dd>
 %%   <dt>`{keep_alive_retransmits, non_neg_integer()}'</dt>
 %%   <dd>
 %%     <p>
-%%     the number of retransmits allowed for session keep_alive requests,
+%%     The number of retransmits allowed for session keep_alive requests,
 %%     default is `2'.
 %%     </p>
 %%  </dd>
 %%   <dt>`{password, string() with length <= 16bytes}'</dt>
 %%   <dd>
 %%     <p>
-%%     a password string used for authentication when anonymous login is not
-%%     available, default is `""'
+%%     A password string used for authentication when anonymous login is not
+%%     available, default is `""'.
+%%     </p>
+%%   </dd>
+%%   <dt>`{poll_sel, integer()}'</dt>
+%%   <dd>
+%%     <p>
+%%     Enables/disable automatic polling of the System Event Log (SEL). When
+%%     polling is enabled the SEL will periodically be read and all events will
+%%     be forwarded to the subscribed event handlers registered with
+%%     {@link subscribe/2}. The provided integer will be used as timeout value
+%%     in milliseconds. A zero or negative value will disable automatic SEL
+%%     polling, default is `0' (disabled).
 %%     </p>
 %%   </dd>
 %%   <dt>`{port, inet:port_number()}'</dt>
 %%   <dd>
 %%     <p>
-%%     the RMCP port the far end is expecting incoming RMCP and IPMI packets,
-%%     default is `623'
+%%     The RMCP port the far end is expecting incoming RMCP and IPMI packets,
+%%     default is `623'.
 %%     </p>
 %%   </dd>
 %%   <dt>`{privilege, callback | user | operator | administrator}'</dt>
 %%   <dd>
 %%     <p>
-%%     the requested privilege level for this session, default is
-%%     `administrator'
+%%     The requested privilege level for this session, default is
+%%     `administrator'.
 %%     </p>
 %%   </dd>
 %%   <dt>`{rq_addr, 16#81..16#8d}'</dt>
 %%   <dd>
 %%     <p>
-%%     the requestor address used in IPMI lan packages, the default value of
-%%     `16#81' should be suitable for all common cases
+%%     The requestor address used in IPMI lan packages, the default value of
+%%     `16#81' should be suitable for all common cases.
 %%     </p>
 %%   </dd>
 %%   <dt>`{timeout, non_neg_integer()}'</dt>
 %%   <dd>
 %%     <p>
-%%     the timeout for IPMI requests, default is `1000ms'
+%%     The timeout for IPMI requests, default is `1000ms'.
 %%     </p>
 %%   </dd>
 %%   <dt>`{user, string() with length <= 16bytes}'</dt>
 %%   <dd>
 %%     <p>
-%%     a user name string used for authentication when neither anonymous nor
-%%     null user login are available, default is `""'
+%%     A user name string used for authentication when neither anonymous nor
+%%     null user login are available, default is `""'.
 %%     </p>
 %%   </dd>
 %% </dl>
@@ -235,15 +257,7 @@ open(IPAddress) ->
                   {ok, session()} | {error, term()}.
 open(IPAddress, Options) ->
     Target = {IPAddress, eipmi_util:get_val(port, Options, ?RMCP_PORT_NUMBER)},
-    Session = {Target, erlang:make_ref()},
-    Start = {eipmi_session, start_link, [Session, IPAddress, Options]},
-    Spec = {Session, Start, temporary, 2000, worker, [eipmi_session]},
-    case supervisor:start_child(?MODULE, Spec) of
-        {ok, _} ->
-            {ok, Session};
-        Error ->
-            Error
-    end.
+    start_session(Target, IPAddress, Options).
 
 %%------------------------------------------------------------------------------
 %% @doc
@@ -254,13 +268,10 @@ open(IPAddress, Options) ->
 %%------------------------------------------------------------------------------
 -spec close(session()) ->
                    ok | {error, no_session}.
-close(Session = {_, _}) ->
-    case get_session(Session, supervisor:which_children(?MODULE)) of
-        {ok, Pid} ->
-            eipmi_session:stop(Pid);
-        Error ->
-            Error
-    end.
+close(Session = {session, _}) ->
+    Result = supervisor:terminate_child(?MODULE, Session),
+    supervisor:delete_child(?MODULE, Session),
+    Result.
 
 %%------------------------------------------------------------------------------
 %% @doc
@@ -272,7 +283,7 @@ close(Session = {_, _}) ->
 %%------------------------------------------------------------------------------
 -spec read_fru(session(), 0..254) ->
                       {ok, fru_info()} | {error, term()}.
-read_fru(Session = {_, _}, FruId) when FruId >= 0 andalso FruId < 255 ->
+read_fru(Session = {session, _}, FruId) when FruId >= 0 andalso FruId < 255 ->
     case get_session(Session, supervisor:which_children(?MODULE)) of
         {ok, Pid} ->
             ?EIPMI_CATCH(eipmi_fru:read(Pid, FruId));
@@ -304,7 +315,7 @@ read_fru_inventory(Session, SdrRepository) ->
 %%------------------------------------------------------------------------------
 -spec read_sdr(session(), non_neg_integer()) ->
                       {ok, sdr()} | {error, term()}.
-read_sdr(Session = {_, _}, RecordId) ->
+read_sdr(Session = {session, _}, RecordId) ->
     case get_session(Session, supervisor:which_children(?MODULE)) of
         {ok, Pid} ->
             case ?EIPMI_CATCH(eipmi_sdr:read(Pid, RecordId)) of
@@ -331,7 +342,7 @@ read_sdr(Session = {_, _}, RecordId) ->
 %%------------------------------------------------------------------------------
 -spec read_sdr_repository(session()) ->
                                  {ok, sdr_repository()} | {error, term()}.
-read_sdr_repository(Session = {_, _}) ->
+read_sdr_repository(Session = {session, _}) ->
     case get_session(Session, supervisor:which_children(?MODULE)) of
         {ok, Pid} ->
             case ?EIPMI_CATCH(eipmi_sdr:read(Pid)) of
@@ -359,7 +370,7 @@ read_sdr_repository(Session = {_, _}) ->
 %%------------------------------------------------------------------------------
 -spec read_sdr_repository(session(), sdr_repository()) ->
                                  {ok, sdr_repository()} | {error, term()}.
-read_sdr_repository(Session = {_, _}, SdrRepository) ->
+read_sdr_repository(Session = {session, _}, SdrRepository) ->
     case get_session(Session, supervisor:which_children(?MODULE)) of
         {ok, Pid} ->
             case ?EIPMI_CATCH(eipmi_sdr:maybe_read(Pid, SdrRepository)) of
@@ -386,7 +397,7 @@ read_sdr_repository(Session = {_, _}, SdrRepository) ->
 %%------------------------------------------------------------------------------
 -spec read_sel(session(), boolean()) ->
                       {ok, [sel_entry()]} | {error, term()}.
-read_sel(Session = {_, _}, Clear) ->
+read_sel(Session = {session, _}, Clear) ->
     case get_session(Session, supervisor:which_children(?MODULE)) of
         {ok, Pid} ->
             case ?EIPMI_CATCH(eipmi_sel:read(Pid, Clear)) of
@@ -407,7 +418,7 @@ read_sel(Session = {_, _}, Clear) ->
 %%------------------------------------------------------------------------------
 -spec raw(session(), req_net_fn(), 0..255, proplists:proplist()) ->
                  {ok, proplists:proplist()} | {error, term()}.
-raw(Session = {_, _}, NetFn, Command, Properties) ->
+raw(Session = {session, _}, NetFn, Command, Properties) ->
     case get_session(Session, supervisor:which_children(?MODULE)) of
         {ok, Pid} ->
             eipmi_session:rpc(Pid, {NetFn, Command}, Properties);
@@ -574,6 +585,17 @@ sdr_to_fru(Sdr, SdrRepository, FruInventory) ->
 %%   <dd>
 %%     <p>the session received an IPMI response but no handler was found for it</p>
 %%   </dd>
+%%   <dt>
+%%     `{ipmi,
+%%       Session :: session(),
+%%       Address :: inet:ip_address() | inet:hostname(),
+%%       SELEntry :: sel_entry()}'
+%%   </dt>
+%%   <dd>
+%%     <p>
+%%       a SEL event forwarded through the automatic SEL polling mechanism
+%%     </p>
+%%   </dd>
 %% </dl>
 %% @end
 %%------------------------------------------------------------------------------
@@ -644,8 +666,39 @@ init([]) ->
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
+start_session(Target, IPAddress, Options) ->
+    Session = {session, {Target, erlang:make_ref()}},
+    Start = {eipmi_session, start_link, [Session, IPAddress, Options]},
+    Spec = {Session, Start, temporary, 2000, worker, [eipmi_session]},
+    Result = supervisor:start_child(?MODULE, Spec),
+    start_session(Result, Session, IPAddress, Options).
+start_session({ok, Pid}, Session, IPAddress, Options) ->
+    DoPoll = eipmi_util:get_val(poll_sel, Options, 0) > 0,
+    start_poll(DoPoll, Pid, Session, IPAddress, Options);
+start_session(Error, _Session, _IPAddress, _Options) ->
+    Error.
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+start_poll(true, Pid, Session, IPAddress, Options) ->
+    Id = {poll, erlang:make_ref()},
+    Start = {eipmi_poll, start_link, [Pid, Session, IPAddress, Options]},
+    Spec = {Id, Start, temporary, brutal_kill, worker, [eipmi_poll]},
+    start_poll(supervisor:start_child(?MODULE, Spec), Session);
+start_poll(false, _Pid, Session, _IPAddress, _Options) ->
+    {ok, Session}.
+start_poll({ok, _Pid}, Session) ->
+    {ok, Session};
+start_poll(Error, Session) ->
+    close(Session),
+    Error.
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
 get_session(S, Cs) ->
-    case [P || {I, P, worker, _} <- Cs, I =:= S andalso is_pid(P)] of
+    case [P || {I = {session, _}, P, _, _} <- Cs, I =:= S andalso is_pid(P)] of
         [] ->
             {error, no_session};
         [P] ->
@@ -656,7 +709,7 @@ get_session(S, Cs) ->
 %% @private
 %%------------------------------------------------------------------------------
 get_sessions(Cs) ->
-    [{Target, P} || {{Target, _Ref}, P, worker, _} <- Cs, is_pid(P)].
+    [{Target, P} || {{session, {Target, _}}, P, _, _} <- Cs, is_pid(P)].
 
 %%------------------------------------------------------------------------------
 %% @private
