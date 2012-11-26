@@ -15,7 +15,6 @@ Initial planned features
 * RMCP presence ping/pong
 * Session initiation and activation
 * Some basic IPMI queries
-* Support for LAN alerts (events)
 
 We really want to provide a simple enough basic implementation, that is open
 for extension, and not going for a complete coverage of the specification right
@@ -47,7 +46,8 @@ Documentation
 The following sections will give a brief description of the EIPMI features as
 well as some usage examples for developers integrating the application into
 their project. Additional information can be found in the projects EDoc
-documentation located [here](http://lindenbaum.github.com/eipmi/).
+documentation located [here](http://lindenbaum.github.com/eipmi/). The EIPMI
+API functions are exported by the `eipmi` module.
 
 ### Sessions &amp; Authentication
 
@@ -172,7 +172,7 @@ will open a session, read the FRU with id 253 and close the session again.
 
 ```erlang
 {ok, Session} = eipmi:open("10.1.31.11"),
-{ok, FruInfo} = eipmi:read_fru(Session, 253),
+{ok, {fru_data, FruInfo}} = eipmi:read_fru(Session, 253),
 BoardArea = proplists:get_value(board_area, FruInfo),
 Name = proplists:get_value(name, BoardArea),
 Serial = proplists:get_value(serial_number, BoardArea),
