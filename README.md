@@ -180,6 +180,18 @@ error_logger:info_msg("Board ~s has serial number ~s.~n", [Name, Serial]),
 eipmi:close(Session),
 ```
 
+The following snippet first reads the BMC's Sensor Data Record Repository and
+then returns the complete FRU inventory based on the found FRU Device Locator
+Records.
+
+```erlang
+{ok, Session} = eipmi:open("10.1.31.11"),
+{ok, SDRRepository} = eipmi:read_sdr_repository(Session),
+{ok, FruInventory} = eipmi:read_fru_inventory(Session, SDRRepository),
+error_logger:info_msg("FRU inventory:~n~p~n", [FruInventory]),
+eipmi:close(Session),
+```
+
 EIPMI also allows to send *raw* requests over a session. However, raw does not
 mean that binary data can be sent directly. The corresponding request/response
 encode/decode functionality must be present. The following snippet will issue
