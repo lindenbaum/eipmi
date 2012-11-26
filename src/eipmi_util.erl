@@ -22,6 +22,7 @@
 
 -export([normalize/2,
          format/2,
+         get_env/2,
          get_val/2,
          get_val/3,
          update_val/3,
@@ -67,6 +68,17 @@ normalize(Length, Binary) when is_binary(Binary) ->
                     string().
 format(Format, Args) ->
     lists:flatten(io_lib:format(Format, Args)).
+
+%%------------------------------------------------------------------------------
+%% @doc
+%% Return the value of a configuration property from the eipmi application
+%% environment.
+%% @end
+%%------------------------------------------------------------------------------
+-spec get_env(atom(), term()) ->
+                     term().
+get_env(Property, Default) ->
+    get_val(Property, application:get_all_env(eipmi), Default).
 
 %%------------------------------------------------------------------------------
 %% @doc

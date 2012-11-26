@@ -75,6 +75,7 @@
 
 -type option() ::
         {initial_outbound_seq_nr, non_neg_integer()} |
+        {keep_alive_retransmits, non_neg_integer()} |
         {password, string()} |
         {port, inet:port_number()} |
         {privilege, callback | user | operator | administrator} |
@@ -84,6 +85,7 @@
 
 -type option_name() ::
         initial_outbound_seq_nr |
+        keep_alive_retransmits |
         password |
         port |
         privilege |
@@ -176,6 +178,13 @@ open(IPAddress) ->
 %%     <p>
 %%     the initial outbound sequence number that will be requested on the BMC,
 %%     default is `16#1337'
+%%     </p>
+%%  </dd>
+%%   <dt>`{keep_alive_retransmits, non_neg_integer()}'</dt>
+%%   <dd>
+%%     <p>
+%%     the number of retransmits allowed for session keep_alive requests,
+%%     default is `2'.
 %%     </p>
 %%  </dd>
 %%   <dt>`{password, string() with length <= 16bytes}'</dt>

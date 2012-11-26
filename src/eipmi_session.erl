@@ -20,10 +20,10 @@
 %%% can close the session using {@link stop/1}.
 %%%
 %%% Synchronous requests can be issued over this session at any given time using
-%%% {@link rpc/3}. When the session is not yet established requests will be
-%%% queued and issued as soon as the far end (BMC) is ready. Request timeouts
-%%% can be configured on state machine startup using the `timeout' property
-%%% of the `Options' field.
+%%% {@link rpc/3} or {@link rpc/4}. When the session is not yet established
+%%% requests will be queued and issued as soon as the far end (BMC) is ready.
+%%% Request timeouts can be configured on state machine startup using the
+%%% `timeout' property of the `Options' field.
 %%%
 %%% A session may be shared between mutliple processes. While the requests of
 %%% one process will be synchronous and thus ordered, requests from different
@@ -36,6 +36,8 @@
 %%% The server will handle the low level RMCP and IPMI protocol regarding
 %%% encoding and decoding of messages, as well as correct packet
 %%% acknowledgement, sequence number handling and session opening/closing.
+%%% Packet loss is not handled during session setup.
+%%%
 %%% A session will use the modules {@link eipmi_request} and
 %%% {@link eipmi_response} to encode and decode requests/responses. Therefore,
 %%% there's no need to edit the session but extending these modules when
@@ -52,6 +54,7 @@
 %% API
 -export([start_link/3,
          rpc/3,
+         rpc/4,
          stop/1]).
 
 %% gen_server callbacks
@@ -90,6 +93,9 @@
 
 -export_type([property/0, property_name/0]).
 
+-define(RETRANSMITS, 2).
+-define(KEEP_ALIVE_TIMER, 45000).
+
 %%------------------------------------------------------------------------------
 %% Session defaults, partially modifyable by the user.
 %%------------------------------------------------------------------------------
@@ -97,6 +103,7 @@
         [
          %% default values modifyable through eipmi:open/2
          {initial_outbound_seq_nr, 16#1337},
+         {keep_alive_retransmits, ?RETRANSMITS},
          {password, ""},
          {port, ?RMCP_PORT_NUMBER},
          {privilege, administrator},
@@ -137,14 +144,35 @@ start_link(Session, IPAddress, Options) ->
 
 %%------------------------------------------------------------------------------
 %% @doc
-%% Send a synchronous IPMI RPC over this session. If the session is not yet
-%% established the request will be queued.
+%% Basically the same as {@link rpc/4}, but the number of allowed retransmits
+%% is taken from the `eipmi' application configuration. If not configured the
+%% default number of allowed retransmits is `2'.
+%% @see rpc/4
 %% @end
 %%------------------------------------------------------------------------------
 -spec rpc(pid(), eipmi:request(), proplists:proplist()) ->
                  {ok, proplists:proplist()} | {error, term()}.
 rpc(Pid, Request, Properties) ->
-    gen_server:call(Pid, {rpc, Request, Properties}, infinity).
+    Retransmits = eipmi_util:get_env(retransmits, ?RETRANSMITS),
+    rpc(Pid, Request, Properties, Retransmits).
+
+%%------------------------------------------------------------------------------
+%% @doc
+%% Send a synchronous IPMI RPC over this session. If the session is not yet
+%% established the request will be queued. The last arguments specifies the
+%% number of allowed retransmits. Since requests get sent over UDP packet
+%% delivery may be unreliable and requests could get lost.
+%% @end
+%%------------------------------------------------------------------------------
+-spec rpc(pid(), eipmi:request(), proplists:proplist(), non_neg_integer()) ->
+                 {ok, proplists:proplist()} | {error, term()}.
+rpc(Pid, Request, Properties, Retransmits) ->
+    F = fun() -> gen_server:call(Pid, {rpc, Request, Properties}, infinity) end,
+    rpc_(F(), F, Retransmits).
+rpc_({error, timeout}, Fun, Retransmits) when Retransmits > 0 ->
+    rpc_(Fun(), Fun, Retransmits - 1);
+rpc_(Result, _Fun, _Retransmits) ->
+    Result.
 
 %%------------------------------------------------------------------------------
 %% @doc
@@ -162,6 +190,7 @@ stop(Pid) ->
 
 -record(state, {
           active = false :: boolean(),
+          keep_alive     :: non_neg_integer(),
           last_send      :: non_neg_integer(),
           queue = []     :: [{eipmi:request(), proplists:proplist(), term()}],
           requests = []  :: [{rpc | internal, 0..63, reference(), term()}],
@@ -431,25 +460,40 @@ handle_set_session_privilege_response(true, _, State = #state{queue = Q}) ->
 
 %%------------------------------------------------------------------------------
 %% @private
-%% According to spec we need to send a request at least every 60000ms, so we do
-%% it at least every 50000ms. Since our target does not support session keep
-%% alive by resending Activate Session requests, we just query the current
-%% privilege level.
+%% According to spec we need to send a request at least every 60000ms. What we
+%% do is to keep track of the timestamp of the last packet. A periodical timer
+%% will then lookup this timestamp. If the last packet timestamp plus the next
+%% timer duration is still under 60000ms we do nothing (other packets will)
+%% probably be sent in this period anyways. In the other case we need to send a
+%% keep-alive request.
 %%------------------------------------------------------------------------------
-keep_alive(Now, State = #state{last_send = Last}) when Now - Last >= 50000 ->
-    process_request(
-      {{?IPMI_NETFN_APPLICATION_REQUEST, ?SET_SESSION_PRIVILEGE_LEVEL},
-       [], fun handle_keep_alive/2}, State);
-keep_alive(Now, State = #state{last_send = Last}) ->
-    erlang:send_after(50000 - (Now - Last), self(), keep_alive),
-    State.
+keep_alive(Now, State = #state{last_send = Last})
+  when Now - Last + ?KEEP_ALIVE_TIMER < 55000 ->
+    start_keep_alive_timer(State);
+keep_alive(_, State) ->
+    send_keep_alive(State).
 
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
+handle_keep_alive({error, timeout}, S = #state{keep_alive = C}) when C > 0 ->
+    send_keep_alive(S#state{keep_alive = C - 1});
 handle_keep_alive({ok, _Fields}, State) ->
-    erlang:send_after(50000, self(), keep_alive),
-    State.
+    start_keep_alive_timer(State).
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+start_keep_alive_timer(State) ->
+    erlang:send_after(?KEEP_ALIVE_TIMER, self(), keep_alive),
+    State#state{keep_alive = get_state_val(keep_alive_retransmits, State)}.
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+send_keep_alive(State) ->
+    Request = {?IPMI_NETFN_APPLICATION_REQUEST, ?SET_SESSION_PRIVILEGE_LEVEL},
+    process_request({Request, [], fun handle_keep_alive/2}, State).
 
 %%------------------------------------------------------------------------------
 %% @private
