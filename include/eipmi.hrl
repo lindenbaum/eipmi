@@ -130,6 +130,16 @@
 -define(IPMI_NETFN_TRANSPORT_RESPONSE, 16#0d).
 
 %%------------------------------------------------------------------------------
+%% The IPMI net function for PICMG specific requests (length is 6bits).
+%%------------------------------------------------------------------------------
+-define(IPMI_NETFN_PICMG_REQUEST, 16#2c).
+
+%%------------------------------------------------------------------------------
+%% The IPMI net function for PICMG specific responses (length is 6bits).
+%%------------------------------------------------------------------------------
+-define(IPMI_NETFN_PICMG_RESPONSE, 16#2d).
+
+%%------------------------------------------------------------------------------
 %% The default reponder address sent in all IPMI requests, currently this is
 %% directly the BMC.
 %%------------------------------------------------------------------------------
@@ -151,9 +161,14 @@
 -define(IPMI_RETRANSMITS, 2).
 
 %%------------------------------------------------------------------------------
-%% The supported FRU Information Storage Definition (v1.0)
+%% The supported FRU Information Storage Definition (v1.0).
 %%------------------------------------------------------------------------------
 -define(FRU_VERSION, 16#1).
+
+%%------------------------------------------------------------------------------
+%% The unknown PICMG Identifier.
+%%------------------------------------------------------------------------------
+-define(PICMG_ID, 0).
 
 %%%=============================================================================
 %%% IPMI Commands
@@ -270,6 +285,22 @@
 -define(GET_LAN_CONFIGURATION_PARAMETERS, 16#02).
 -define(SUSPEND_BMC_ARPS, 16#03).
 -define(GET_IP_UDP_RMCP_STATISTICS, 16#04).
+
+%% PICMG (PICMG)
+-define(PICMG_GET_PICMG_PROPERTIES, 16#00).
+-define(PICMG_GET_ADDRESS_INFO, 16#01).
+-define(PICMG_GET_SHELF_ADDRESS_INFO, 16#02).
+-define(PICMG_FRU_CONTROL, 16#04).
+-define(PICMG_GET_FRU_LED_PROPERTIES, 16#05).
+-define(PICMG_GET_LED_COLOR_CAPABILITIES, 16#06).
+-define(PICMG_GET_FRU_LED_STATE, 16#08).
+-define(PICMG_GET_FRU_POLICY, 16#0b).
+-define(PICMG_FRU_ACTIVATION, 16#0c).
+-define(PICMG_GET_DEVICE_LOCATOR_RECORD, 16#0d).
+-define(PICMG_GET_PORT_STATE_CMD, 16#0f).
+-define(PICMG_GET_POWER_LEVEL, 16#12).
+-define(PICMG_GET_FAN_SPEED_PROPERTIES, 16#14).
+-define(PICMG_GET_FAN_LEVEL, 16#16).
 
 %%%=============================================================================
 %%% Messages

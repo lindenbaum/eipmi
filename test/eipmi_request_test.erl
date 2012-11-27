@@ -150,3 +150,17 @@ encode_get_sdr_test() ->
     ?assertEqual(
        <<16#22, 16#11, 16#44, 16#33, 16#00, 16#05>>,
        eipmi_request:encode(Req, Properties)).
+
+encode_picmg_fru_activation_test() ->
+    Req = {?IPMI_NETFN_PICMG_REQUEST, ?PICMG_FRU_ACTIVATION},
+    Properties = [{fru_id, 5}, {activate, true}],
+    ?assertEqual(
+       <<16#00, 16#05, 16#01>>,
+       eipmi_request:encode(Req, Properties)).
+
+encode_picmg_fru_control_test() ->
+    Req = {?IPMI_NETFN_PICMG_REQUEST, ?PICMG_FRU_CONTROL},
+    Properties = [{fru_id, 5}, {control, graceful_reboot}],
+    ?assertEqual(
+       <<16#00, 16#05, 16#02>>,
+       eipmi_request:encode(Req, Properties)).

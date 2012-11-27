@@ -534,3 +534,27 @@ Returns:
 ```erlang
 [{data, binary()}]
 ```
+
+#### PICMG FRU Activation
+Argument:
+```erlang
+[{fru_id, 0..254},
+ {activate, boolean()}]
+```
+
+Returns:
+```erlang
+[]
+```
+
+#### PICMG FRU Control
+Argument:
+```erlang
+[{fru_id, 0..254},
+ {control, cold_reset | warm_reset | graceful_reboot | diagnostic_interrupt | quiesce}]
+```
+
+Returns:
+```erlang
+[]
+```

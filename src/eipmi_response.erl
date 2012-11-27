@@ -46,7 +46,9 @@ decode({?IPMI_NETFN_APPLICATION_RESPONSE, Cmd}, Data) ->
 decode({?IPMI_NETFN_STORAGE_RESPONSE, Cmd}, Data) ->
     decode_storage(Cmd, Data);
 decode({?IPMI_NETFN_TRANSPORT_RESPONSE, Cmd}, Data) ->
-    decode_transport(Cmd, Data).
+    decode_transport(Cmd, Data);
+decode({?IPMI_NETFN_PICMG_RESPONSE, Cmd}, Data) ->
+    decode_picmg(Cmd, Data).
 
 %%------------------------------------------------------------------------------
 %% @doc
@@ -177,6 +179,14 @@ decode_transport(?GET_IP_UDP_RMCP_STATISTICS,
      {rmcp_packets_received, RMCPRx}];
 decode_transport(?GET_LAN_CONFIGURATION_PARAMETERS, <<_Rev:8, Data/binary>>) ->
     [{data, Data}].
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+decode_picmg(?PICMG_FRU_ACTIVATION, <<?PICMG_ID:8>>) ->
+    [];
+decode_picmg(?PICMG_FRU_CONTROL, <<?PICMG_ID:8>>) ->
+    [].
 
 %%------------------------------------------------------------------------------
 %% @private

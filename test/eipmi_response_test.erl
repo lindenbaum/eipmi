@@ -213,3 +213,11 @@ decode_get_sdr_test() ->
        [{next_record_id, 16#1122},
         {data, <<$d, $a, $t, $a>>}],
        eipmi_response:decode(Resp, Bin)).
+
+decode_picmg_fru_activation_test() ->
+    Resp = {?IPMI_NETFN_PICMG_RESPONSE, ?PICMG_FRU_ACTIVATION},
+    ?assertEqual([], eipmi_response:decode(Resp, <<16#00>>)).
+
+decode_picmg_fru_control_test() ->
+    Resp = {?IPMI_NETFN_PICMG_RESPONSE, ?PICMG_FRU_CONTROL},
+    ?assertEqual([], eipmi_response:decode(Resp, <<16#00>>)).

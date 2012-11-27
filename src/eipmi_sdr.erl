@@ -546,7 +546,7 @@ get_linearization_fun(log2) -> fun(X) -> math:log(X) / math:log(2) end;
 get_linearization_fun(e) -> fun(X) -> math:exp(X) end;
 get_linearization_fun(exp10) -> fun(X) -> math:pow(10, X) end;
 get_linearization_fun(exp2) -> fun(X) -> math:pow(2, X) end;
-get_linearization_fun('1/x') -> fun(X) -> 1 / X end;
+get_linearization_fun('1/x') -> fun(X) when X /= 0 -> 1 / X; (X) -> X end;
 get_linearization_fun(sqr) -> fun(X) -> X * X end;
 get_linearization_fun(cube) -> fun(X) -> X * X * X end;
 get_linearization_fun(sqrt) -> fun(X) -> math:sqrt(X) end;

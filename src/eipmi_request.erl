@@ -45,7 +45,9 @@ encode({?IPMI_NETFN_APPLICATION_REQUEST, Cmd}, Properties) ->
 encode({?IPMI_NETFN_STORAGE_REQUEST, Cmd}, Properties) ->
     encode_storage(Cmd, Properties);
 encode({?IPMI_NETFN_TRANSPORT_REQUEST, Cmd}, Properties) ->
-    encode_transport(Cmd, Properties).
+    encode_transport(Cmd, Properties);
+encode({?IPMI_NETFN_PICMG_REQUEST, Cmd}, Properties) ->
+    encode_picmg(Cmd, Properties).
 
 %%%=============================================================================
 %%% Internal functions
@@ -144,8 +146,29 @@ encode_transport(?GET_LAN_CONFIGURATION_PARAMETERS, Properties) ->
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
+encode_picmg(?PICMG_FRU_ACTIVATION, Properties) ->
+    FruId = eipmi_util:get_val(fru_id, Properties),
+    Activate = eipmi_util:get_val(activate, Properties),
+    <<?PICMG_ID:8, FruId:8, (case Activate of true -> 1; false -> 0 end):8>>;
+encode_picmg(?PICMG_FRU_CONTROL, Properties) ->
+    FruId = eipmi_util:get_val(fru_id, Properties),
+    Control = eipmi_util:get_val(control, Properties),
+    <<?PICMG_ID:8, FruId:8, (encode_fru_control(Control)):8>>.
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
 encode_privilege(present) -> 0;
 encode_privilege(callback) -> 1;
 encode_privilege(user) -> 2;
 encode_privilege(operator) -> 3;
 encode_privilege(administrator) -> 4.
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+encode_fru_control(cold_reset) -> 0;
+encode_fru_control(warm_reset) -> 1;
+encode_fru_control(graceful_reboot) -> 2;
+encode_fru_control(diagnostic_interrupt) -> 3;
+encode_fru_control(quiesce) -> 4.
