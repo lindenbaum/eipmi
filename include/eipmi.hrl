@@ -166,9 +166,19 @@
 -define(FRU_VERSION, 16#1).
 
 %%------------------------------------------------------------------------------
-%% The unknown PICMG Identifier.
+%% The default PICMG Identifier.
 %%------------------------------------------------------------------------------
 -define(PICMG_ID, 0).
+
+%%------------------------------------------------------------------------------
+%% The PICMG manufacturer id.
+%%------------------------------------------------------------------------------
+-define(PICMG_MID, 16#00315a).
+
+%%------------------------------------------------------------------------------
+%% The supported PICMG FRU record version.
+%%------------------------------------------------------------------------------
+-define(PICMG_FRU_VERSION, 0).
 
 %%%=============================================================================
 %%% IPMI Commands
@@ -287,20 +297,36 @@
 -define(GET_IP_UDP_RMCP_STATISTICS, 16#04).
 
 %% PICMG (PICMG)
--define(PICMG_GET_PICMG_PROPERTIES, 16#00).
--define(PICMG_GET_ADDRESS_INFO, 16#01).
--define(PICMG_GET_SHELF_ADDRESS_INFO, 16#02).
--define(PICMG_FRU_CONTROL, 16#04).
--define(PICMG_GET_FRU_LED_PROPERTIES, 16#05).
--define(PICMG_GET_LED_COLOR_CAPABILITIES, 16#06).
--define(PICMG_GET_FRU_LED_STATE, 16#08).
--define(PICMG_GET_FRU_POLICY, 16#0b).
--define(PICMG_FRU_ACTIVATION, 16#0c).
--define(PICMG_GET_DEVICE_LOCATOR_RECORD, 16#0d).
--define(PICMG_GET_PORT_STATE_CMD, 16#0f).
--define(PICMG_GET_POWER_LEVEL, 16#12).
--define(PICMG_GET_FAN_SPEED_PROPERTIES, 16#14).
--define(PICMG_GET_FAN_LEVEL, 16#16).
+-define(GET_PICMG_PROPERTIES, 16#00).
+-define(GET_ADDRESS_INFO, 16#01).
+-define(GET_SHELF_ADDRESS_INFO, 16#02).
+-define(SET_SHELF_ADDRESS_INFO, 16#03).
+-define(FRU_CONTROL, 16#04).
+-define(GET_FRU_LED_PROPERTIES, 16#05).
+-define(GET_LED_COLOR, 16#06).
+-define(SET_FRU_LED_STATE, 16#07).
+-define(GET_FRU_LED_STATE, 16#08).
+-define(SET_IPMB_STATE, 16#09).
+-define(SET_FRU_ACTIVATION_POLICY, 16#0a).
+-define(GET_FRU_ACTIVATION_POLICY, 16#0b).
+-define(SET_FRU_ACTIVATION, 16#0c).
+-define(GET_DEVICE_LOCATOR_RECORD_ID, 16#0d).
+-define(SET_PORT_STATE, 16#0e).
+-define(GET_PORT_STATE, 16#0f).
+-define(COMPUTE_POWER_PROPERTIES, 16#10).
+-define(SET_POWER_LEVEL, 16#11).
+-define(GET_POWER_LEVEL, 16#12).
+-define(RENEGOTIATE_POWER, 16#13).
+-define(GET_FAN_SPEED_PROPERTIES, 16#14).
+-define(SET_FAN_LEVEL, 16#15).
+-define(GET_FAN_LEVEL, 16#16).
+-define(BUSED_RESOURCE_CONTROL, 16#17).
+-define(GET_IPMB_LINK_INFO, 16#18).
+-define(SET_AMC_PORT_STATE, 16#19).
+-define(GET_AMC_PORT_STATE, 16#1a).
+-define(SET_CLOCK_STATE, 16#2c).
+-define(GET_CLOCK_STATE, 16#2d).
+-define(FRU_CONTROL_CAPABILITIES, 16#1e).
 
 %%%=============================================================================
 %%% Messages

@@ -60,6 +60,7 @@
         {management_access, proplists:proplist()} |
         {base_compatibility, proplists:proplist()} |
         {extended_compatibility, proplists:proplist()} |
+        {amc_p2p_connectivity, proplists:proplist()} |
         {oem, proplists:proplist()}.
 
 -type info() ::
@@ -254,10 +255,10 @@ decode_record(Binary = <<Header:5/binary, _/binary>>) ->
     decode_record(is_binary_sane(Header), Binary).
 decode_record(false, _Binary) ->
     {[], <<>>};
-decode_record(true, <<T:8, 1:1, _:7, L:8, C:8, _:8, Data:L/binary, _/binary>>) ->
-    {decode_record(sum(Data, C) =:= 0, T, Data), <<>>};
-decode_record(true, <<T:8, 0:1, _:7, L:8, C:8, _:8, Data:L/binary, R/binary>>) ->
-    {decode_record(sum(Data, C) =:= 0, T, Data), R}.
+decode_record(true, <<T:8, 1:1, _:7, L:8, C:8, _:8, D:L/binary, _/binary>>) ->
+    {decode_record(sum(D, C) =:= 0, T, D), <<>>};
+decode_record(true, <<T:8, 0:1, _:7, L:8, C:8, _:8, D:L/binary, R/binary>>) ->
+    {decode_record(sum(D, C) =:= 0, T, D), R}.
 decode_record(false, _Type, _Data) ->
     [];
 decode_record(true, Type, Data) ->
@@ -278,9 +279,11 @@ decode_record_field_definition(16#04, Data) ->
     [{base_compatibility, decode_compatibility(Data)}];
 decode_record_field_definition(16#05, Data) ->
     [{extended_compatibility, decode_compatibility(Data)}];
-decode_record_field_definition(Type, Data)
+decode_record_field_definition(16#c0, <<?PICMG_MID:24/little, Rest/binary>>) ->
+    decode_picmg_record(Rest);
+decode_record_field_definition(Type, <<ManufaturerId:24/little, Rest/binary>>)
   when Type >= 16#c0 andalso Type =< 16#ff ->
-    [{oem, [{type, Type}, {data, Data}]}].
+    [{oem, [{type, Type}, {manufacturer_id, ManufaturerId}, {data, Rest}]}].
 
 %%------------------------------------------------------------------------------
 %% @private
@@ -392,6 +395,55 @@ decode_compatibility(<<ManufacturerID:24/little, EntityID:8,
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
+decode_picmg_record(<<16#19:8, Rest/binary>>) ->
+    [{amc_p2p_connectivity, decode_amc_p2p_connectivity_record(Rest)}];
+decode_picmg_record(<<16#22:8, Rest/binary>>) ->
+    [{mtca_carrier_information, decode_mtca_carrier_information_record(Rest)}];
+decode_picmg_record(Data) ->
+    [{oem, [{type, 16#c0}, {manufacturer_id, ?PICMG_MID}, {data, Data}]}].
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+decode_amc_p2p_connectivity_record(
+  <<?PICMG_FRU_VERSION:8, GUIDCount:8, Rest/binary>>) ->
+    decode_amc_p2p_connectivity_record([], GUIDCount * 16, Rest).
+decode_amc_p2p_connectivity_record(Acc, 0, <<Rest/binary>>) ->
+    decode_amc_p2p_connectivity_record(Acc, Rest);
+decode_amc_p2p_connectivity_record(Acc, C, <<GUID:16/binary, Rest/binary>>) ->
+    NewAcc = Acc ++ [{guid, eipmi_util:binary_to_string(GUID)}],
+    decode_amc_p2p_connectivity_record(NewAcc, C - 1, Rest).
+decode_amc_p2p_connectivity_record(Acc, <<D:1/binary, C:8, Rest/binary>>) ->
+    {ChanDescs, NewRest} = get_amc_channel_descriptors(C * 3, Rest),
+    LinkDescs = get_amc_link_descs(NewRest),
+    Acc ++ get_device(D) ++ ChanDescs ++ LinkDescs.
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+decode_mtca_carrier_information_record(
+  <<?PICMG_FRU_VERSION:8, C:8, O:1, _:7, Rest/binary>>) ->
+    Slots = decode_mtca_carrier_information_record([], Rest),
+    case C of 16#ff -> []; _ -> [{carrier_number, C}] end
+        ++ get_mtca_orientation(O)
+        ++ [{amc_slots, length(get_mtca_slots(amc, Slots))}]
+        ++ [{mch_slots, length(get_mtca_slots(mch, Slots))}]
+        ++ Slots.
+decode_mtca_carrier_information_record(Acc, <<>>) ->
+    Acc;
+decode_mtca_carrier_information_record(
+  Acc, <<SiN:8, SiT:8, SlN:8, TiN:8, Y:16/little, X:16/little, Rest/binary>>) ->
+    decode_mtca_carrier_information_record(
+      Acc ++ [{slot, get_mtca_site_type(SiT) ++
+                   [{site_number, SiN},
+                    {slot_number, SlN},
+                    {tier_number, TiN},
+                    {x, {X, eipmi_sensor:get_unit(32)}},
+                    {y, {Y, eipmi_sensor:get_unit(32)}}]}], Rest).
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
 get_code_ranges(Bytes, CodeStart) ->
     lists:sort(get_code_ranges(Bytes, CodeStart, 0, [CodeStart])).
 get_code_ranges(<<>>, _CodeStart, _BitIndex, Acc) ->
@@ -433,6 +485,91 @@ get_power_supply_predictive_fail_signal(0) ->
     one_pulse_per_rotation_or_signal_asserted;
 get_power_supply_predictive_fail_signal(1) ->
     two_pulses_per_rotation_or_signal_deasserted.
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+get_device(<<1:1, ?EIPMI_RESERVED:7>>) ->
+    [{device_type, amc}];
+get_device(<<0:1, ?EIPMI_RESERVED:3, Id:4>>) ->
+    [{device_type, on_carrier_device}, {device_id, Id}].
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+get_amc_channel_descriptors(Count, Data) ->
+    <<D:Count/binary, Rest/binary>> = Data,
+    {get_amc_channel_descriptors_(D, []), Rest}.
+get_amc_channel_descriptors_(<<>>, Acc) ->
+    lists:reverse(Acc);
+get_amc_channel_descriptors_(<<Desc:24/little, Rest/binary>>, Acc) ->
+    NewAcc = [get_amc_channel_descriptor(<<Desc:24>>) | Acc],
+    get_amc_channel_descriptors_(Rest, NewAcc).
+get_amc_channel_descriptor(<<?EIPMI_RESERVED:4, L3:5, L2:5, L1:5, L0:5>>) ->
+    {amc_channel_descriptor,
+     case L0 of 16#1f -> []; _ -> [{lane0_port, L0}] end
+     ++ case L1 of 16#1f -> []; _ -> [{lane1_port, L1}] end
+     ++ case L2 of 16#1f -> []; _ -> [{lane2_port, L2}] end
+     ++ case L3 of 16#1f -> []; _ -> [{lane3_port, L3}] end}.
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+get_amc_link_descs(Binary) ->
+    get_amc_link_descs(Binary, []).
+get_amc_link_descs(<<>>, Acc) ->
+    lists:reverse(Acc);
+get_amc_link_descs(<<Desc:40/little, Rest/binary>>, Acc) ->
+    get_amc_link_descs(Rest, [get_amc_link_desc(<<Desc:40>>) | Acc]).
+get_amc_link_desc(<<?EIPMI_RESERVED:8, G:8, LTExt:4, LT:8, Ls:4, Id:8>>) ->
+    {amc_link_descriptor,
+     [{channel_id, Id}, {group_id, G}]
+     ++ get_amc_lanes(Ls) ++ get_link_type(LT, LTExt)}.
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+get_amc_lanes(Lanes) ->
+    A = case Lanes band 2#1000 bsr 3 of 1 -> [3]; _ -> [] end,
+    B = case Lanes band 2#100 bsr 2 of 1 -> [2]; _ -> [] end,
+    C = case Lanes band 2#10 bsr 1 of 1 -> [1]; _ -> [] end,
+    D = case Lanes band 2#1 of 1 -> [0]; _ -> [] end,
+    [{lanes, A ++ B ++ C ++ D}].
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+get_link_type(16#02, Ext) -> [{link_type, {pci_express, Ext}}];
+get_link_type(16#03, Ext) -> [{link_type, {pci_express_advanced_switching, Ext}}];
+get_link_type(16#04, Ext) -> [{link_type, {pci_express_advanced_switching, Ext}}];
+get_link_type(16#05, Ext) -> [{link_type, {ethernet, Ext}}];
+get_link_type(16#06, Ext) -> [{link_type, {serial_rapid_io, Ext}}];
+get_link_type(16#07, Ext) -> [{link_type, {storage, Ext}}];
+get_link_type(T, Ext) when T >= 16#f0 andalso T =< 16#fe ->
+    [{link_type, {ekeying, Ext}}].
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+get_mtca_orientation(0) ->
+    [{slot_orientation, left_to_right}, {tier_orientation, bottom_to_top}];
+get_mtca_orientation(1) ->
+    [{slot_orientation, bottom_to_top}, {tier_orientation, left_to_right}].
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+get_mtca_site_type(16#04) -> [{site_type, colling_unit}];
+get_mtca_site_type(16#07) -> [{site_type, amc}];
+get_mtca_site_type(16#0a) -> [{site_type, mch}];
+get_mtca_site_type(16#0b) -> [{site_type, power_module}];
+get_mtca_site_type(_) -> [].
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+get_mtca_slots(Type, Slots) ->
+    [S || S = {slot, Ps} <- Slots, eipmi_util:get_val(site_type, Ps) =:= Type].
 
 %%------------------------------------------------------------------------------
 %% @private

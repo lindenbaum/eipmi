@@ -146,14 +146,19 @@ encode_transport(?GET_LAN_CONFIGURATION_PARAMETERS, Properties) ->
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-encode_picmg(?PICMG_FRU_ACTIVATION, Properties) ->
+encode_picmg(?GET_PICMG_PROPERTIES, _Properties) ->
+    <<?PICMG_ID:8>>;
+encode_picmg(?SET_FRU_ACTIVATION, Properties) ->
     FruId = eipmi_util:get_val(fru_id, Properties),
     Activate = eipmi_util:get_val(activate, Properties),
     <<?PICMG_ID:8, FruId:8, (case Activate of true -> 1; false -> 0 end):8>>;
-encode_picmg(?PICMG_FRU_CONTROL, Properties) ->
+encode_picmg(?FRU_CONTROL, Properties) ->
     FruId = eipmi_util:get_val(fru_id, Properties),
     Control = eipmi_util:get_val(control, Properties),
-    <<?PICMG_ID:8, FruId:8, (encode_fru_control(Control)):8>>.
+    <<?PICMG_ID:8, FruId:8, (encode_fru_control(Control)):8>>;
+encode_picmg(?GET_DEVICE_LOCATOR_RECORD_ID, Properties) ->
+    FruId = eipmi_util:get_val(fru_id, Properties),
+    <<?PICMG_ID:8, FruId:8>>.
 
 %%------------------------------------------------------------------------------
 %% @private

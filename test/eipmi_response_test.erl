@@ -214,10 +214,24 @@ decode_get_sdr_test() ->
         {data, <<$d, $a, $t, $a>>}],
        eipmi_response:decode(Resp, Bin)).
 
-decode_picmg_fru_activation_test() ->
-    Resp = {?IPMI_NETFN_PICMG_RESPONSE, ?PICMG_FRU_ACTIVATION},
+decode_get_picmg_properties_test() ->
+    Resp = {?IPMI_NETFN_PICMG_RESPONSE, ?GET_PICMG_PROPERTIES},
+    Bin = <<16#00, 16#12, 16#05, 16#6>>,
+    ?assertEqual(
+       [{picmg_extension, "2.1"},
+        {max_fru_id, 5},
+        {ipmc_fru_id, 6}],
+       eipmi_response:decode(Resp, Bin)).
+
+decode_set_fru_activation_test() ->
+    Resp = {?IPMI_NETFN_PICMG_RESPONSE, ?SET_FRU_ACTIVATION},
     ?assertEqual([], eipmi_response:decode(Resp, <<16#00>>)).
 
-decode_picmg_fru_control_test() ->
-    Resp = {?IPMI_NETFN_PICMG_RESPONSE, ?PICMG_FRU_CONTROL},
+decode_fru_control_test() ->
+    Resp = {?IPMI_NETFN_PICMG_RESPONSE, ?FRU_CONTROL},
     ?assertEqual([], eipmi_response:decode(Resp, <<16#00>>)).
+
+decode_get_device_locator_record_id_test() ->
+    Resp = {?IPMI_NETFN_PICMG_RESPONSE, ?GET_DEVICE_LOCATOR_RECORD_ID},
+    Bin = <<16#00, 16#34, 16#12>>,
+    ?assertEqual([{record_id, 16#1234}], eipmi_response:decode(Resp, Bin)).

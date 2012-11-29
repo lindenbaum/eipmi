@@ -183,10 +183,18 @@ decode_transport(?GET_LAN_CONFIGURATION_PARAMETERS, <<_Rev:8, Data/binary>>) ->
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-decode_picmg(?PICMG_FRU_ACTIVATION, <<?PICMG_ID:8>>) ->
+decode_picmg(?GET_PICMG_PROPERTIES,
+             <<?PICMG_ID:8, Version:1/binary, MaxFruId:8, IPMCFruId:8>>) ->
+    [Major | Minor] = lists:reverse(eipmi_util:from_bcd_plus(Version)),
+    [{picmg_extension, [Major | [$. | Minor]]},
+     {max_fru_id, MaxFruId},
+     {ipmc_fru_id, IPMCFruId}];
+decode_picmg(?SET_FRU_ACTIVATION, <<?PICMG_ID:8>>) ->
     [];
-decode_picmg(?PICMG_FRU_CONTROL, <<?PICMG_ID:8>>) ->
-    [].
+decode_picmg(?FRU_CONTROL, <<?PICMG_ID:8>>) ->
+    [];
+decode_picmg(?GET_DEVICE_LOCATOR_RECORD_ID, <<?PICMG_ID:8, Id:16/little>>) ->
+    [{record_id, Id}].
 
 %%------------------------------------------------------------------------------
 %% @private

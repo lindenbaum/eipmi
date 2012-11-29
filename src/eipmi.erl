@@ -65,7 +65,7 @@
 
 -type target() :: {inet:ip_address() | inet:hostname(), inet:port_number()}.
 
--opaque session() :: {session, {target(), reference()}}.
+-type session() :: {session, target(), reference()}.
 
 -type req_net_fn()  :: 16#04 | 16#06 | 16#a | 16#c.
 -type resp_net_fn() :: 16#05 | 16#07 | 16#b | 16#d.
@@ -168,7 +168,7 @@ ping(IPAddress, Timeout) when is_integer(Timeout) andalso Timeout > 0 ->
 %% @end
 %%------------------------------------------------------------------------------
 -spec open(inet:ip_address() | inet:hostname()) ->
-                  {ok, session()} | {error, term()}.
+                  {ok, eipmi:session()} | {error, term()}.
 open(IPAddress) ->
     open(IPAddress, []).
 
@@ -254,7 +254,7 @@ open(IPAddress) ->
 %% @end
 %%------------------------------------------------------------------------------
 -spec open(inet:ip_address() | inet:hostname(), [option()]) ->
-                  {ok, session()} | {error, term()}.
+                  {ok, eipmi:session()} | {error, term()}.
 open(IPAddress, Options) ->
     Target = {IPAddress, eipmi_util:get_val(port, Options, ?RMCP_PORT_NUMBER)},
     start_session(Target, IPAddress, Options).
@@ -266,9 +266,9 @@ open(IPAddress, Options) ->
 %% session is not active any more.
 %% @end
 %%------------------------------------------------------------------------------
--spec close(session()) ->
-                   ok | {error, no_session}.
-close(Session = {session, _}) ->
+-spec close(eipmi:session()) ->
+                   ok | {error, term()}.
+close(Session) ->
     Result = supervisor:terminate_child(?MODULE, Session),
     supervisor:delete_child(?MODULE, Session),
     Result.
@@ -283,7 +283,7 @@ close(Session = {session, _}) ->
 %%------------------------------------------------------------------------------
 -spec read_fru(session(), 0..254) ->
                       {ok, fru_info()} | {error, term()}.
-read_fru(Session = {session, _}, FruId) when FruId >= 0 andalso FruId < 255 ->
+read_fru(Session, FruId) when FruId >= 0 andalso FruId < 255 ->
     case get_session(Session, supervisor:which_children(?MODULE)) of
         {ok, Pid} ->
             ?EIPMI_CATCH(eipmi_fru:read(Pid, FruId));
@@ -315,7 +315,7 @@ read_fru_inventory(Session, SdrRepository) ->
 %%------------------------------------------------------------------------------
 -spec read_sdr(session(), non_neg_integer()) ->
                       {ok, sdr()} | {error, term()}.
-read_sdr(Session = {session, _}, RecordId) ->
+read_sdr(Session, RecordId) ->
     case get_session(Session, supervisor:which_children(?MODULE)) of
         {ok, Pid} ->
             case ?EIPMI_CATCH(eipmi_sdr:read(Pid, RecordId)) of
@@ -342,7 +342,7 @@ read_sdr(Session = {session, _}, RecordId) ->
 %%------------------------------------------------------------------------------
 -spec read_sdr_repository(session()) ->
                                  {ok, sdr_repository()} | {error, term()}.
-read_sdr_repository(Session = {session, _}) ->
+read_sdr_repository(Session) ->
     case get_session(Session, supervisor:which_children(?MODULE)) of
         {ok, Pid} ->
             case ?EIPMI_CATCH(eipmi_sdr:read(Pid)) of
@@ -370,7 +370,7 @@ read_sdr_repository(Session = {session, _}) ->
 %%------------------------------------------------------------------------------
 -spec read_sdr_repository(session(), sdr_repository()) ->
                                  {ok, sdr_repository()} | {error, term()}.
-read_sdr_repository(Session = {session, _}, SdrRepository) ->
+read_sdr_repository(Session, SdrRepository) ->
     case get_session(Session, supervisor:which_children(?MODULE)) of
         {ok, Pid} ->
             case ?EIPMI_CATCH(eipmi_sdr:maybe_read(Pid, SdrRepository)) of
@@ -397,7 +397,7 @@ read_sdr_repository(Session = {session, _}, SdrRepository) ->
 %%------------------------------------------------------------------------------
 -spec read_sel(session(), boolean()) ->
                       {ok, [sel_entry()]} | {error, term()}.
-read_sel(Session = {session, _}, Clear) ->
+read_sel(Session, Clear) ->
     case get_session(Session, supervisor:which_children(?MODULE)) of
         {ok, Pid} ->
             case ?EIPMI_CATCH(eipmi_sel:read(Pid, Clear)) of
@@ -418,7 +418,7 @@ read_sel(Session = {session, _}, Clear) ->
 %%------------------------------------------------------------------------------
 -spec raw(session(), req_net_fn(), 0..255, proplists:proplist()) ->
                  {ok, proplists:proplist()} | {error, term()}.
-raw(Session = {session, _}, NetFn, Command, Properties) ->
+raw(Session, NetFn, Command, Properties) ->
     case get_session(Session, supervisor:which_children(?MODULE)) of
         {ok, Pid} ->
             eipmi_session:rpc(Pid, {NetFn, Command}, Properties);
@@ -667,38 +667,41 @@ init([]) ->
 %% @private
 %%------------------------------------------------------------------------------
 start_session(Target, IPAddress, Options) ->
-    Session = {session, {Target, erlang:make_ref()}},
+    Session = {session, Target, erlang:make_ref()},
     Start = {eipmi_session, start_link, [Session, IPAddress, Options]},
     Spec = {Session, Start, temporary, 2000, worker, [eipmi_session]},
-    Result = supervisor:start_child(?MODULE, Spec),
-    start_session(Result, Session, IPAddress, Options).
-start_session({ok, Pid}, Session, IPAddress, Options) ->
-    DoPoll = eipmi_util:get_val(poll_sel, Options, 0) > 0,
-    start_poll(DoPoll, Pid, Session, IPAddress, Options);
-start_session(Error, _Session, _IPAddress, _Options) ->
-    Error.
+    case supervisor:start_child(?MODULE, Spec) of
+        Error = {error, _} ->
+            Error;
+        Ok when element(1, Ok) =:= ok ->
+            case eipmi_util:get_val(poll_sel, Options, 0) > 0 of
+                false ->
+                    {ok, Session};
+                true ->
+                    start_poll(element(2, Ok), Session, IPAddress, Options)
+            end
+    end.
 
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-start_poll(true, Pid, Session, IPAddress, Options) ->
+start_poll(Pid, Session, IPAddress, Options) ->
     Id = {poll, erlang:make_ref()},
     Start = {eipmi_poll, start_link, [Pid, Session, IPAddress, Options]},
     Spec = {Id, Start, temporary, brutal_kill, worker, [eipmi_poll]},
-    start_poll(supervisor:start_child(?MODULE, Spec), Session);
-start_poll(false, _Pid, Session, _IPAddress, _Options) ->
-    {ok, Session}.
-start_poll({ok, _Pid}, Session) ->
-    {ok, Session};
-start_poll(Error, Session) ->
-    close(Session),
-    Error.
+    case supervisor:start_child(?MODULE, Spec) of
+        Error = {error, _} ->
+            close(Session),
+            Error;
+        Ok when element(1, Ok) =:= ok ->
+            {ok, Session}
+    end.
 
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
 get_session(S, Cs) ->
-    case [P || {I = {session, _}, P, _, _} <- Cs, I =:= S andalso is_pid(P)] of
+    case [P || {Id, P, _, _} <- Cs, Id =:= S andalso is_pid(P)] of
         [] ->
             {error, no_session};
         [P] ->
@@ -709,7 +712,7 @@ get_session(S, Cs) ->
 %% @private
 %%------------------------------------------------------------------------------
 get_sessions(Cs) ->
-    [{Target, P} || {{session, {Target, _}}, P, _, _} <- Cs, is_pid(P)].
+    [{Target, P} || {{session, Target, _}, P, _, _} <- Cs, is_pid(P)].
 
 %%------------------------------------------------------------------------------
 %% @private

@@ -78,7 +78,11 @@
         management_subsystem_health | battery | session | version | fru_state |
         non_neg_integer().
 
--type value() :: term().
+-type value() ::
+        {sensor_value, term()} |
+        {previous_value, term()} |
+        {severity_value, term()} |
+        term().
 
 -type unit() ::
         celsius | fahrenheit | kelvin | volts | amps | watts | joules |
@@ -211,6 +215,7 @@ get_type({specific,  16#29}) -> [{sensor_type, battery}];
 get_type({specific,  16#2a}) -> [{sensor_type, session}];
 get_type({specific,  16#2b}) -> [{sensor_type, version}];
 get_type({specific,  16#2c}) -> [{sensor_type, fru_state}];
+get_type({specific,  16#f0}) -> [{sensor_type, hot_swap}];
 get_type({_,          Type}) -> [{sensor_type, Type}].
 
 %%------------------------------------------------------------------------------
@@ -219,6 +224,12 @@ get_type({_,          Type}) -> [{sensor_type, Type}].
 %% into human readable values (at least for threshold based sensors).
 %% @end
 %%------------------------------------------------------------------------------
+-spec get_value({threshold | generic | specific | term(), non_neg_integer()},
+                non_neg_integer(),
+                0 | 1,
+                0..255,
+                0..255) ->
+                       [value()].
 get_value(Type, Offset, Assertion, Value1, Value2) ->
     map(Type, Offset, Assertion, Value1, Value2).
 
@@ -421,700 +432,447 @@ get_unit(_)  ->  unspecified.
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-%% threshold
-map({threshold, 16#01}, 16#00, _,    B2,    B3) ->
-    {lower_non_critical, going_low, B2 ++ B3};
-map({threshold, 16#01}, 16#01, _,    B2,    B3) ->
-    {lower_non_critical, going_high, B2 ++ B3};
-map({threshold, 16#01}, 16#02, _,    B2,    B3) ->
-    {lower_critical, going_low, B2 ++ B3};
-map({threshold, 16#01}, 16#03, _,    B2,    B3) ->
-    {lower_critical, going_high, B2 ++ B3};
-map({threshold, 16#01}, 16#04, _,    B2,    B3) ->
-    {lower_non_recoverable, going_low, B2 ++ B3};
-map({threshold, 16#01}, 16#05, _,    B2,    B3) ->
-    {lower_non_recoverable, going_high, B2 ++ B3};
-map({threshold, 16#01}, 16#06, _,    B2,    B3) ->
-    {upper_non_critical, going_low, B2 ++ B3};
-map({threshold, 16#01}, 16#07, _,    B2,    B3) ->
-    {upper_non_critical, going_high, B2 ++ B3};
-map({threshold, 16#01}, 16#08, _,    B2,    B3) ->
-    {upper_critical, going_low, B2 ++ B3};
-map({threshold, 16#01}, 16#09, _,    B2,    B3) ->
-    {upper_critical, going_high, B2 ++ B3};
-map({threshold, 16#01}, 16#0a, _,    B2,    B3) ->
-    {upper_non_recoverable, going_low, B2 ++ B3};
-map({threshold, 16#01}, 16#0b, _,    B2,    B3) ->
-    {upper_non_recoverable, going_high, B2 ++ B3};
-%% dmi_usage
-map({generic,   16#02}, 16#00, _,     _,     _) ->
-    transition_to_idle;
-map({generic,   16#02}, 16#01, _,     _,     _) ->
-    transition_to_active;
-map({generic,   16#02}, 16#02, _,     _,     _) ->
-    transition_to_busy;
-%% state
-map({generic,   16#03}, 16#00, _,     _,     _) ->
-    deasserted;
-map({generic,   16#03}, 16#01, _,     _,     _) ->
-    asserted;
-%% predictive_failure
-map({generic,   16#04}, 16#00, _,     _,     _) ->
-    deasserted;
-map({generic,   16#04}, 16#01, _,     _,     _) ->
-    asserted;
-%% limit
-map({generic,   16#05}, 16#00, _,     _,     _) ->
-    not_exceeded;
-map({generic,   16#05}, 16#01, _,     _,     _) ->
-    exceeded;
-%% performance
-map({generic,   16#06}, 16#00, _,     _,     _) ->
-    met;
-map({generic,   16#06}, 16#01, _,     _,     _) ->
-    lags;
-%% severity
-map({generic,   16#07}, 16#00, _,     _,     _) ->
-    transition_to_ok;
-map({generic,   16#07}, 16#01, _,     _,     _) ->
-    transition_to_non_critical_from_ok;
-map({generic,   16#07}, 16#02, _,     _,     _) ->
-    transition_to_critical_from_less_severe;
-map({generic,   16#07}, 16#03, _,     _,     _) ->
-    transition_to_non_recoverable_from_less_severe;
-map({generic,   16#07}, 16#04, _,     _,     _) ->
-    transition_to_non_critical_from_more_severe;
-map({generic,   16#07}, 16#05, _,     _,     _) ->
-    transition_to_critical_from_non_recoverable;
-map({generic,   16#07}, 16#06, _,     _,     _) ->
-    transition_to_non_recoverable;
-map({generic,   16#07}, 16#07, _,     _,     _) ->
-    monitor;
-map({generic,   16#07}, 16#08, _,     _,     _) ->
-    informational;
-%% availability
-map({generic,   16#08}, 16#00, _,     _,     _) ->
-    device_removed_or_absent;
-map({generic,   16#08}, 16#01, _,     _,     _) ->
-    device_inserted_or_present;
-map({generic,   16#09}, 16#00, _,     _,     _) ->
-    device_disabled;
-map({generic,   16#09}, 16#01, _,     _,     _) ->
-    device_enabled;
-map({generic,   16#0a}, 16#00, _,     _,     _) ->
-    transition_to_running;
-map({generic,   16#0a}, 16#01, _,     _,     _) ->
-    transition_to_in_test;
-map({generic,   16#0a}, 16#02, _,     _,     _) ->
-    transition_to_power_off;
-map({generic,   16#0a}, 16#03, _,     _,     _) ->
-    transition_to_on_line;
-map({generic,   16#0a}, 16#04, _,     _,     _) ->
-    transition_to_off_line;
-map({generic,   16#0a}, 16#05, _,     _,     _) ->
-    transition_to_off_duty;
-map({generic,   16#0a}, 16#06, _,     _,     _) ->
-    transition_to_degraded;
-map({generic,   16#0a}, 16#07, _,     _,     _) ->
-    transition_to_power_save;
-map({generic,   16#0a}, 16#08, _,     _,     _) ->
-    install_error;
-%% redundancy
-map({generic,   16#0b}, 16#00, _,     _,     _) ->
-    full;
-map({generic,   16#0b}, 16#01, _,     _,     _) ->
-    lost;
-map({generic,   16#0b}, 16#02, _,     _,     _) ->
-    degraded;
-map({generic,   16#0b}, 16#03, _,     _,     _) ->
-    none_from_degraded_or_full;
-map({generic,   16#0b}, 16#04, _,     _,     _) ->
-    none_sufficient_resources;
-map({generic,   16#0b}, 16#05, _,     _,     _) ->
-    none_insufficient_resources;
-map({generic,   16#0b}, 16#06, _,     _,     _) ->
-    degraded_from_full;
-map({generic,   16#0b}, 16#07, _,     _,     _) ->
-    degraded_from_none;
-%% acpi_power_state
-map({generic,   16#0c}, 16#00, _,     _,     _) ->
-    d0;
-map({generic,   16#0c}, 16#01, _,     _,     _) ->
-    d1;
-map({generic,   16#0c}, 16#02, _,     _,     _) ->
-    d2;
-map({generic,   16#0c}, 16#03, _,     _,     _) ->
-    d3;
-%% intrusion
-map({specific,  16#05}, 16#00, _,     _,     _) ->
-    general_chassis;
-map({specific,  16#05}, 16#01, _,     _,     _) ->
-    drive_bay;
-map({specific,  16#05}, 16#02, _,     _,     _) ->
-    io_card_area;
-map({specific,  16#05}, 16#03, _,     _,     _) ->
-    processor_area;
-map({specific,  16#05}, 16#04, _,     _,     _) ->
-    lan_leash_lost;
-map({specific,  16#05}, 16#05, _,     _,     _) ->
-    unauthorized_dock;
-map({specific,  16#05}, 16#06, _,     _,     _) ->
-    fan_area;
-%% violation_attempt
-map({specific,  16#06}, 16#00, _,     _,     _) ->
-    secure_mode;
-map({specific,  16#06}, 16#01, _,     _,     _) ->
-    pre_boot_user_password;
-map({specific,  16#06}, 16#02, _,     _,     _) ->
-    pre_boot_setup_password;
-map({specific,  16#06}, 16#03, _,     _,     _) ->
-    pre_boot_network_password;
-map({specific,  16#06}, 16#04, _,     _,     _) ->
-    pre_boot_other_password;
-map({specific,  16#06}, 16#05, _,     _,     _) ->
-    pre_boot_out_of_band_access;
-%% processor
-map({specific,  16#07}, 16#00, _,     _,     _) ->
-    internal_error;
-map({specific,  16#07}, 16#01, _,     _,     _) ->
-    thermal_trip;
-map({specific,  16#07}, 16#02, _,     _,     _) ->
-    frb1_bist_failure;
-map({specific,  16#07}, 16#03, _,     _,     _) ->
-    frb2_hang_in_post_failure;
-map({specific,  16#07}, 16#04, _,     _,     _) ->
-    frb3_startup_initialization_failure;
-map({specific,  16#07}, 16#05, _,     _,     _) ->
-    configuration_error;
-map({specific,  16#07}, 16#06, _,     _,     _) ->
-    uncorrectable_cpu_complex_error;
-map({specific,  16#07}, 16#07, _,     _,     _) ->
-    presence_detected;
-map({specific,  16#07}, 16#08, _,     _,     _) ->
-    disabled;
-map({specific,  16#07}, 16#09, _,     _,     _) ->
-    terminator_presence_detected;
-map({specific,  16#07}, 16#0a, _,     _,     _) ->
-    throttled_automatically;
-map({specific,  16#07}, 16#0b, _,     _,     _) ->
-    uncorrectable_machine_check_error;
-map({specific,  16#07}, 16#0c, _,     _,     _) ->
-    correctable_machine_check_error;
-%% power_supply
-map({specific,  16#08}, 16#00, _,     _,     _) ->
-    presence_detected;
-map({specific,  16#08}, 16#01, _,     _,     _) ->
-    failure_detected;
-map({specific,  16#08}, 16#02, _,     _,     _) ->
-    predictive_failure;
-map({specific,  16#08}, 16#03, _,     _,     _) ->
-    input_lost;
-map({specific,  16#08}, 16#04, _,     _,     _) ->
-    input_lost_or_out_of_range;
-map({specific,  16#08}, 16#05, _,     _,     _) ->
-    input_out_of_range_but_present;
-map({specific,  16#08}, 16#06, _,     _, 16#00) ->
-    {configuration_error, vendor_mismatch};
-map({specific,  16#08}, 16#06, _,     _, 16#01) ->
-    {configuration_error, revision_mismatch};
-map({specific,  16#08}, 16#06, _,     _, 16#02) ->
-    {configuration_error, processor_missing};
-map({specific,  16#08}, 16#06, _,     _, 16#03) ->
-    {configuration_error, power_supply_rating_mismatch};
-map({specific,  16#08}, 16#06, _,     _, 16#04) ->
-    {configuration_error, voltage_rating_mismatch};
-map({specific,  16#08}, 16#06, _,     _,     _) ->
-    {configuration_error, unknown};
-%% power_unit
-map({specific,  16#09}, 16#00, _,     _,     _) ->
-    power_off;
-map({specific,  16#09}, 16#01, _,     _,     _) ->
-    power_cycle;
-map({specific,  16#09}, 16#02, _,     _,     _) ->
-    power_down_240va;
-map({specific,  16#09}, 16#03, _,     _,     _) ->
-    power_down_interlock;
-map({specific,  16#09}, 16#04, _,     _,     _) ->
-    power_input_lost;
-map({specific,  16#09}, 16#05, _,     _,     _) ->
-    soft_power_control_failure;
-map({specific,  16#09}, 16#06, _,     _,     _) ->
-    failure_detected;
-map({specific,  16#09}, 16#07, _,     _,     _) ->
-    predictive_failure;
-%% memory
-map({specific,  16#0c}, 16#00, _,     _,     _) ->
-    correctable_ecc;
-map({specific,  16#0c}, 16#01, _,     _,     _) ->
-    uncorrectable_ecc;
-map({specific,  16#0c}, 16#02, _,     _,     _) ->
-    parity;
-map({specific,  16#0c}, 16#03, _,     _,     _) ->
-    memory_scrub_failed;
-map({specific,  16#0c}, 16#04, _,     _,     _) ->
-    device_disabled;
-map({specific,  16#0c}, 16#05, _,     _,     _) ->
-    error_logging_limit_reached;
-map({specific,  16#0c}, 16#06, _,     _,     _) ->
-    presence_detected;
-map({specific,  16#0c}, 16#07, _,     _,     _) ->
-    configuration_error;
-map({specific,  16#0c}, 16#08, _,     _, 16#ff) ->
-    {spare, unspecified};
-map({specific,  16#0c}, 16#08, _,     _,    Id) ->
-    {spare, Id};
-map({specific,  16#0c}, 16#09, _,     _,     _) ->
-    throttled_automatically;
-map({specific,  16#0c}, 16#0a, _,     _,     _) ->
-    critical_overtemperature;
-%% drive_slot
-map({specific,  16#0d}, 16#00, _,     _,     _) ->
-    drive_presence;
-map({specific,  16#0d}, 16#01, _,     _,     _) ->
-    drive_fault;
-map({specific,  16#0d}, 16#02, _,     _,     _) ->
-    predictive_failure;
-map({specific,  16#0d}, 16#03, _,     _,     _) ->
-    hot_spare;
-map({specific,  16#0d}, 16#04, _,     _,     _) ->
-    consistency_check_in_progress;
-map({specific,  16#0d}, 16#05, _,     _,     _) ->
-    in_critical_array;
-map({specific,  16#0d}, 16#06, _,     _,     _) ->
-    in_failed_array;
-map({specific,  16#0d}, 16#07, _,     _,     _) ->
-    rebuild_in_progress;
-map({specific,  16#0d}, 16#08, _,     _,     _) ->
-    rebuild_aborted;
-%% system_firmware
-map({specific,  16#0f}, 16#00, _, 16#01,     _) ->
-    {error, no_memory_installed};
-map({specific,  16#0f}, 16#00, _, 16#02,     _) ->
-    {error, no_memory_usable};
-map({specific,  16#0f}, 16#00, _, 16#03,     _) ->
-    {error, hard_disk_failure};
-map({specific,  16#0f}, 16#00, _, 16#04,     _) ->
-    {error, system_board_failure};
-map({specific,  16#0f}, 16#00, _, 16#05,     _) ->
-    {error, diskette_subsystem_failure};
-map({specific,  16#0f}, 16#00, _, 16#06,     _) ->
-    {error, hard_disk_controller_failure};
-map({specific,  16#0f}, 16#00, _, 16#07,     _) ->
-    {error, keyboard_failure};
-map({specific,  16#0f}, 16#00, _, 16#08,     _) ->
-    {error, boot_media_not_found};
-map({specific,  16#0f}, 16#00, _, 16#09,     _) ->
-    {error, video_controller_failure};
-map({specific,  16#0f}, 16#00, _, 16#0a,     _) ->
-    {error, no_video_device};
-map({specific,  16#0f}, 16#00, _, 16#0b,     _) ->
-    {error, firmware_corrupted};
-map({specific,  16#0f}, 16#00, _, 16#0c,     _) ->
-    {error, cpu_voltage_missing};
-map({specific,  16#0f}, 16#00, _, 16#0d,     _) ->
-    {error, cpu_speed_matching_failure};
-map({specific,  16#0f}, 16#00, _,     _,     _) ->
-    {error, unspecified};
-map({specific,  16#0f}, 16#01, _,     _,     _) ->
-    hang;
-map({specific,  16#0f}, 16#02, _, 16#01,     _) ->
-    {progress, memory_initialization};
-map({specific,  16#0f}, 16#02, _, 16#02,     _) ->
-    {progress, hard_disk_initialization};
-map({specific,  16#0f}, 16#02, _, 16#03,     _) ->
-    {progress, sec_processor_initialization};
-map({specific,  16#0f}, 16#02, _, 16#04,     _) ->
-    {progress, user_authentication};
-map({specific,  16#0f}, 16#02, _, 16#05,     _) ->
-    {progress, user_initiated_system_setup};
-map({specific,  16#0f}, 16#02, _, 16#06,     _) ->
-    {progress, usb_resource_configuration};
-map({specific,  16#0f}, 16#02, _, 16#07,     _) ->
-    {progress, pci_resource_configuration};
-map({specific,  16#0f}, 16#02, _, 16#08,     _) ->
-    {progress, option_rom_initialization};
-map({specific,  16#0f}, 16#02, _, 16#09,     _) ->
-    {progress, video_initialization};
-map({specific,  16#0f}, 16#02, _, 16#0a,     _) ->
-    {progress, cache_initialization};
-map({specific,  16#0f}, 16#02, _, 16#0b,     _) ->
-    {progress, sm_bus_initialization};
-map({specific,  16#0f}, 16#02, _, 16#0c,     _) ->
-    {progress, keyboard_controller_initialization};
-map({specific,  16#0f}, 16#02, _, 16#0d,     _) ->
-    {progress, mgmt_controller_initialization};
-map({specific,  16#0f}, 16#02, _, 16#0e,     _) ->
-    {progress, docking_station_attachment};
-map({specific,  16#0f}, 16#02, _, 16#0f,     _) ->
-    {progress, enabling_docking_station};
-map({specific,  16#0f}, 16#02, _, 16#10,     _) ->
-    {progress, docking_station_ejection};
-map({specific,  16#0f}, 16#02, _, 16#11,     _) ->
-    {progress, disabling_docking_station};
-map({specific,  16#0f}, 16#02, _, 16#12,     _) ->
-    {progress, calling_operating_system_wake_up_vector};
-map({specific,  16#0f}, 16#02, _, 16#13,     _) ->
-    {progress, starting_operating_system_boot_process};
-map({specific,  16#0f}, 16#02, _, 16#14,     _) ->
-    {progress, baseboard_initialization};
-map({specific,  16#0f}, 16#02, _, 16#16,     _) ->
-    {progress, floppy_initialization};
-map({specific,  16#0f}, 16#02, _, 16#17,     _) ->
-    {progress, keyboard_test};
-map({specific,  16#0f}, 16#02, _, 16#18,     _) ->
-    {progress, pointing_device_test};
-map({specific,  16#0f}, 16#02, _, 16#19,     _) ->
-    {progress, prim_processor_initialization};
-map({specific,  16#0f}, 16#02, _,     _,     _) ->
-    {progress, unspecified};
-%% event_logging
-map({specific,  16#10}, 16#00, _, 16#ff,     _) ->
-    {disabled, {memory, unspecified}};
-map({specific,  16#10}, 16#00, _,    Id,     _) ->
-    {disabled, {memory, Id}};
-map({specific,  16#10}, 16#01, _, 16#ff, 16#ff) ->
-    {disabled, {event, unspecified}};
-map({specific,  16#10}, 16#01, _, RType,  Byte) ->
-    {_, Type} = get_reading(RType, 16#00),
-    Offset = Byte band 16#0f,
-    Assertion = (Byte band 16#10) bsr 4,
-    Tag = case (Byte band 16#20) bsr 5 of 0 -> disabled; 1 -> disabled_all end,
-    {Tag, {event, map(Type, Offset, Assertion, 16#ff, 16#ff)}};
-map({specific,  16#10}, 16#02, _,     _,     _) ->
-    log_area_cleared;
-map({specific,  16#10}, 16#03, _,     _,     _) ->
-    {disabled, all};
-map({specific,  16#10}, 16#04, _,     _,     _) ->
-    sel_full;
-map({specific,  16#10}, 16#05, _,     _, 16#ff) ->
-    {sel_almost_full, unknown};
-map({specific,  16#10}, 16#05, _,     _,  Fill) ->
-    {sel_almost_full, Fill};
-map({specific,  16#10}, 16#06, _, 16#ff, 16#ff) ->
-    {disabled_all, correctable_machine_check};
-map({specific,  16#10}, 16#06, _,    Id,     0) ->
-    {disabled, {correctable_machine_check, {instance, Id}}};
-map({specific,  16#10}, 16#06, _,    Id, 16#80) ->
-    {disabled, {correctable_machine_check, {processor, Id}}};
-map({specific,  16#10}, 16#06, _,    Id,     _) ->
-    {disabled, {correctable_machine_check, {instance, Id}}};
-%% watchdog
-map({specific,  16#11}, 16#00, _,     _,     _) ->
-    bios_reset;
-map({specific,  16#11}, 16#01, _,     _,     _) ->
-    os_reset;
-map({specific,  16#11}, 16#02, _,     _,     _) ->
-    shut_down;
-map({specific,  16#11}, 16#03, _,     _,     _) ->
-    power_down;
-map({specific,  16#11}, 16#04, _,     _,     _) ->
-    power_cycle;
-map({specific,  16#11}, 16#05, _,     _,     _) ->
-    os_nmi;
-map({specific,  16#11}, 16#06, _,     _,     _) ->
-    expired;
-map({specific,  16#11}, 16#07, _,     _,     _) ->
-    os_non_nmi;
-%% system_event
-map({specific,  16#12}, 16#00, _,     _,     _) ->
-    system_reconfigured;
-map({specific,  16#12}, 16#01, _,     _,     _) ->
-    oem_boot_event;
-map({specific,  16#12}, 16#02, _,     _,     _) ->
-    hardware_failure;
-map({specific,  16#12}, 16#03, _, 16#ff,     _) ->
-    {auxiliary_log, unknown};
-map({specific,  16#12}, 16#03, _,  Data,     _) ->
+map({threshold, 16#01}, A, _, _, _) -> get_threshold(A);
+map({generic,   16#02}, A, _, _, _) -> get_dmi_usage(A);
+map({generic,   16#03}, A, _, _, _) -> get_assertion(A);
+map({generic,   16#04}, A, _, _, _) -> get_assertion(A);
+map({generic,   16#05}, A, _, _, _) -> get_limit(A);
+map({generic,   16#06}, A, _, _, _) -> get_performance(A);
+map({generic,   16#07}, A, _, _, _) -> get_severity(A);
+map({generic,   16#08}, A, _, _, _) -> get_availability08(A);
+map({generic,   16#09}, A, _, _, _) -> get_availability09(A);
+map({generic,   16#0a}, A, _, _, _) -> get_availability0a(A);
+map({generic,   16#0b}, A, _, _, _) -> get_redundancy(A);
+map({generic,   16#0c}, A, _, _, _) -> get_acpi_power_state(A);
+map({specific,  16#05}, A, _, _, _) -> get_intrusion(A);
+map({specific,  16#06}, A, _, _, _) -> get_violation_attempt(A);
+map({specific,  16#07}, A, _, _, _) -> get_processor_failure(A);
+map({specific,  16#08}, A, _, _, D) -> get_power_supply_event(A, D);
+map({specific,  16#09}, A, _, _, _) -> get_power_unit_event(A);
+map({specific,  16#0c}, A, _, _, D) -> get_memory_event(A, D);
+map({specific,  16#0d}, A, _, _, _) -> get_drive_slot_state(A);
+map({specific,  16#0f}, A, _, C, _) -> get_system_firmware_event(A, C);
+map({specific,  16#10}, A, _, C, D) -> get_event_logging_event(A, C, D);
+map({specific,  16#11}, A, _, _, _) -> get_watchdog_old(A);
+map({specific,  16#12}, A, _, C, _) -> get_system_event(A, C);
+map({specific,  16#13}, A, _, _, _) -> get_critical_interrupt(A);
+map({specific,  16#14}, A, _, _, _) -> get_switch_event(A);
+map({specific,  16#19}, A, _, C, D) -> get_chip_set_event(A, C, D);
+map({specific,  16#1b}, A, _, _, _) -> get_interconnect(A);
+map({specific,  16#1d}, A, _, C, D) -> get_system_boot_event(A, C, D);
+map({specific,  16#1e}, A, _, _, _) -> get_boot_error(A);
+map({specific,  16#1f}, A, _, _, _) -> get_os_boot_event(A);
+map({specific,  16#20}, A, _, _, _) -> get_os_shutdown_event(A);
+map({specific,  16#21}, A, _, C, D) -> get_slot_event(A, C, D);
+map({specific,  16#22}, A, _, _, _) -> get_power_state(A);
+map({specific,  16#23}, A, _, C, _) -> get_watchdog_new(A, C);
+map({specific,  16#24}, A, _, _, _) -> get_platform_alert(A);
+map({specific,  16#25}, A, B, _, _) -> get_entity_presence(A, B);
+map({specific,  16#27}, A, _, _, _) -> get_lan_event(A);
+map({specific,  16#28}, A, _, C, D) -> get_management_subsystem_health(A, C, D);
+map({specific,  16#29}, A, _, _, _) -> get_battery_state(A);
+map({specific,  16#2a}, A, _, C, D) -> get_session_event(A, C, D);
+map({specific,  16#2b}, A, B, C, _) -> get_version_change(A, B, C);
+map({specific,  16#2c}, A, _, C, _) -> get_fru_event(A, C);
+map({specific,  16#f0}, A, _, C, D) -> get_hot_swap_event(A, C, D);
+map(Type, A, B, C, D) ->
+    {unknown, [{type, Type}, {offset, A}, {data2, C}, {data3, D},
+               {asserted, eipmi_util:get_bool_inv(B)}]}.
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+get_threshold(16#00) ->
+    [{sensor_value, lower_non_critical}, {tendency, going_low}];
+get_threshold(16#01) ->
+    [{sensor_value, lower_non_critical}, {tendency, going_high}];
+get_threshold(16#02) ->
+    [{sensor_value, lower_critical}, {tendency, going_low}];
+get_threshold(16#03) ->
+    [{sensor_value, lower_critical}, {tendency, going_high}];
+get_threshold(16#04) ->
+    [{sensor_value, lower_non_recoverable}, {tendency, going_low}];
+get_threshold(16#05) ->
+    [{sensor_value, lower_non_recoverable}, {tendency, going_high}];
+get_threshold(16#06) ->
+    [{sensor_value, upper_non_critical}, {tendency, going_low}];
+get_threshold(16#07) ->
+    [{sensor_value, upper_non_critical}, {tendency, going_high}];
+get_threshold(16#08) ->
+    [{sensor_value, upper_critical}, {tendency, going_low}];
+get_threshold(16#09) ->
+    [{sensor_value, upper_critical}, {tendency, going_high}];
+get_threshold(16#0a) ->
+    [{sensor_value, upper_non_recoverable}, {tendency, going_low}];
+get_threshold(16#0b) ->
+    [{sensor_value, upper_non_recoverable}, {tendency, going_high}].
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+get_dmi_usage(16#00) -> [{sensor_value, transition_to_idle}];
+get_dmi_usage(16#01) -> [{sensor_value, transition_to_active}];
+get_dmi_usage(16#02) -> [{sensor_value, transition_to_busy}].
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+get_assertion(16#00) -> [{sensor_value, deasserted}];
+get_assertion(16#01) -> [{sensor_value, asserted}].
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+get_limit(16#00) -> [{sensor_value, not_exceeded}];
+get_limit(16#01) -> [{sensor_value, exceeded}].
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+get_performance(16#00) -> [{sensor_value, met}];
+get_performance(16#01) -> [{sensor_value, lags}].
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+get_severity(16#00) -> [{sensor_value, ok}];
+get_severity(16#01) -> [{sensor_value, non_critical}];
+get_severity(16#02) -> [{sensor_value, critical}];
+get_severity(16#03) -> [{sensor_value, non_recoverable}];
+get_severity(16#04) -> [{sensor_value, non_critical}];
+get_severity(16#05) -> [{sensor_value, critical}];
+get_severity(16#06) -> [{sensor_value, non_recoverable}];
+get_severity(16#07) -> [{sensor_value, monitor}];
+get_severity(16#08) -> [{sensor_value, informational}].
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+get_availability08(16#00) -> [{sensor_value, removed_or_absent}];
+get_availability08(16#01) -> [{sensor_value, inserted_or_present}].
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+get_availability09(16#00) -> [{sensor_value, device_disabled}];
+get_availability09(16#01) -> [{sensor_value, device_enabled}].
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+get_availability0a(16#00) -> [{sensor_value, to_running}];
+get_availability0a(16#01) -> [{sensor_value, to_in_test}];
+get_availability0a(16#02) -> [{sensor_value, to_power_off}];
+get_availability0a(16#03) -> [{sensor_value, to_on_line}];
+get_availability0a(16#04) -> [{sensor_value, to_off_line}];
+get_availability0a(16#05) -> [{sensor_value, to_off_duty}];
+get_availability0a(16#06) -> [{sensor_value, to_degraded}];
+get_availability0a(16#07) -> [{sensor_value, to_power_save}];
+get_availability0a(16#08) -> [{sensor_value, install_error}].
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+get_redundancy(16#00) -> [{sensor_value, full}];
+get_redundancy(16#01) -> [{sensor_value, lost}];
+get_redundancy(16#02) -> [{sensor_value, degraded}];
+get_redundancy(16#03) -> [{sensor_value, none_from_degraded_or_full}];
+get_redundancy(16#04) -> [{sensor_value, none_sufficient_resources}];
+get_redundancy(16#05) -> [{sensor_value, none_insufficient_resources}];
+get_redundancy(16#06) -> [{sensor_value, degraded_from_full}];
+get_redundancy(16#07) -> [{sensor_value, degraded_from_none}].
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+get_acpi_power_state(16#00) -> [{sensor_value, d0}];
+get_acpi_power_state(16#01) -> [{sensor_value, d1}];
+get_acpi_power_state(16#02) -> [{sensor_value, d2}];
+get_acpi_power_state(16#03) -> [{sensor_value, d3}].
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+get_intrusion(16#00) -> [{sensor_value, general_chassis}];
+get_intrusion(16#01) -> [{sensor_value, drive_bay}];
+get_intrusion(16#02) -> [{sensor_value, io_card_area}];
+get_intrusion(16#03) -> [{sensor_value, processor_area}];
+get_intrusion(16#04) -> [{sensor_value, lan_leash_lost}];
+get_intrusion(16#05) -> [{sensor_value, unauthorized_dock}];
+get_intrusion(16#06) -> [{sensor_value, fan_area}].
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+get_violation_attempt(16#00) -> [{sensor_value, secure_mode}];
+get_violation_attempt(16#01) -> [{sensor_value, pre_boot_user_password}];
+get_violation_attempt(16#02) -> [{sensor_value, pre_boot_setup_password}];
+get_violation_attempt(16#03) -> [{sensor_value, pre_boot_network_password}];
+get_violation_attempt(16#04) -> [{sensor_value, pre_boot_other_password}];
+get_violation_attempt(16#05) -> [{sensor_value, pre_boot_out_of_band_access}].
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+get_processor_failure(16#00) ->
+    [{sensor_value, internal_error}];
+get_processor_failure(16#01) ->
+    [{sensor_value, thermal_trip}];
+get_processor_failure(16#02) ->
+    [{sensor_value, frb1_bist_failure}];
+get_processor_failure(16#03) ->
+    [{sensor_value, frb2_hang_in_post_failure}];
+get_processor_failure(16#04) ->
+    [{sensor_value, frb3_startup_initialization_failure}];
+get_processor_failure(16#05) ->
+    [{sensor_value, configuration_error}];
+get_processor_failure(16#06) ->
+    [{sensor_value, uncorrectable_cpu_complex_error}];
+get_processor_failure(16#07) ->
+    [{sensor_value, presence_detected}];
+get_processor_failure(16#08) ->
+    [{sensor_value, disabled}];
+get_processor_failure(16#09) ->
+    [{sensor_value, terminator_presence_detected}];
+get_processor_failure(16#0a) ->
+    [{sensor_value, throttled_automatically}];
+get_processor_failure(16#0b) ->
+    [{sensor_value, uncorrectable_machine_check_error}];
+get_processor_failure(16#0c) ->
+    [{sensor_value, correctable_machine_check_error}].
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+get_power_supply_event(16#00,     _) ->
+    [{sensor_value, presence_detected}];
+get_power_supply_event(16#01,     _) ->
+    [{sensor_value, failure_detected}];
+get_power_supply_event(16#02,     _) ->
+    [{sensor_value, predictive_failure}];
+get_power_supply_event(16#03,     _) ->
+    [{sensor_value, input_lost}];
+get_power_supply_event(16#04,     _) ->
+    [{sensor_value, input_lost_or_out_of_range}];
+get_power_supply_event(16#05,     _) ->
+    [{sensor_value, input_out_of_range_but_present}];
+get_power_supply_event(16#06, 16#00) ->
+    [{sensor_value, configuration_error}, {reason, vendor_mismatch}];
+get_power_supply_event(16#06, 16#01) ->
+    [{sensor_value, configuration_error}, {reason, revision_mismatch}];
+get_power_supply_event(16#06, 16#02) ->
+    [{sensor_value, configuration_error}, {reason, processor_missing}];
+get_power_supply_event(16#06, 16#03) ->
+    [{sensor_value, configuration_error}, {reason, power_supply_rating_mismatch}];
+get_power_supply_event(16#06, 16#04) ->
+    [{sensor_value, configuration_error}, {reason, voltage_rating_mismatch}];
+get_power_supply_event(16#06,     _) ->
+    [{sensor_value, configuration_error}, {reason, unknown}].
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+get_power_unit_event(16#00) -> [{sensor_value, power_off}];
+get_power_unit_event(16#01) -> [{sensor_value, power_cycle}];
+get_power_unit_event(16#02) -> [{sensor_value, power_down_240va}];
+get_power_unit_event(16#03) -> [{sensor_value, power_down_interlock}];
+get_power_unit_event(16#04) -> [{sensor_value, power_input_lost}];
+get_power_unit_event(16#05) -> [{sensor_value, soft_power_control_failure}];
+get_power_unit_event(16#06) -> [{sensor_value, failure_detected}];
+get_power_unit_event(16#07) -> [{sensor_value, predictive_failure}].
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+get_memory_event(16#00,     _) -> [{sensor_value, correctable_ecc}];
+get_memory_event(16#01,     _) -> [{sensor_value, uncorrectable_ecc}];
+get_memory_event(16#02,     _) -> [{sensor_value, parity}];
+get_memory_event(16#03,     _) -> [{sensor_value, memory_scrub_failed}];
+get_memory_event(16#04,     _) -> [{sensor_value, device_disabled}];
+get_memory_event(16#05,     _) -> [{sensor_value, error_logging_limit_reached}];
+get_memory_event(16#06,     _) -> [{sensor_value, presence_detected}];
+get_memory_event(16#07,     _) -> [{sensor_value, configuration_error}];
+get_memory_event(16#08, 16#ff) -> [{sensor_value, spare}];
+get_memory_event(16#08,    Id) -> [{sensor_value, spare}, {spare_id, Id}];
+get_memory_event(16#09,     _) -> [{sensor_value, throttled_automatically}];
+get_memory_event(16#0a,     _) -> [{sensor_value, critical_overtemperature}].
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+get_drive_slot_state(16#00) -> [{sensor_value, drive_presence}];
+get_drive_slot_state(16#01) -> [{sensor_value, drive_fault}];
+get_drive_slot_state(16#02) -> [{sensor_value, predictive_failure}];
+get_drive_slot_state(16#03) -> [{sensor_value, hot_spare}];
+get_drive_slot_state(16#04) -> [{sensor_value, consistency_check_in_progress}];
+get_drive_slot_state(16#05) -> [{sensor_value, in_critical_array}];
+get_drive_slot_state(16#06) -> [{sensor_value, in_failed_array}];
+get_drive_slot_state(16#07) -> [{sensor_value, rebuild_in_progress}];
+get_drive_slot_state(16#08) -> [{sensor_value, rebuild_aborted}].
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+get_system_firmware_event(16#00, 16#01) ->
+    [{sensor_value, error}, {reason, no_memory_installed}];
+get_system_firmware_event(16#00, 16#02) ->
+    [{sensor_value, error}, {reason, no_memory_usable}];
+get_system_firmware_event(16#00, 16#03) ->
+    [{sensor_value, error}, {reason, hard_disk_failure}];
+get_system_firmware_event(16#00, 16#04) ->
+    [{sensor_value, error}, {reason, system_board_failure}];
+get_system_firmware_event(16#00, 16#05) ->
+    [{sensor_value, error}, {reason, diskette_subsystem_failure}];
+get_system_firmware_event(16#00, 16#06) ->
+    [{sensor_value, error}, {reason, hard_disk_controller_failure}];
+get_system_firmware_event(16#00, 16#07) ->
+    [{sensor_value, error}, {reason, keyboard_failure}];
+get_system_firmware_event(16#00, 16#08) ->
+    [{sensor_value, error}, {reason, boot_media_not_found}];
+get_system_firmware_event(16#00, 16#09) ->
+    [{sensor_value, error}, {reason, video_controller_failure}];
+get_system_firmware_event(16#00, 16#0a) ->
+    [{sensor_value, error}, {reason, no_video_device}];
+get_system_firmware_event(16#00, 16#0b) ->
+    [{sensor_value, error}, {reason, firmware_corrupted}];
+get_system_firmware_event(16#00, 16#0c) ->
+    [{sensor_value, error}, {reason, cpu_voltage_missing}];
+get_system_firmware_event(16#00, 16#0d) ->
+    [{sensor_value, error}, {reason, cpu_speed_matching_failure}];
+get_system_firmware_event(16#00,     _) ->
+    [{sensor_value, error}, {reason, unspecified}];
+get_system_firmware_event(16#01,     _) ->
+    [{sensor_value, hang}];
+get_system_firmware_event(16#02, 16#01) ->
+    [{sensor_value, progress}, {process, memory_initialization}];
+get_system_firmware_event(16#02, 16#02) ->
+    [{sensor_value, progress}, {process, hard_disk_initialization}];
+get_system_firmware_event(16#02, 16#03) ->
+    [{sensor_value, progress}, {process, sec_processor_initialization}];
+get_system_firmware_event(16#02, 16#04) ->
+    [{sensor_value, progress}, {process, user_authentication}];
+get_system_firmware_event(16#02, 16#05) ->
+    [{sensor_value, progress}, {process, user_initiated_system_setup}];
+get_system_firmware_event(16#02, 16#06) ->
+    [{sensor_value, progress}, {process, usb_resource_configuration}];
+get_system_firmware_event(16#02, 16#07) ->
+    [{sensor_value, progress}, {process, pci_resource_configuration}];
+get_system_firmware_event(16#02, 16#08) ->
+    [{sensor_value, progress}, {process, option_rom_initialization}];
+get_system_firmware_event(16#02, 16#09) ->
+    [{sensor_value, progress}, {process, video_initialization}];
+get_system_firmware_event(16#02, 16#0a) ->
+    [{sensor_value, progress}, {process, cache_initialization}];
+get_system_firmware_event(16#02, 16#0b) ->
+    [{sensor_value, progress}, {process, sm_bus_initialization}];
+get_system_firmware_event(16#02, 16#0c) ->
+    [{sensor_value, progress}, {process, keyboard_controller_initialization}];
+get_system_firmware_event(16#02, 16#0d) ->
+    [{sensor_value, progress}, {process, mgmt_controller_initialization}];
+get_system_firmware_event(16#02, 16#0e) ->
+    [{sensor_value, progress}, {process, docking_station_attachment}];
+get_system_firmware_event(16#02, 16#0f) ->
+    [{sensor_value, progress}, {process, enabling_docking_station}];
+get_system_firmware_event(16#02, 16#10) ->
+    [{sensor_value, progress}, {process, docking_station_ejection}];
+get_system_firmware_event(16#02, 16#11) ->
+    [{sensor_value, progress}, {process, disabling_docking_station}];
+get_system_firmware_event(16#02, 16#12) ->
+    [{sensor_value, progress}, {process, calling_operating_system_wake_up_vector}];
+get_system_firmware_event(16#02, 16#13) ->
+    [{sensor_value, progress}, {process, starting_operating_system_boot_process}];
+get_system_firmware_event(16#02, 16#14) ->
+    [{sensor_value, progress}, {process, baseboard_initialization}];
+get_system_firmware_event(16#02, 16#16) ->
+    [{sensor_value, progress}, {process, floppy_initialization}];
+get_system_firmware_event(16#02, 16#17) ->
+    [{sensor_value, progress}, {process, keyboard_test}];
+get_system_firmware_event(16#02, 16#18) ->
+    [{sensor_value, progress}, {process, pointing_device_test}];
+get_system_firmware_event(16#02, 16#19) ->
+    [{sensor_value, progress}, {process, prim_processor_initialization}];
+get_system_firmware_event(16#02,     _) ->
+    [{sensor_value, progress}].
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+get_event_logging_event(16#00, 16#ff,     _) ->
+    [{sensor_value, disabled}, {component, memory}];
+get_event_logging_event(16#00,    Id,     _) ->
+    [{sensor_value, disabled}, {component, memory}, {component_id, Id}];
+get_event_logging_event(16#02,     _,     _) ->
+    [{sensor_value, log_area_cleared}];
+get_event_logging_event(16#03,     _,     _) ->
+    [{sensor_value, disabled_all}];
+get_event_logging_event(16#04,     _,     _) ->
+    [{sensor_value, sel_full}];
+get_event_logging_event(16#05,     _, 16#ff) ->
+    [{sensor_value, sel_almost_full}, {level, unknown}];
+get_event_logging_event(16#05,     _,  Fill) ->
+    [{sensor_value, sel_almost_full}, {level, Fill}];
+get_event_logging_event(16#06, 16#ff, 16#ff) ->
+    [{sensor_value, disabled}, {component, correctable_machine_check}];
+get_event_logging_event(16#06,    Id, 16#80) ->
+    [{sensor_value, disabled}, {component, correctable_machine_check}, {processor, Id}];
+get_event_logging_event(16#06,    Id,     _) ->
+    [{sensor_value, disabled}, {component, correctable_machine_check}, {instance, Id}];
+get_event_logging_event(16#01, 16#ff, 16#ff) ->
+    [{sensor_value, disabled}];
+get_event_logging_event(16#01, RType,  Byte) ->
+    Sensor = get_event(RType, Byte band 16#0f, (Byte band 16#10) bsr 4),
+    [{sensor_value, disabled}, {component, Sensor}].
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+get_event(ReadingType, Offset, Assertion) ->
+    {_, Type} = get_reading(ReadingType, 16#00),
+    get_type(Type) ++ map(Type, Offset, Assertion, 16#ff, 16#ff).
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+get_watchdog_old(16#00) -> [{sensor_value, bios_reset}];
+get_watchdog_old(16#01) -> [{sensor_value, os_reset}];
+get_watchdog_old(16#02) -> [{sensor_value, shut_down}];
+get_watchdog_old(16#03) -> [{sensor_value, power_down}];
+get_watchdog_old(16#04) -> [{sensor_value, power_cycle}];
+get_watchdog_old(16#05) -> [{sensor_value, os_nmi}];
+get_watchdog_old(16#06) -> [{sensor_value, expired}];
+get_watchdog_old(16#07) -> [{sensor_value, os_non_nmi}].
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+get_system_event(16#00,     _) ->
+    [{sensor_value, system_reconfigured}];
+get_system_event(16#01,     _) ->
+    [{sensor_value, oem_boot_event}];
+get_system_event(16#02,     _) ->
+    [{sensor_value, hardware_failure}];
+get_system_event(16#04, 16#ff) ->
+    [{sensor_value, pef_actions}, {pef_actions, []}];
+get_system_event(16#04,  Data) ->
+    [{sensor_value, pef_actions}, {pef_actions, get_pef_actions(Data)}];
+get_system_event(16#03, 16#ff) ->
+    [{sensor_value, auxiliary_log}];
+get_system_event(16#03,  Data) ->
     Type = get_auxiliary_log_type(Data band 16#0f),
     Action = get_auxiliary_log_action(Data band 16#f0 bsr 4),
-    {auxiliary_log, [{action, Action}, {type, Type}]};
-map({specific,  16#12}, 16#04, _, 16#ff,     _) ->
-    {pef_actions, []};
-map({specific,  16#12}, 16#04, _,  Data,     _) ->
-    {pef_actions, get_pef_actions(Data)};
-%% critical_interrupt
-map({specific,  16#13}, 16#00, _,     _,     _) ->
-    front_panel_nmi;
-map({specific,  16#13}, 16#01, _,     _,     _) ->
-    bus_timeout;
-map({specific,  16#13}, 16#02, _,     _,     _) ->
-    io_channel_check_nmi;
-map({specific,  16#13}, 16#03, _,     _,     _) ->
-    software_nmi;
-map({specific,  16#13}, 16#04, _,     _,     _) ->
-    pci_perr;
-map({specific,  16#13}, 16#05, _,     _,     _) ->
-    pci_serr;
-map({specific,  16#13}, 16#06, _,     _,     _) ->
-    eisa_fail_safe_timeout;
-map({specific,  16#13}, 16#07, _,     _,     _) ->
-    bus_correctable_error;
-map({specific,  16#13}, 16#08, _,     _,     _) ->
-    bus_uncorrectable_error;
-map({specific,  16#13}, 16#09, _,     _,     _) ->
-    fatal_nmi;
-map({specific,  16#13}, 16#0a, _,     _,     _) ->
-    bus_fatal_error;
-map({specific,  16#13}, 16#0b, _,     _,     _) ->
-    bus_degraded;
-%% switch
-map({specific,  16#14}, 16#00, _,     _,     _) ->
-    power_button_pressed;
-map({specific,  16#14}, 16#01, _,     _,     _) ->
-    sleep_button_pressed;
-map({specific,  16#14}, 16#02, _,     _,     _) ->
-    reset_button_pressed;
-map({specific,  16#14}, 16#03, _,     _,     _) ->
-    fru_latch_open;
-map({specific,  16#14}, 16#04, _,     _,     _) ->
-    fru_service_request_button;
-%% chip_set
-map({specific,  16#19}, 16#00, _,   Req,   Cur) ->
-    Requested = get_power_state(Req),
-    Current = get_power_state(Cur),
-    {soft_power_control_failure, [{requested, Requested}, {current, Current}]};
-map({specific,  16#19}, 16#01, _,     _,     _) ->
-    thermal_trip;
-%% interconnect
-map({specific,  16#1b}, 16#00, _,     _,     _) ->
-    connected;
-map({specific,  16#1b}, 16#01, _,     _,     _) ->
-    configuration_error;
-%% system_boot
-map({specific,  16#1d}, 16#00, _,     _,     _) ->
-    initiated_by_power_up;
-map({specific,  16#1d}, 16#01, _,     _,     _) ->
-    initiated_by_hard_reset;
-map({specific,  16#1d}, 16#02, _,     _,     _) ->
-    initiated_by_warm_reset;
-map({specific,  16#1d}, 16#03, _,     _,     _) ->
-    user_requested_pxe_boot;
-map({specific,  16#1d}, 16#04, _,     _,     _) ->
-    automatic_boot_to_diagnostic;
-map({specific,  16#1d}, 16#05, _,     _,     _) ->
-    software_initiated_hard_reset;
-map({specific,  16#1d}, 16#06, _,     _,     _) ->
-    software_initiated_warm_reset;
-map({specific,  16#1d}, 16#07, _,   Cau,  Chan) ->
-    Channel = case Chan of 16#ff -> unspecified; _ -> Chan end,
-    Cause = get_system_restart_cause(Cau),
-    {system_restart, [{channel, Channel}, {cause, Cause}]};
-%% boot_error
-map({specific,  16#1e}, 16#00, _,     _,     _) ->
-    no_bootable_media;
-map({specific,  16#1e}, 16#01, _,     _,     _) ->
-    non_bootable_media_left_in_drive;
-map({specific,  16#1e}, 16#02, _,     _,     _) ->
-    pxe_server_not_found;
-map({specific,  16#1e}, 16#03, _,     _,     _) ->
-    invalid_boot_sector;
-map({specific,  16#1e}, 16#04, _,     _,     _) ->
-    timeout_waiting_for_user;
-%% os_boot
-map({specific,  16#1f}, 16#00, _,     _,     _) ->
-    completed_a;
-map({specific,  16#1f}, 16#01, _,     _,     _) ->
-    completed_c;
-map({specific,  16#1f}, 16#02, _,     _,     _) ->
-    completed_pxe;
-map({specific,  16#1f}, 16#03, _,     _,     _) ->
-    completed_diagnostic;
-map({specific,  16#1f}, 16#04, _,     _,     _) ->
-    completed_cdrom;
-map({specific,  16#1f}, 16#05, _,     _,     _) ->
-    completed_rom;
-map({specific,  16#1f}, 16#06, _,     _,     _) ->
-    completed;
-%% os_shutdown
-map({specific,  16#20}, 16#00, _,     _,     _) ->
-    critical_stop_during_startup;
-map({specific,  16#20}, 16#01, _,     _,     _) ->
-    critical_stop_during_runtime;
-map({specific,  16#20}, 16#02, _,     _,     _) ->
-    graceful_stop;
-map({specific,  16#20}, 16#03, _,     _,     _) ->
-    graceful_shutdown;
-map({specific,  16#20}, 16#04, _,     _,     _) ->
-    soft_shutdown;
-map({specific,  16#20}, 16#05, _,     _,     _) ->
-    agent_not_responding;
-%% slot
-map({specific,  16#21}, 16#00, _,  Type,   Num) ->
-    T = get_slot_type(Type band 2#01111111),
-    {fault_status_asserted, [{type, T}, {number, Num}]};
-map({specific,  16#21}, 16#01, _,  Type,   Num) ->
-    T = get_slot_type(Type band 2#01111111),
-    {identify_status_asserted, [{type, T}, {number, Num}]};
-map({specific,  16#21}, 16#02, _,  Type,   Num) ->
-    T = get_slot_type(Type band 2#01111111),
-    {installed, [{type, T}, {number, Num}]};
-map({specific,  16#21}, 16#03, _,  Type,   Num) ->
-    T = get_slot_type(Type band 2#01111111),
-    {ready_for_installation, [{type, T}, {number, Num}]};
-map({specific,  16#21}, 16#04, _,  Type,   Num) ->
-    T = get_slot_type(Type band 2#01111111),
-    {ready_for_removal, [{type, T}, {number, Num}]};
-map({specific,  16#21}, 16#05, _,  Type,   Num) ->
-    T = get_slot_type(Type band 2#01111111),
-    {off, [{type, T}, {number, Num}]};
-map({specific,  16#21}, 16#06, _,  Type,   Num) ->
-    T = get_slot_type(Type band 2#01111111),
-    {removal_request, [{type, T}, {number, Num}]};
-map({specific,  16#21}, 16#07, _,  Type,   Num) ->
-    T = get_slot_type(Type band 2#01111111),
-    {interlock_asserted, [{type, T}, {number, Num}]};
-map({specific,  16#21}, 16#08, _,  Type,   Num) ->
-    T = get_slot_type(Type band 2#01111111),
-    {disabled, [{type, T}, {number, Num}]};
-map({specific,  16#21}, 16#09, _,  Type,   Num) ->
-    T = get_slot_type(Type band 2#01111111),
-    {spare, [{type, T}, {number, Num}]};
-%% system_acpi_power_state
-map({specific,  16#22},   Off, _,     _,     _) ->
-    get_power_state(Off);
-%% watchdog
-map({specific,  16#23}, 16#00, _,  Data,     _) ->
-    Interrupt = get_interrupt_type(Data band 16#f0 bsr 4),
-    Timer = get_timer_use(Data band 16#0f),
-    {timer_expired, [{interrup, Interrupt}, {timer_use, Timer}]};
-map({specific,  16#23}, 16#01, _,  Data,     _) ->
-    Interrupt = get_interrupt_type(Data band 16#f0 bsr 4),
-    Timer = get_timer_use(Data band 16#0f),
-    {hard_reset, [{interrup, Interrupt}, {timer_use, Timer}]};
-map({specific,  16#23}, 16#02, _,  Data,     _) ->
-    Interrupt = get_interrupt_type(Data band 16#f0 bsr 4),
-    Timer = get_timer_use(Data band 16#0f),
-    {power_down, [{interrup, Interrupt}, {timer_use, Timer}]};
-map({specific,  16#23}, 16#03, _,  Data,     _) ->
-    Interrupt = get_interrupt_type(Data band 16#f0 bsr 4),
-    Timer = get_timer_use(Data band 16#0f),
-    {power_cycle, [{interrup, Interrupt}, {timer_use, Timer}]};
-map({specific,  16#23}, 16#08, _,  Data,     _) ->
-    Interrupt = get_interrupt_type(Data band 16#f0 bsr 4),
-    Timer = get_timer_use(Data band 16#0f),
-    {timer_interrupt, [{interrup, Interrupt}, {timer_use, Timer}]};
-%% platform_alert
-map({specific,  16#24}, 16#00, _,     _,     _) ->
-    generated_page;
-map({specific,  16#24}, 16#01, _,     _,     _) ->
-    generated_lan_alert;
-map({specific,  16#24}, 16#02, _,     _,     _) ->
-    generated_event_trap;
-map({specific,  16#24}, 16#03, _,     _,     _) ->
-    generated_snmp_trap;
-%% entity_presence
-map({specific,  16#25}, 16#00, _,     _,     _) ->
-    present;
-map({specific,  16#25}, 16#01, _,     _,     _) ->
-    absent;
-map({specific,  16#25}, 16#02, 0,     _,     _) ->
-    disabled;
-map({specific,  16#25}, 16#02, 1,     _,     _) ->
-    enabled;
-%% lan
-map({specific,  16#27}, 16#00, _,     _,     _) ->
-    heartbeat_lost;
-map({specific,  16#27}, 16#01, _,     _,     _) ->
-    heartbeat;
-%% management_subsystem_health
-map({specific,  16#28}, 16#00, _,     _,     _) ->
-    sensor_access_degraded;
-map({specific,  16#28}, 16#01, _,     _,     _) ->
-    controller_access_degraded;
-map({specific,  16#28}, 16#02, _,     _,     _) ->
-    controller_offline;
-map({specific,  16#28}, 16#03, _,     _,     _) ->
-    controller_unavailable;
-map({specific,  16#28}, 16#04, _, 16#ff,     _) ->
-    sensor_failure;
-map({specific,  16#28}, 16#04, _,   Num,     _) ->
-    {sensor_failure, Num};
-map({specific,  16#28}, 16#05, _, 16#ff, 16#ff) ->
-    fru_failure;
-map({specific,  16#28}, 16#05, _, Data1, Data2) ->
-    {fru_failure, get_fru_device(Data1, Data2)};
-%% battery
-map({specific,  16#29}, 16#00, _,     _,     _) ->
-    low;
-map({specific,  16#29}, 16#01, _,     _,     _) ->
-    failed;
-map({specific,  16#29}, 16#02, _,     _,     _) ->
-    presence_detected;
-%% session
-map({specific,  16#2a}, 16#00, _,  User,  Data) ->
-    {activated, get_session_data(User, Data)};
-map({specific,  16#2a}, 16#01, _,  User,  Data) ->
-    {deactivated, get_session_data(User, Data)};
-map({specific,  16#2a}, 16#02, _,  User,  Data) ->
-    {invalid_user_or_password, get_session_data(User, Data)};
-map({specific,  16#2a}, 16#03, _,  User,  Data) ->
-    {invalid_password_disable, get_session_data(User, Data)};
-%% version
-map({specific,  16#2b}, 16#00, _,  Type,     _) ->
-    {hardware_change_detected, get_version_change_type(Type)};
-map({specific,  16#2b}, 16#01, _,  Type,     _) ->
-    {firmware_change_detected, get_version_change_type(Type)};
-map({specific,  16#2b}, 16#02, _,  Type,     _) ->
-    {hardware_incompatibility_detected, get_version_change_type(Type)};
-map({specific,  16#2b}, 16#03, _,  Type,     _) ->
-    {firmware_incompatibility_detected, get_version_change_type(Type)};
-map({specific,  16#2b}, 16#04, _,  Type,     _) ->
-    {unsupported_hardware_version, get_version_change_type(Type)};
-map({specific,  16#2b}, 16#05, _,  Type,     _) ->
-    {unsupported_firmware_version, get_version_change_type(Type)};
-map({specific,  16#2b}, 16#06, 0,  Type,     _) ->
-    {successful_hardware_change_detected, get_version_change_type(Type)};
-map({specific,  16#2b}, 16#06, 1,  Type,     _) ->
-    {unsuccessful_hardware_change_detected, get_version_change_type(Type)};
-map({specific,  16#2b}, 16#07, 0,  Type,     _) ->
-    {successful_firmware_change_detected, get_version_change_type(Type)};
-map({specific,  16#2b}, 16#07, 1,  Type,     _) ->
-    {unsuccessful_firmware_change_detected, get_version_change_type(Type)};
-%% fru state
-map({specific,  16#2c}, 16#00, _,  Data,     _) ->
-    {not_installed, get_fru_state_data(Data)};
-map({specific,  16#2c}, 16#01, _,  Data,     _) ->
-    {inactive, get_fru_state_data(Data)};
-map({specific,  16#2c}, 16#02, _,  Data,     _) ->
-    {activation_requested, get_fru_state_data(Data)};
-map({specific,  16#2c}, 16#03, _,  Data,     _) ->
-    {activation_in_progress, get_fru_state_data(Data)};
-map({specific,  16#2c}, 16#04, _,  Data,     _) ->
-    {active, get_fru_state_data(Data)};
-map({specific,  16#2c}, 16#05, _,  Data,     _) ->
-    {deactivation_requested, get_fru_state_data(Data)};
-map({specific,  16#2c}, 16#06, _,  Data,     _) ->
-    {deactivation_in_progress, get_fru_state_data(Data)};
-map({specific,  16#2c}, 16#07, _,  Data,     _) ->
-    {communication_lost, get_fru_state_data(Data)};
-map(              Type,     O, A,    B2,    B3) ->
-    {unknown, [{type, Type}, {offset, O},
-               {asserted, eipmi_util:get_bool_inv(A)},
-               {data2, B2}, {data3, B3}]}.
+    [{sensor_value, auxiliary_log}, {log_action, Action}, {log_type, Type}].
 
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-get_channel(0) -> [];
-get_channel(Channel) -> [{channel, Channel}].
-
-%%------------------------------------------------------------------------------
-%% @private
-%%------------------------------------------------------------------------------
-get_power_state(16#00) -> {s0_g0, working};
-get_power_state(16#01) -> {s1, clocks_stopped};
-get_power_state(16#02) -> {s2, clocks_stopped};
-get_power_state(16#03) -> {s3, suspend_to_ram};
-get_power_state(16#04) -> {s4, suspend_to_disk};
-get_power_state(16#05) -> {s5_g2, soft_off};
-get_power_state(16#06) -> {s4_s5, soft_off};
-get_power_state(16#07) -> {g3, mechanical_off};
-get_power_state(16#08) -> {s1_s2_s3, sleeping};
-get_power_state(16#09) -> {g1, sleeping};
-get_power_state(16#0a) -> {s5, override};
-get_power_state(16#0b) -> legacy_on;
-get_power_state(16#0c) -> legacy_off;
-get_power_state(_)     -> unknown.
+get_pef_actions(Actions) ->
+    A = case Actions band 16#20 bsr 5 of 0 -> []; 1 -> diagnostic_interrupt end,
+    B = case Actions band 16#10 bsr 4 of 0 -> []; 1 -> oem end,
+    C = case Actions band 16#08 bsr 3 of 0 -> []; 1 -> power_cycle end,
+    D = case Actions band 16#04 bsr 2 of 0 -> []; 1 -> reset end,
+    E = case Actions band 16#02 bsr 1 of 0 -> []; 1 -> power_off end,
+    F = case Actions band 16#01 of 0 -> []; 1 -> alert end,
+    A ++ B ++ C ++ D ++ E ++ F.
 
 %%------------------------------------------------------------------------------
 %% @private
@@ -1138,6 +896,69 @@ get_auxiliary_log_action(_) -> unknown.
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
+get_critical_interrupt(16#00) -> [{sensor_value, front_panel_nmi}];
+get_critical_interrupt(16#01) -> [{sensor_value, bus_timeout}];
+get_critical_interrupt(16#02) -> [{sensor_value, io_channel_check_nmi}];
+get_critical_interrupt(16#03) -> [{sensor_value, software_nmi}];
+get_critical_interrupt(16#04) -> [{sensor_value, pci_perr}];
+get_critical_interrupt(16#05) -> [{sensor_value, pci_serr}];
+get_critical_interrupt(16#06) -> [{sensor_value, eisa_fail_safe_timeout}];
+get_critical_interrupt(16#07) -> [{sensor_value, bus_correctable_error}];
+get_critical_interrupt(16#08) -> [{sensor_value, bus_uncorrectable_error}];
+get_critical_interrupt(16#09) -> [{sensor_value, fatal_nmi}];
+get_critical_interrupt(16#0a) -> [{sensor_value, bus_fatal_error}];
+get_critical_interrupt(16#0b) -> [{sensor_value, bus_degraded}].
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+get_switch_event(16#00) -> [{sensor_value, power_button_pressed}];
+get_switch_event(16#01) -> [{sensor_value, sleep_button_pressed}];
+get_switch_event(16#02) -> [{sensor_value, reset_button_pressed}];
+get_switch_event(16#03) -> [{sensor_value, fru_latch_open}];
+get_switch_event(16#04) -> [{sensor_value, fru_service_request_button}].
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+get_chip_set_event(16#01,   _,   _) ->
+    [{sensor_value, thermal_trip}];
+get_chip_set_event(16#00, Requested, Actual) ->
+    [{sensor_value, R}] = get_power_state(Requested),
+    [{sensor_value, A}] = get_power_state(Actual),
+    [{sensor_value, soft_power_control_failure}, {requested, R}, {actual, A}].
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+get_interconnect(16#00) -> [{sensor_value, connected}];
+get_interconnect(16#01) -> [{sensor_value, configuration_error}].
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+get_system_boot_event(16#00,   _,    _) ->
+    [{sensor_value, initiated_by_power_up}];
+get_system_boot_event(16#01,   _,    _) ->
+    [{sensor_value, initiated_by_hard_reset}];
+get_system_boot_event(16#02,   _,    _) ->
+    [{sensor_value, initiated_by_warm_reset}];
+get_system_boot_event(16#03,   _,    _) ->
+    [{sensor_value, user_requested_pxe_boot}];
+get_system_boot_event(16#04,   _,    _) ->
+    [{sensor_value, automatic_boot_to_diagnostic}];
+get_system_boot_event(16#05,   _,    _) ->
+    [{sensor_value, software_initiated_hard_reset}];
+get_system_boot_event(16#06,   _,    _) ->
+    [{sensor_value, software_initiated_warm_reset}];
+get_system_boot_event(16#07, Cau, Chan) ->
+    [{sensor_value, system_restart},
+     {cause, get_system_restart_cause(Cau)}]
+        ++ case Chan of 16#ff -> []; _ -> [{channel, Chan}] end.
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
 get_system_restart_cause(16#01) -> chassis_control_command;
 get_system_restart_cause(16#02) -> reset_via_pushbutton;
 get_system_restart_cause(16#03) -> power_up_via_power_pushbutton;
@@ -1150,6 +971,53 @@ get_system_restart_cause(16#09) -> power_cycle_via_pef;
 get_system_restart_cause(16#0a) -> soft_reset;
 get_system_restart_cause(16#0b) -> power_up_via_rtc;
 get_system_restart_cause(_)     -> unknown.
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+get_boot_error(16#00) -> [{sensor_value, no_bootable_media}];
+get_boot_error(16#01) -> [{sensor_value, non_bootable_media_left_in_drive}];
+get_boot_error(16#02) -> [{sensor_value, pxe_server_not_found}];
+get_boot_error(16#03) -> [{sensor_value, invalid_boot_sector}];
+get_boot_error(16#04) -> [{sensor_value, timeout_waiting_for_user}].
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+get_os_boot_event(16#00) -> [{sensor_value, completed_a}];
+get_os_boot_event(16#01) -> [{sensor_value, completed_c}];
+get_os_boot_event(16#02) -> [{sensor_value, completed_pxe}];
+get_os_boot_event(16#03) -> [{sensor_value, completed_diagnostic}];
+get_os_boot_event(16#04) -> [{sensor_value, completed_cdrom}];
+get_os_boot_event(16#05) -> [{sensor_value, completed_rom}];
+get_os_boot_event(16#06) -> [{sensor_value, completed}].
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+get_os_shutdown_event(16#00) -> [{sensor_value, critical_stop_during_startup}];
+get_os_shutdown_event(16#01) -> [{sensor_value, critical_stop_during_runtime}];
+get_os_shutdown_event(16#02) -> [{sensor_value, graceful_stop}];
+get_os_shutdown_event(16#03) -> [{sensor_value, graceful_shutdown}];
+get_os_shutdown_event(16#04) -> [{sensor_value, soft_shutdown}];
+get_os_shutdown_event(16#05) -> [{sensor_value, agent_not_responding}].
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+get_slot_event(Value, Type, Num) ->
+    T = get_slot_type(Type band 2#01111111),
+    get_slot_event(Value) ++ [{slot_type, T}, {slot_number, Num}].
+get_slot_event(16#00) -> [{sensor_value, fault_status_asserted}];
+get_slot_event(16#01) -> [{sensor_value, identify_status_asserted}];
+get_slot_event(16#02) -> [{sensor_value, installed}];
+get_slot_event(16#03) -> [{sensor_value, ready_for_installation}];
+get_slot_event(16#04) -> [{sensor_value, ready_for_removal}];
+get_slot_event(16#05) -> [{sensor_value, off}];
+get_slot_event(16#06) -> [{sensor_value, removal_request}];
+get_slot_event(16#07) -> [{sensor_value, interlock_asserted}];
+get_slot_event(16#08) -> [{sensor_value, disabled}];
+get_slot_event(16#09) -> [{sensor_value, spare}].
 
 %%------------------------------------------------------------------------------
 %% @private
@@ -1171,73 +1039,111 @@ get_slot_type(_)  -> unknown.
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-get_interrupt_type(0) -> none;
-get_interrupt_type(1) -> smi;
-get_interrupt_type(2) -> nmi;
-get_interrupt_type(3) -> messaging;
-get_interrupt_type(_) -> unspecified.
+get_power_state(16#00) -> [{sensor_value, {s0_g0, working}}];
+get_power_state(16#01) -> [{sensor_value, {s1, clocks_stopped}}];
+get_power_state(16#02) -> [{sensor_value, {s2, clocks_stopped}}];
+get_power_state(16#03) -> [{sensor_value, {s3, suspend_to_ram}}];
+get_power_state(16#04) -> [{sensor_value, {s4, suspend_to_disk}}];
+get_power_state(16#05) -> [{sensor_value, {s5_g2, soft_off}}];
+get_power_state(16#06) -> [{sensor_value, {s4_s5, soft_off}}];
+get_power_state(16#07) -> [{sensor_value, {g3, mechanical_off}}];
+get_power_state(16#08) -> [{sensor_value, {s1_s2_s3, sleeping}}];
+get_power_state(16#09) -> [{sensor_value, {g1, sleeping}}];
+get_power_state(16#0a) -> [{sensor_value, {s5, override}}];
+get_power_state(16#0b) -> [{sensor_value, legacy_on}];
+get_power_state(16#0c) -> [{sensor_value, legacy_off}];
+get_power_state(_)     -> [{sensor_value, unknown}].
 
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-get_timer_use(1) -> bios_frb2;
-get_timer_use(2) -> bios;
-get_timer_use(3) -> os_load;
-get_timer_use(4) -> sms;
-get_timer_use(5) -> oem;
-get_timer_use(_) -> unspecified.
+get_watchdog_new(Value, Data) ->
+    get_watchdog_new(Value)
+        ++ get_interrupt_type(Data band 16#f0 bsr 4)
+        ++ get_timer_use(Data band 16#0f).
+get_watchdog_new(16#00) -> [{sensor_value, timer_expired}];
+get_watchdog_new(16#01) -> [{sensor_value, hard_reset}];
+get_watchdog_new(16#02) -> [{sensor_value, power_down}];
+get_watchdog_new(16#03) -> [{sensor_value, power_cycle}];
+get_watchdog_new(16#08) -> [{sensor_value, timer_interrupt}].
 
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-get_pef_actions(Actions) ->
-    A = case Actions band 16#20 bsr 5 of 0 -> []; 1 -> diagnostic_interrupt end,
-    B = case Actions band 16#10 bsr 4 of 0 -> []; 1 -> oem end,
-    C = case Actions band 16#08 bsr 3 of 0 -> []; 1 -> power_cycle end,
-    D = case Actions band 16#04 bsr 2 of 0 -> []; 1 -> reset end,
-    E = case Actions band 16#02 bsr 1 of 0 -> []; 1 -> power_off end,
-    F = case Actions band 16#01 of 0 -> []; 1 -> alert end,
-    A ++ B ++ C ++ D ++ E ++ F.
+get_interrupt_type(0) -> [{interrupt, none}];
+get_interrupt_type(1) -> [{interrupt, smi}];
+get_interrupt_type(2) -> [{interrupt, nmi}];
+get_interrupt_type(3) -> [{interrupt, messaging}];
+get_interrupt_type(_) -> [].
 
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-get_fru_device(A, B) when (A band 16#80 bsr 7) == 0 ->
-    {non_logical, B band 2#11111110 bsr 1};
-get_fru_device(_, B) ->
-    {logical, B}.
+get_timer_use(1) -> [{timer_use, bios_frb2}];
+get_timer_use(2) -> [{timer_use, bios}];
+get_timer_use(3) -> [{timer_use, os_load}];
+get_timer_use(4) -> [{timer_use, sms}];
+get_timer_use(5) -> [{timer_use, oem}];
+get_timer_use(_) -> [].
 
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-get_fru_state_data(16#ff) ->
-    [];
-get_fru_state_data(A) ->
-    get_fru_state_data_(<<A:8>>).
-get_fru_state_data_(<<0:4, P:4>>) ->
-    [{cause, normal_state_change}] ++ maybe_previous({specific,  16#2c}, P, 0);
-get_fru_state_data_(<<1:4, P:4>>) ->
-    [{cause, external_software}] ++ maybe_previous({specific,  16#2c}, P, 0);
-get_fru_state_data_(<<2:4, P:4>>) ->
-    [{cause, latch}] ++ maybe_previous({specific,  16#2c}, P, 0);
-get_fru_state_data_(<<3:4, P:4>>) ->
-    [{cause, hot_swap}] ++ maybe_previous({specific,  16#2c}, P, 0);
-get_fru_state_data_(<<4:4, P:4>>) ->
-    [{cause, internal_software}] ++ maybe_previous({specific,  16#2c}, P, 0);
-get_fru_state_data_(<<5:4, P:4>>) ->
-    [{cause, communication_lost}] ++ maybe_previous({specific,  16#2c}, P, 0);
-get_fru_state_data_(<<6:4, P:4>>) ->
-    [{cause, communication_lost}] ++ maybe_previous({specific,  16#2c}, P, 0);
-get_fru_state_data_(<<7:4, P:4>>) ->
-    [{cause, unexpected_extraction}] ++ maybe_previous({specific,  16#2c}, P, 0);
-get_fru_state_data_(<<8:4, P:4>>) ->
-    [{cause, update}] ++ maybe_previous({specific,  16#2c}, P, 0);
-get_fru_state_data_(<<9:4, P:4>>) ->
-    [{cause, no_ipmb_address}] ++ maybe_previous({specific,  16#2c}, P, 0);
-get_fru_state_data_(<<10:4, P:4>>) ->
-    [{cause, unexpedcted_deactivation}] ++ maybe_previous({specific,  16#2c}, P, 0);
-get_fru_state_data_(<<_:4, P:4>>) ->
-    maybe_previous({specific,  16#2c}, P, 0).
+get_platform_alert(16#00) -> [{sensor_value, generated_page}];
+get_platform_alert(16#01) -> [{sensor_value, generated_lan_alert}];
+get_platform_alert(16#02) -> [{sensor_value, generated_event_trap}];
+get_platform_alert(16#03) -> [{sensor_value, generated_snmp_trap}].
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+get_entity_presence(16#00, _) -> [{sensor_value, present}];
+get_entity_presence(16#01, _) -> [{sensor_value, absent}];
+get_entity_presence(16#02, 0) -> [{sensor_value, disabled}];
+get_entity_presence(16#02, 1) -> [{sensor_value, enabled}].
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+get_lan_event(16#00) -> [{sensor_value, heartbeat_lost}];
+get_lan_event(16#01) -> [{sensor_value, heartbeat}].
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+get_management_subsystem_health(16#00,     _,     _) ->
+    [{sensor_value, sensor_access_degraded}];
+get_management_subsystem_health(16#01,     _,     _) ->
+    [{sensor_value, controller_access_degraded}];
+get_management_subsystem_health(16#02,     _,     _) ->
+    [{sensor_value, controller_offline}];
+get_management_subsystem_health(16#03,     _,     _) ->
+    [{sensor_value, controller_unavailable}];
+get_management_subsystem_health(16#04, 16#ff,     _) ->
+    [{sensor_value, sensor_failure}];
+get_management_subsystem_health(16#04,   Num,     _) ->
+    [{sensor_value, sensor_failure}, {failed_sensor_number, Num}];
+get_management_subsystem_health(16#05, 16#ff, 16#ff) ->
+    [{sensor_value, fru_failure}];
+get_management_subsystem_health(16#05, Data1, Data2) ->
+    [{sensor_value, fru_failure}] ++ get_addr(<<Data2:8, Data1:8, 0:8>>).
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+get_battery_state(16#00) -> [{sensor_value, low}];
+get_battery_state(16#01) -> [{sensor_value, failed}];
+get_battery_state(16#02) -> [{sensor_value, presence_detected}].
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+get_session_event(Value, User, Data) ->
+    get_session_event(Value) ++ get_session_data(User, Data).
+get_session_event(16#00) -> [{sensor_value, activated}];
+get_session_event(16#01) -> [{sensor_value, deactivated}];
+get_session_event(16#02) -> [{sensor_value, invalid_user_or_password}];
+get_session_event(16#03) -> [{sensor_value, invalid_password_disable}].
 
 %%------------------------------------------------------------------------------
 %% @private
@@ -1258,35 +1164,153 @@ get_session_data_(<<_:2, UserId:6>>, <<_:2, 3:2, Channel:4>>) ->
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-get_version_change_type(16#01) -> management_controller_device_id;
-get_version_change_type(16#02) -> management_controller_firmware_revision;
-get_version_change_type(16#03) -> management_controller_device_revision;
-get_version_change_type(16#04) -> management_controller_manufacturer_id;
-get_version_change_type(16#05) -> management_controller_ipmi_version;
-get_version_change_type(16#06) -> management_controller_auxiliary_firmware_id;
-get_version_change_type(16#07) -> management_controller_firmware_boot_block;
-get_version_change_type(16#08) -> management_controller_firmware;
-get_version_change_type(16#09) -> system_firmware_change;
-get_version_change_type(16#0a) -> sm_bios_change;
-get_version_change_type(16#0b) -> operating_system_change;
-get_version_change_type(16#0c) -> operating_system_loader_change;
-get_version_change_type(16#0d) -> partition_change;
-get_version_change_type(16#0e) -> management_software_agent_change;
-get_version_change_type(16#0f) -> management_software_application_change;
-get_version_change_type(16#10) -> management_software_middleware_change;
-get_version_change_type(16#11) -> programmable_hardware_change;
-get_version_change_type(16#12) -> fru_module_change;
-get_version_change_type(16#13) -> fru_component_change;
-get_version_change_type(16#14) -> fru_replaced_with_equivalent_version;
-get_version_change_type(16#15) -> fru_replaced_with_newer_version;
-get_version_change_type(16#16) -> fru_replaced_with_older_version;
-get_version_change_type(16#17) -> fru_hardware_configuration_change;
-get_version_change_type(_)     -> unspecified.
+get_version_change(Val1, Val2, Type) ->
+    get_version_change(Val1, Val2) ++ get_version_change_type(Type).
+get_version_change(16#00, _) ->
+    [{sensor_value, hardware_change_detected}];
+get_version_change(16#01, _) ->
+    [{sensor_value, firmware_change_detected}];
+get_version_change(16#02, _) ->
+    [{sensor_value, hardware_incompatibility_detected}];
+get_version_change(16#03, _) ->
+    [{sensor_value, firmware_incompatibility_detected}];
+get_version_change(16#04, _) ->
+    [{sensor_value, unsupported_hardware_version}];
+get_version_change(16#05, _) ->
+    [{sensor_value, unsupported_firmware_version}];
+get_version_change(16#06, 0) ->
+    [{sensor_value, successful_hardware_change_detected}];
+get_version_change(16#06, 1) ->
+    [{sensor_value, unsuccessful_hardware_change_detected}];
+get_version_change(16#07, 0) ->
+    [{sensor_value, successful_firmware_change_detected}];
+get_version_change(16#07, 1) ->
+    [{sensor_value, unsuccessful_firmware_change_detected}].
 
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-maybe_previous(_Type, 16#f, _Assert) ->
-    [];
-maybe_previous(Type, Offset, Assert) ->
-    [{previous_value, map(Type, Offset, Assert, 16#ff, 16#ff)}].
+get_version_change_type(16#01) ->
+    [{change_type, management_controller_device_id}];
+get_version_change_type(16#02) ->
+    [{change_type, management_controller_firmware_revision}];
+get_version_change_type(16#03) ->
+    [{change_type, management_controller_device_revision}];
+get_version_change_type(16#04) ->
+    [{change_type, management_controller_manufacturer_id}];
+get_version_change_type(16#05) ->
+    [{change_type, management_controller_ipmi_version}];
+get_version_change_type(16#06) ->
+    [{change_type, management_controller_auxiliary_firmware_id}];
+get_version_change_type(16#07) ->
+    [{change_type, management_controller_firmware_boot_block}];
+get_version_change_type(16#08) ->
+    [{change_type, management_controller_firmware}];
+get_version_change_type(16#09) ->
+    [{change_type, system_firmware_change}];
+get_version_change_type(16#0a) ->
+    [{change_type, sm_bios_change}];
+get_version_change_type(16#0b) ->
+    [{change_type, operating_system_change}];
+get_version_change_type(16#0c) ->
+    [{change_type, operating_system_loader_change}];
+get_version_change_type(16#0d) ->
+    [{change_type, partition_change}];
+get_version_change_type(16#0e) ->
+    [{change_type, management_software_agent_change}];
+get_version_change_type(16#0f) ->
+    [{change_type, management_software_application_change}];
+get_version_change_type(16#10) ->
+    [{change_type, management_software_middleware_change}];
+get_version_change_type(16#11) ->
+    [{change_type, programmable_hardware_change}];
+get_version_change_type(16#12) ->
+    [{change_type, fru_module_change}];
+get_version_change_type(16#13) ->
+    [{change_type, fru_component_change}];
+get_version_change_type(16#14) ->
+    [{change_type, fru_replaced_with_equivalent_version}];
+get_version_change_type(16#15) ->
+    [{change_type, fru_replaced_with_newer_version}];
+get_version_change_type(16#16) ->
+    [{change_type, fru_replaced_with_older_version}];
+get_version_change_type(16#17) ->
+    [{change_type, fru_hardware_configuration_change}];
+get_version_change_type(_)     ->
+    [].
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+get_fru_event(Value, Data) ->
+    [{sensor_value, get_fru_state(Value)}] ++ get_fru_event(<<Data:8>>).
+get_fru_event(<<Cause:4, Prev:4>>) ->
+    get_fru_state_cause(Cause) ++ [{previous_value, get_fru_state(Prev)}].
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+get_fru_state(16#00) -> not_installed;
+get_fru_state(16#01) -> inactive;
+get_fru_state(16#02) -> activation_requested;
+get_fru_state(16#03) -> activation_in_progress;
+get_fru_state(16#04) -> active;
+get_fru_state(16#05) -> deactivation_requested;
+get_fru_state(16#06) -> deactivation_in_progress;
+get_fru_state(16#07) -> communication_lost.
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+get_fru_state_cause(16#00) -> [{cause, normal_state_change}];
+get_fru_state_cause(16#01) -> [{cause, external_software}];
+get_fru_state_cause(16#02) -> [{cause, latch}];
+get_fru_state_cause(16#03) -> [{cause, hot_swap}];
+get_fru_state_cause(16#04) -> [{cause, internal_software}];
+get_fru_state_cause(16#05) -> [{cause, communication_lost}];
+get_fru_state_cause(16#06) -> [{cause, communication_lost}];
+get_fru_state_cause(16#07) -> [{cause, unexpected_extraction}];
+get_fru_state_cause(16#08) -> [{cause, update}];
+get_fru_state_cause(16#09) -> [{cause, no_ipmb_address}];
+get_fru_state_cause(16#0a) -> [{cause, unexpedcted_deactivation}];
+get_fru_state_cause(    _) -> [{cause, unknown}].
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+get_hot_swap_event(Value, Data, FruId) ->
+    [{sensor_value, get_fru_state(Value)}]
+        ++ get_hot_swap_event(<<Data:8>>, FruId).
+get_hot_swap_event(<<Cause:4, Prev:4>>, FruId) ->
+    get_hot_swap_state_cause(Cause)
+        ++ [{previous_value, get_fru_state(Prev)}, {fru_id, FruId}].
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+get_hot_swap_state_cause(16#00) ->
+    [{cause, normal}];
+get_hot_swap_state_cause(16#01) ->
+    [{cause, shelf_manager}];
+get_hot_swap_state_cause(16#02) ->
+    [{cause, operator}];
+get_hot_swap_state_cause(16#03) ->
+    [{cause, fru_action}];
+get_hot_swap_state_cause(16#04) ->
+    [{cause, communication_lost_or_regained}];
+get_hot_swap_state_cause(16#05) ->
+    [{cause, communication_lost_or_regained_locally}];
+get_hot_swap_state_cause(16#06) ->
+    [{cause, surprise}];
+get_hot_swap_state_cause(16#07) ->
+    [{cause, provided_information}];
+get_hot_swap_state_cause(16#08) ->
+    [{cause, invalid_hardware_address}];
+get_hot_swap_state_cause(    _) ->
+    [{cause, unknown}].
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+get_channel(0) -> [];
+get_channel(Channel) -> [{channel, Channel}].

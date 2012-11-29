@@ -39,16 +39,14 @@
           {type, record_type()} |
           {oem_type, non_neg_integer()} |
           {time, non_neg_integer()} |
-          {maunfacturer_id, non_neg_integer()} |
+          {manufacturer_id, non_neg_integer()} |
           {data, binary()} |
           {revision, non_neg_integer()} |
           {sensor_type, eipmi_sensor:type()} |
           {sensor_number, non_neg_integer()} |
-          {sensor_value, eipmi_sensor:value()} |
-          {previous_value, eipmi_sensor:value()} |
-          {severity_value, eipmi_sensor:value()} |
-          {reading, binary()} |
-          {threshold, binary()} |
+          {sensor_reading, non_neg_integer()} |
+          {sensor_threshold, non_neg_integer()} |
+          eipmi_sensor:value() |
           eipmi_sensor:addr()]}.
 
 -export_type([entry/0]).
@@ -173,7 +171,7 @@ decode_system_event1(Acc, <<Revision:8, Data/binary>>) ->
 %% @private
 %%------------------------------------------------------------------------------
 decode_oem_timestamped(Acc, <<Time:32/little, M:24/little, Data/binary>>) ->
-    Acc ++ [{time, Time}, {maunfacturer_id, M}, {data, Data}].
+    Acc ++ [{time, Time}, {manufacturer_id, M}, {data, Data}].
 
 %%------------------------------------------------------------------------------
 %% @private
@@ -194,52 +192,42 @@ decode_event_data({oem, Type}, Assertion, Data) ->
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-decode_threshold(Type, Assertion, <<1:2, 0:2, Offset:4, B2:1/binary, _:8>>) ->
-    get_value(Type, Offset, Assertion, [{reading, B2}], []);
-decode_threshold(Type, Assertion, <<1:2, 1:2, Offset:4, B2:1/binary, B3:1/binary>>) ->
-    get_value(Type, Offset, Assertion, [{reading, B2}], [{threshold, B3}]);
-decode_threshold(Type, Assertion, <<_:2, _:2, Offset:4, _:8, _:8>>) ->
-    get_value(Type, Offset, Assertion, [], []).
+decode_threshold(Type, Assertion, <<1:2, 0:2, Offset:4, B2:8, _:8>>) ->
+    eipmi_sensor:get_value(Type, Offset, Assertion, 16#ff, 16#ff)
+        ++ [{sensor_reading, B2}];
+decode_threshold(Type, Assertion, <<1:2, 1:2, Offset:4, B2:8, B3:8>>) ->
+    eipmi_sensor:get_value(Type, Offset, Assertion, 16#ff, 16#ff)
+        ++ [{sensor_reading, B2}, {sensor_threshold, B3}];
+decode_threshold(Type, Assertion, <<E2:2, E3:2, Offset:4, B2:8, B3:8>>) ->
+    Byte2 = case E2 of 0 -> 16#ff; _ -> B2 end,
+    Byte3 = case E3 of 0 -> 16#ff; _ -> B3 end,
+    eipmi_sensor:get_value(Type, Offset, Assertion, Byte2, Byte3).
 
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-decode_generic(Type, Assertion, <<0:2, 3:2, Offset:4, _:8, B3:8>>) ->
-    get_value(Type, Offset, Assertion, 16#ff, B3);
-decode_generic(Type, Assertion, <<1:2, 0:2, Offset:4, SOff:4, POff:4, _:8>>) ->
+decode_generic(Type, Assertion, <<1:2, E3:2, Offset:4, SOff:4, POff:4, B3:8>>) ->
     Severity = maybe_value(severity_value, {generic, 16#07}, SOff, 0),
     Previous = maybe_value(previous_value, Type, POff, Assertion),
-    get_value(Type, Offset, Assertion, 16#ff, 16#ff) ++ Severity ++ Previous;
-decode_generic(Type, Assertion, <<1:2, 3:2, Offset:4, SOff:4, POff:4, B3:8>>) ->
-    Severity = maybe_value(severity_value, {generic, 16#07}, SOff, 0),
-    Previous = maybe_value(previous_value, Type, POff, Assertion),
-    get_value(Type, Offset, Assertion, 16#ff, B3) ++ Severity ++ Previous;
-decode_generic(Type, Assertion, <<3:2, 0:2, Offset:4, B2:8, _:8>>) ->
-    get_value(Type, Offset, Assertion, B2, 16#ff);
-decode_generic(Type, Assertion, <<3:2, 3:2, Offset:4, B2:8, B3:8>>) ->
-    get_value(Type, Offset, Assertion, B2, B3);
-decode_generic(Type, Assertion, <<_:2, _:2, Offset:4, _:8, _:8>>) ->
-    get_value(Type, Offset, Assertion, 16#ff, 16#ff).
+    decode_generic(Type, Assertion, <<0:2, E3:2, Offset:4, 16#ff:8, B3:8>>)
+        ++ Severity ++ Previous;
+decode_generic(Type, Assertion, <<E2:2, E3:2, Offset:4, B2:8, B3:8>>) ->
+    Byte2 = case E2 of 0 -> 16#ff; _ -> B2 end,
+    Byte3 = case E3 of 0 -> 16#ff; _ -> B3 end,
+    eipmi_sensor:get_value(Type, Offset, Assertion, Byte2, Byte3).
 
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-decode_oem(Type, Assertion, <<0:2, 2:2, Offset:4, _:8, B3:8>>) ->
-    get_value(Type, Offset, Assertion, 16#ff, B3);
-decode_oem(Type, Assertion, <<1:2, 0:2, Offset:4, SOff:4, POff:4, _:8>>) ->
+decode_oem(Type, Assertion, <<1:2, E3:2, Offset:4, SOff:4, POff:4, B3:8>>) ->
     Severity = maybe_value(severity_value, {generic, 16#07}, SOff, 0),
     Previous = maybe_value(previous_value, Type, POff, Assertion),
-    get_value(Type, Offset, Assertion, 16#ff, 16#ff) ++ Severity ++ Previous;
-decode_oem(Type, Assertion, <<1:2, 2:2, Offset:4, SOff:4, POff:4, B3:8>>) ->
-    Severity = maybe_value(severity_value, {generic, 16#07}, SOff, 0),
-    Previous = maybe_value(previous_value, Type, POff, Assertion),
-    get_value(Type, Offset, Assertion, 16#ff, B3) ++ Severity ++ Previous;
-decode_oem(Type, Assertion, <<2:2, 0:2, Offset:4, B2:8, _:8>>) ->
-    get_value(Type, Offset, Assertion, B2, 16#ff);
-decode_oem(Type, Assertion, <<2:2, 2:2, Offset:4, B2:8, B3:8>>) ->
-    get_value(Type, Offset, Assertion, B2, B3);
-decode_oem(Type, Assertion, <<_:2, _:2, Offset:4, _:8, _:8>>) ->
-    get_value(Type, Offset, Assertion, 16#ff, 16#ff).
+    decode_oem(Type, Assertion, <<0:2, E3:2, Offset:4, 16#ff:8, B3:8>>)
+        ++ Severity ++ Previous;
+decode_oem(Type, Assertion, <<E2:2, E3:2, Offset:4, B2:8, B3:8>>) ->
+    Byte2 = case E2 of 2 -> B2; _ -> 16#ff end,
+    Byte3 = case E3 of 2 -> B3; _ -> 16#ff end,
+    eipmi_sensor:get_value(Type, Offset, Assertion, Byte2, Byte3).
 
 %%------------------------------------------------------------------------------
 %% @private
@@ -254,16 +242,11 @@ pad_event_data(Data = <<_:3/binary>>) ->
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-get_value(Type, Offset, Assertion, B2, B3) ->
-    [{sensor_value, eipmi_sensor:get_value(Type, Offset, Assertion, B2, B3)}].
-
-%%------------------------------------------------------------------------------
-%% @private
-%%------------------------------------------------------------------------------
 maybe_value(_Tag, _Type, 16#f, _Assert) ->
     [];
 maybe_value(Tag, Type, Offset, Assert) ->
-    [{Tag, eipmi_sensor:get_value(Type, Offset, Assert, 16#ff, 16#ff)}].
+    Vs = eipmi_sensor:get_value(Type, Offset, Assert, 16#ff, 16#ff),
+    [{Tag, eipmi_util:get_val(sensor_value, Vs)}].
 
 %%%=============================================================================
 %%% TESTS
