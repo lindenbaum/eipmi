@@ -189,6 +189,12 @@ decode_picmg(?GET_PICMG_PROPERTIES,
     [{picmg_extension, [Major | [$. | Minor]]},
      {max_fru_id, MaxFruId},
      {ipmc_fru_id, IPMCFruId}];
+decode_picmg(?SET_FRU_ACTIVATION_POLICY, <<?PICMG_ID:8>>) ->
+    [];
+decode_picmg(?GET_FRU_ACTIVATION_POLICY,
+             <<?PICMG_ID:8, ?EIPMI_RESERVED:6, Deactivation:1, Locked:1>>) ->
+    [{deactivation_locked, eipmi_util:get_bool(Deactivation)},
+     {locked, eipmi_util:get_bool(Locked)}];
 decode_picmg(?SET_FRU_ACTIVATION, <<?PICMG_ID:8>>) ->
     [];
 decode_picmg(?FRU_CONTROL, <<?PICMG_ID:8>>) ->

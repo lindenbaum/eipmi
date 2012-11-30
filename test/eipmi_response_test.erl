@@ -223,6 +223,15 @@ decode_get_picmg_properties_test() ->
         {ipmc_fru_id, 6}],
        eipmi_response:decode(Resp, Bin)).
 
+decode_set_fru_activation_policy_test() ->
+    Resp = {?IPMI_NETFN_PICMG_RESPONSE, ?SET_FRU_ACTIVATION_POLICY},
+    ?assertEqual([], eipmi_response:decode(Resp, <<16#00>>)).
+
+decode_get_fru_activation_policy_test() ->
+    Resp = {?IPMI_NETFN_PICMG_RESPONSE, ?GET_FRU_ACTIVATION_POLICY},
+    ?assertEqual([{deactivation_locked, true}, {locked, true}],
+                 eipmi_response:decode(Resp, <<16#00, 16#03>>)).
+
 decode_set_fru_activation_test() ->
     Resp = {?IPMI_NETFN_PICMG_RESPONSE, ?SET_FRU_ACTIVATION},
     ?assertEqual([], eipmi_response:decode(Resp, <<16#00>>)).

@@ -535,7 +535,45 @@ Returns:
 [{data, binary()}]
 ```
 
-#### PICMG FRU Activation
+#### Get PICMG Properties
+Argument:
+```erlang
+[]
+```
+
+Returns:
+```erlang
+[{picmg_extension, string()},
+ {max_fru_id, 0..254},
+ {ipmc_fru_id, 0..254}]
+```
+
+#### Set FRU Activation Policy
+Argument:
+```erlang
+[{fru_id, 0..254},
+ {deactivation_locked, boolean()}, (optional)
+ {locked, boolean()} (optional)]
+```
+
+Returns:
+```erlang
+[]
+```
+
+#### Get FRU Activation Policy
+Argument:
+```erlang
+[{fru_id, 0..254}]
+```
+
+Returns:
+```erlang
+[{deactivation_locked, boolean()},
+ {locked, boolean()}]
+```
+
+#### Set FRU Activation
 Argument:
 ```erlang
 [{fru_id, 0..254},
@@ -547,7 +585,7 @@ Returns:
 []
 ```
 
-#### PICMG FRU Control
+#### FRU Control
 Argument:
 ```erlang
 [{fru_id, 0..254},
@@ -557,4 +595,15 @@ Argument:
 Returns:
 ```erlang
 []
+```
+
+#### Get Device Locator Record ID
+Argument:
+```erlang
+[{fru_id, 0..254}]
+```
+
+Returns:
+```erlang
+[{record_id, non_neg_integer()}]
 ```

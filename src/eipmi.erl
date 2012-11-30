@@ -623,7 +623,7 @@ unsubscribe(Handler, Args) ->
 %% @end
 %%------------------------------------------------------------------------------
 -spec stats() ->
-                   [{sessions, [{target(), pid()}]} |
+                   [{sessions, [session()]} |
                     {handlers, [module() | {module(), term()}]}].
 stats() ->
     Children = supervisor:which_children(?MODULE),
@@ -712,7 +712,7 @@ get_session(S, Cs) ->
 %% @private
 %%------------------------------------------------------------------------------
 get_sessions(Cs) ->
-    [{Target, P} || {{session, Target, _}, P, _, _} <- Cs, is_pid(P)].
+    [S || S = {{session, _, _}, P, _, _} <- Cs, is_pid(P)].
 
 %%------------------------------------------------------------------------------
 %% @private

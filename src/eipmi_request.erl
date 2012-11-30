@@ -148,6 +148,16 @@ encode_transport(?GET_LAN_CONFIGURATION_PARAMETERS, Properties) ->
 %%------------------------------------------------------------------------------
 encode_picmg(?GET_PICMG_PROPERTIES, _Properties) ->
     <<?PICMG_ID:8>>;
+encode_picmg(?SET_FRU_ACTIVATION_POLICY, Properties) ->
+    FruId = eipmi_util:get_val(fru_id, Properties),
+    D = eipmi_util:get_val(deactivation_locked, Properties),
+    L = eipmi_util:get_val(locked, Properties),
+    Mask = set_activation_mask([L, D]),
+    Set = set_activation_policy([L, D]),
+    <<?PICMG_ID:8, FruId:8, Mask:8, Set:8>>;
+encode_picmg(?GET_FRU_ACTIVATION_POLICY, Properties) ->
+    FruId = eipmi_util:get_val(fru_id, Properties),
+    <<?PICMG_ID:8, FruId:8>>;
 encode_picmg(?SET_FRU_ACTIVATION, Properties) ->
     FruId = eipmi_util:get_val(fru_id, Properties),
     Activate = eipmi_util:get_val(activate, Properties),
@@ -159,6 +169,24 @@ encode_picmg(?FRU_CONTROL, Properties) ->
 encode_picmg(?GET_DEVICE_LOCATOR_RECORD_ID, Properties) ->
     FruId = eipmi_util:get_val(fru_id, Properties),
     <<?PICMG_ID:8, FruId:8>>.
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+set_activation_mask(List) ->
+    {Mask, _} = lists:foldl(fun set_activation_mask/2, {0, 0}, List),
+    Mask.
+set_activation_mask(undefined, {Mask, Bit}) -> {Mask, Bit + 1};
+set_activation_mask(_, {Mask, Bit}) -> {Mask + (1 bsl Bit), Bit + 1}.
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+set_activation_policy(List) ->
+    {Set, _} = lists:foldl(fun set_activation_policy/2, {0, 0}, List),
+    Set.
+set_activation_policy(true, {Set, Bit}) -> {Set + (1 bsl Bit), Bit + 1};
+set_activation_policy(_, {Set, Bit}) -> {Set, Bit + 1}.
 
 %%------------------------------------------------------------------------------
 %% @private
