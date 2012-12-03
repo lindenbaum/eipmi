@@ -114,8 +114,8 @@ decode_application(?GET_CHANNEL_AUTHENTICATION_CAPABILITIES,
                      ?EIPMI_RESERVED:40>>) ->
     [{channel, Channel},
      {auth_types, get_auth_types(A)},
-     {per_message_authentication_enabled, eipmi_util:get_bool_inv(P)},
-     {user_level_authentication_enabled, eipmi_util:get_bool_inv(U)},
+     {per_message_authentication_enabled, not eipmi_util:get_bool(P)},
+     {user_level_authentication_enabled, not eipmi_util:get_bool(U)},
      {login_status, get_login_status(L)}];
 decode_application(?GET_SESSION_CHALLENGE, <<I:32/little, C/binary>>) ->
     [{session_id, I}, {challenge, C}];

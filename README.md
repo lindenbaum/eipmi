@@ -54,7 +54,10 @@ API functions are exported by the `eipmi` module.
 EIPMI does all the necessary session handling for the user as soon as a session
 is requested using `eipmi:open/1` or `eipmi:open/2`. However, according to the
 capabilities of the target BMC the user eventually has to pass in user and
-password credentials using the `Options` argument of `eipmi:open/2`.
+password credentials using the `Options` argument of `eipmi:open/2`. A user
+process can immediatelly start using a session. All requests received before the
+session is established will be queued and issued after the session is
+established.
 
 All authentication mechanism mentioned in the specification are supported,
 including *anonymous*, *null user* and *non-null user*. Additionally, all
@@ -67,9 +70,12 @@ BMC supports *anonymous* logins no options need to be set.
 
 A session may be shared between mutliple processes. While the requests of one
 process will be synchronous and thus ordered, requests from different processes
-will not block each other. However, flow control is performed over all requests
-of a session. If a maximum of 8 pending requests is reached new requests will
-be queued and sent as pending requests get completed.
+will not block each other. However, flow control is not performed by the session
+and a user has to ensure that only a limited number of processes issue
+concurrent requests over the same session.
+
+An established session will be kept alive by the session state machine until
+`eipmi:close/1` gets called.
 
 ### Asynchronous Events
 

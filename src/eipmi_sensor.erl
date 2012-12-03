@@ -477,7 +477,7 @@ map({specific,  16#2c}, A, _, C, _) -> get_fru_event(A, C);
 map({specific,  16#f0}, A, _, C, D) -> get_hot_swap_event(A, C, D);
 map(Type, A, B, C, D) ->
     {unknown, [{type, Type}, {offset, A}, {data2, C}, {data3, D},
-               {asserted, eipmi_util:get_bool_inv(B)}]}.
+               {asserted, not eipmi_util:get_bool(B)}]}.
 
 %%------------------------------------------------------------------------------
 %% @private

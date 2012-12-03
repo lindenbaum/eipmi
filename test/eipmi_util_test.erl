@@ -100,3 +100,12 @@ from_base26_test() ->
     ?assertEqual("AAA", eipmi_util:from_base26(702)),
     ?assertEqual("AAZ", eipmi_util:from_base26(727)),
     ?assertEqual("ZZZ", eipmi_util:from_base26(18277)).
+
+get_bool_test() ->
+    ?assert(not eipmi_util:get_bool(0)),
+    ?assert(eipmi_util:get_bool(other)).
+
+binary_to_string_test() ->
+    ?assertEqual("abc", eipmi_util:binary_to_string(<<$a, $b, $c>>)),
+    ?assertEqual("abc", eipmi_util:binary_to_string(<<$a, $b, $c, 0>>)),
+    ?assertEqual("abc", eipmi_util:binary_to_string(<<$a, $b, $c, 0, 0>>)).
