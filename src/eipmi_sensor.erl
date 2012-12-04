@@ -57,7 +57,9 @@
         processor_io_module | management_controller_firmware | ipmi_channel |
         pci_bus | pci_expresstm_bus | scsi_bus | sata_bus | front_side_bus |
         real_time_clock | air_inlet | air_inlet | processor |
-        main_system_board | non_neg_integer().
+        main_system_board | front_board | amc | mch |
+        shelf_management_controller | filtration_unit | shelf_fru_information |
+        alarm_panel | non_neg_integer().
 
 -type entity() ::
         {entity_id, entity_id()} |
@@ -76,7 +78,8 @@
         os_boot | os_shutdown | slot | system_acpi_power_state | watchdog |
         platform_alert | entity_presence | monitor_asic_ic | lan |
         management_subsystem_health | battery | session | version | fru_state |
-        non_neg_integer().
+        fru_hot_swap | ipmb_physical | module_hot_swap | power_channel |
+        telco_alarm | non_neg_integer().
 
 -type value() ::
         {sensor_value, term()} |
@@ -215,7 +218,11 @@ get_type({specific,  16#29}) -> [{sensor_type, battery}];
 get_type({specific,  16#2a}) -> [{sensor_type, session}];
 get_type({specific,  16#2b}) -> [{sensor_type, version}];
 get_type({specific,  16#2c}) -> [{sensor_type, fru_state}];
-get_type({specific,  16#f0}) -> [{sensor_type, hot_swap}];
+get_type({specific,  16#f0}) -> [{sensor_type, fru_hot_swap}];
+get_type({specific,  16#f1}) -> [{sensor_type, ipmb_physical}];
+get_type({specific,  16#f2}) -> [{sensor_type, module_hot_swap}];
+get_type({specific,  16#f3}) -> [{sensor_type, power_channel}];
+get_type({specific,  16#f4}) -> [{sensor_type, telco_alarm}];
 get_type({_,          Type}) -> [{sensor_type, Type}].
 
 %%------------------------------------------------------------------------------
@@ -321,6 +328,13 @@ get_entity_id(16#37) -> [{entity_id, air_inlet}];
 get_entity_id(16#40) -> [{entity_id, air_inlet}];
 get_entity_id(16#41) -> [{entity_id, processor}];
 get_entity_id(16#42) -> [{entity_id, main_system_board}];
+get_entity_id(16#a0) -> [{entity_id, front_board}];
+get_entity_id(16#c1) -> [{entity_id, amc}];
+get_entity_id(16#c2) -> [{entity_id, mch}];
+get_entity_id(16#f0) -> [{entity_id, shelf_management_controller}];
+get_entity_id(16#f1) -> [{entity_id, filtration_unit}];
+get_entity_id(16#f2) -> [{entity_id, shelf_fru_information}];
+get_entity_id(16#f3) -> [{entity_id, alarm_panel}];
 get_entity_id(Id)    -> [{entity_id, Id}].
 
 %%------------------------------------------------------------------------------
@@ -474,7 +488,8 @@ map({specific,  16#29}, A, _, _, _) -> get_battery_state(A);
 map({specific,  16#2a}, A, _, C, D) -> get_session_event(A, C, D);
 map({specific,  16#2b}, A, B, C, _) -> get_version_change(A, B, C);
 map({specific,  16#2c}, A, _, C, _) -> get_fru_event(A, C);
-map({specific,  16#f0}, A, _, C, D) -> get_hot_swap_event(A, C, D);
+map({specific,  16#f0}, A, _, C, D) -> get_fru_hot_swap_event(A, C, D);
+map({specific,  16#f2}, A, _, _, _) -> get_module_hot_swap_event(A);
 map(Type, A, B, C, D) ->
     {unknown, [{type, Type}, {offset, A}, {data2, C}, {data3, D},
                {asserted, not eipmi_util:get_bool(B)}]}.
@@ -1278,36 +1293,45 @@ get_fru_state_cause(    _) -> [{cause, unknown}].
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-get_hot_swap_event(Value, Data, FruId) ->
+get_fru_hot_swap_event(Value, Data, FruId) ->
     [{sensor_value, get_fru_state(Value)}]
-        ++ get_hot_swap_event(<<Data:8>>, FruId).
-get_hot_swap_event(<<Cause:4, Prev:4>>, FruId) ->
-    get_hot_swap_state_cause(Cause)
+        ++ get_fru_hot_swap_event(<<Data:8>>, FruId).
+get_fru_hot_swap_event(<<Cause:4, Prev:4>>, FruId) ->
+    get_fru_hot_swap_state_cause(Cause)
         ++ [{previous_value, get_fru_state(Prev)}, {fru_id, FruId}].
 
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-get_hot_swap_state_cause(16#00) ->
+get_fru_hot_swap_state_cause(16#00) ->
     [{cause, normal}];
-get_hot_swap_state_cause(16#01) ->
+get_fru_hot_swap_state_cause(16#01) ->
     [{cause, shelf_manager}];
-get_hot_swap_state_cause(16#02) ->
+get_fru_hot_swap_state_cause(16#02) ->
     [{cause, operator}];
-get_hot_swap_state_cause(16#03) ->
+get_fru_hot_swap_state_cause(16#03) ->
     [{cause, fru_action}];
-get_hot_swap_state_cause(16#04) ->
+get_fru_hot_swap_state_cause(16#04) ->
     [{cause, communication_lost_or_regained}];
-get_hot_swap_state_cause(16#05) ->
+get_fru_hot_swap_state_cause(16#05) ->
     [{cause, communication_lost_or_regained_locally}];
-get_hot_swap_state_cause(16#06) ->
+get_fru_hot_swap_state_cause(16#06) ->
     [{cause, surprise}];
-get_hot_swap_state_cause(16#07) ->
+get_fru_hot_swap_state_cause(16#07) ->
     [{cause, provided_information}];
-get_hot_swap_state_cause(16#08) ->
+get_fru_hot_swap_state_cause(16#08) ->
     [{cause, invalid_hardware_address}];
-get_hot_swap_state_cause(    _) ->
+get_fru_hot_swap_state_cause(    _) ->
     [{cause, unknown}].
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+get_module_hot_swap_event(0) -> [{sensor_value, handle_closed}];
+get_module_hot_swap_event(1) -> [{sensor_value, handle_opened}];
+get_module_hot_swap_event(2) -> [{sensor_value, quiesced}];
+get_module_hot_swap_event(3) -> [{sensor_value, backend_power_failure}];
+get_module_hot_swap_event(4) -> [{sensor_value, backend_power_shutdown}].
 
 %%------------------------------------------------------------------------------
 %% @private

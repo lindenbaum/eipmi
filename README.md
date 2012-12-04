@@ -147,6 +147,14 @@ The session received an invalid message.
  {unhandled, {ipmi, {ok | error, term()}}}}
 ```
 The session received an IPMI response but no handler was found for it.
+```erlang
+{ipmi,
+ Session :: session(),
+ Address :: inet:ip_address() | inet:hostname(),
+ SELEntry :: sel_entry()}
+```
+A forwarded entry from the System Event Log (only when automatic SEL polling is
+enabled).
 
 ### Building
 
