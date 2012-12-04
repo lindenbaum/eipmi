@@ -434,7 +434,7 @@ decode_mtca_carrier_information_record(Acc, <<>>) ->
 decode_mtca_carrier_information_record(
   Acc, <<SiN:8, SiT:8, SlN:8, TiN:8, Y:16/little, X:16/little, Rest/binary>>) ->
     decode_mtca_carrier_information_record(
-      Acc ++ [{slot, get_mtca_site_type(SiT) ++
+      Acc ++ [{slot, eipmi_response:get_picmg_site_type(SiT) ++
                    [{site_number, SiN},
                     {slot_number, SlN},
                     {tier_number, TiN},
@@ -555,23 +555,6 @@ get_mtca_orientation(0) ->
     [{slot_orientation, left_to_right}, {tier_orientation, bottom_to_top}];
 get_mtca_orientation(1) ->
     [{slot_orientation, bottom_to_top}, {tier_orientation, left_to_right}].
-
-%%------------------------------------------------------------------------------
-%% @private
-%%------------------------------------------------------------------------------
-get_mtca_site_type(16#00) -> [{site_type, picmg_board}];
-get_mtca_site_type(16#01) -> [{site_type, power_entry}];
-get_mtca_site_type(16#02) -> [{site_type, shelf_fru_information}];
-get_mtca_site_type(16#03) -> [{site_type, dedicated_shelf_management_controller}];
-get_mtca_site_type(16#04) -> [{site_type, fan_tray}];
-get_mtca_site_type(16#05) -> [{site_type, fan_filter_tray}];
-get_mtca_site_type(16#06) -> [{site_type, alarm}];
-get_mtca_site_type(16#07) -> [{site_type, amc}];
-get_mtca_site_type(16#08) -> [{site_type, pmc}];
-get_mtca_site_type(16#09) -> [{site_type, rear_transition_module}];
-get_mtca_site_type(16#0a) -> [{site_type, mch}];
-get_mtca_site_type(16#0b) -> [{site_type, power_module}];
-get_mtca_site_type(_) -> [].
 
 %%------------------------------------------------------------------------------
 %% @private

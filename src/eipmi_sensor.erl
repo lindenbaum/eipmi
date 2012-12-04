@@ -490,6 +490,7 @@ map({specific,  16#2b}, A, B, C, _) -> get_version_change(A, B, C);
 map({specific,  16#2c}, A, _, C, _) -> get_fru_event(A, C);
 map({specific,  16#f0}, A, _, C, D) -> get_fru_hot_swap_event(A, C, D);
 map({specific,  16#f2}, A, _, _, _) -> get_module_hot_swap_event(A);
+map({specific,  16#f3}, A, _, C, D) -> get_power_channel_notification(A, C, D);
 map(Type, A, B, C, D) ->
     {unknown, [{type, Type}, {offset, A}, {data2, C}, {data3, D},
                {asserted, not eipmi_util:get_bool(B)}]}.
@@ -1332,6 +1333,40 @@ get_module_hot_swap_event(1) -> [{sensor_value, handle_opened}];
 get_module_hot_swap_event(2) -> [{sensor_value, quiesced}];
 get_module_hot_swap_event(3) -> [{sensor_value, backend_power_failure}];
 get_module_hot_swap_event(4) -> [{sensor_value, backend_power_shutdown}].
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+get_power_channel_notification(0, Bitfield, _) ->
+    get_global_power_channel_notification(<<Bitfield:8>>);
+get_power_channel_notification(1, Bitfield, Channel) ->
+    get_local_power_channel_notification(<<Bitfield:8>>, Channel).
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+get_global_power_channel_notification(
+  <<?EIPMI_RESERVED:4, A:1, B:1, C:1, D:1>>) ->
+    [{sensor_value, global_state_change},
+     {redundant_pm_provides_payload_power, eipmi_util:get_bool(A)},
+     {payload_power, case B of 0 -> not_good; _ -> good end},
+     {management_power, case C of 0 -> not_good; _ -> good end},
+     {role, case D of 0 -> redundant; _ -> primary end}].
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+get_local_power_channel_notification(
+  <<?EIPMI_RESERVED:1, A:1, B:1, C:1, D:1, E:1, F:1, G:1>>, Channel) ->
+    [{sensor_value, local_state_change},
+     {channel, Channel},
+     {power_on_asserted, eipmi_util:get_bool(A)},
+     {payload_power_overcurrent_detected, eipmi_util:get_bool(B)},
+     {payload_power_enabled, eipmi_util:get_bool(C)},
+     {enable_asserted, eipmi_util:get_bool(D)},
+     {management_power_overcurrent_detected, eipmi_util:get_bool(E)},
+     {management_power_enabled, eipmi_util:get_bool(F)},
+     {ps1_asserted, eipmi_util:get_bool(G)}].
 
 %%------------------------------------------------------------------------------
 %% @private

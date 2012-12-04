@@ -148,6 +148,20 @@ encode_transport(?GET_LAN_CONFIGURATION_PARAMETERS, Properties) ->
 %%------------------------------------------------------------------------------
 encode_picmg(?GET_PICMG_PROPERTIES, _Properties) ->
     <<?PICMG_ID:8>>;
+encode_picmg(?GET_ADDRESS_INFO, Properties) ->
+    N = eipmi_util:get_val(site_number, Properties),
+    case eipmi_util:get_val(fru_id, Properties) of
+        undefined ->
+            case eipmi_util:get_val(site_type, Properties) of
+                undefined ->
+                    <<?PICMG_ID:8>>;
+                T ->
+                    SiteT = encode_picmg_site_type(T),
+                    <<?PICMG_ID:8, 0:8, 3:8, N:8, SiteT:8>>
+            end;
+        FruId ->
+            <<?PICMG_ID:8, FruId:8>>
+    end;
 encode_picmg(?SET_FRU_ACTIVATION_POLICY, Properties) ->
     FruId = eipmi_util:get_val(fru_id, Properties),
     D = eipmi_util:get_val(deactivation_locked, Properties),
@@ -205,3 +219,19 @@ encode_fru_control(warm_reset) -> 1;
 encode_fru_control(graceful_reboot) -> 2;
 encode_fru_control(diagnostic_interrupt) -> 3;
 encode_fru_control(quiesce) -> 4.
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+encode_picmg_site_type(picmg_board) -> 16#00;
+encode_picmg_site_type(power_entry) -> 16#01;
+encode_picmg_site_type(shelf_fru_information) -> 16#02;
+encode_picmg_site_type(dedicated_shelf_management_controller) -> 16#03;
+encode_picmg_site_type(fan_tray) -> 16#04;
+encode_picmg_site_type(fan_filter_tray) -> 16#05;
+encode_picmg_site_type(alarm) -> 16#06;
+encode_picmg_site_type(amc) -> 16#07;
+encode_picmg_site_type(pmc) -> 16#08;
+encode_picmg_site_type(rear_transition_module) -> 16#09;
+encode_picmg_site_type(mch) -> 16#0a;
+encode_picmg_site_type(power_module) -> 16#0b.

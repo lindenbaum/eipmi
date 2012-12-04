@@ -155,6 +155,20 @@ encode_get_picmg_properties_test() ->
     Req = {?IPMI_NETFN_PICMG_REQUEST, ?GET_PICMG_PROPERTIES},
     ?assertEqual(<<16#00>>, eipmi_request:encode(Req, [])).
 
+encode_get_address_info_0_test() ->
+    Req = {?IPMI_NETFN_PICMG_REQUEST, ?GET_ADDRESS_INFO},
+    ?assertEqual(<<16#00>>, eipmi_request:encode(Req, [])).
+
+encode_get_address_info_1_test() ->
+    Req = {?IPMI_NETFN_PICMG_REQUEST, ?GET_ADDRESS_INFO},
+    ?assertEqual(<<16#00, 16#05>>, eipmi_request:encode(Req, [{fru_id, 5}])).
+
+encode_get_address_info_2_test() ->
+    Req = {?IPMI_NETFN_PICMG_REQUEST, ?GET_ADDRESS_INFO},
+    ?assertEqual(
+       <<16#00, 16#00, 16#03, 16#05, 16#07>>,
+       eipmi_request:encode(Req, [{site_type, amc}, {site_number, 5}])).
+
 encode_set_fru_activation_policy_test() ->
     Req = {?IPMI_NETFN_PICMG_REQUEST, ?SET_FRU_ACTIVATION_POLICY},
     Properties = [{fru_id, 5}, {deactivation_locked, true}, {locked, false}],

@@ -562,6 +562,30 @@ Returns:
  {ipmc_fru_id, 0..254}]
 ```
 
+#### Get Address Info
+Argument:
+```erlang
+[{fru_id, 0..254}, (optional)
+ {site_type, picmg_board | power_entry | shelf_fru_information |
+             dedicated_shelf_management_controller | fan_tray | fan_filter_tray |
+             alarm | amc | pmc | rear_transition_module | mch |
+             power_module}, (optional)
+ {site_number, non_neg_integer()} (optional)]
+```
+
+Returns:
+```erlang
+[{mch_site_number, non_neg_integer()},
+ {ipmb_address, non_neg_integer()},
+ {fru_id, 0..254}, (optional)
+ {site_number, non_neg_integer()}, (optional)
+ {site_type, picmg_board | power_entry | shelf_fru_information |
+             dedicated_shelf_management_controller | fan_tray | fan_filter_tray |
+             alarm | amc | pmc | rear_transition_module | mch |
+             power_module}, (optional)
+ {carrier_number, non_neg_integer()} (optional)]
+```
+
 #### Set FRU Activation Policy
 Argument:
 ```erlang

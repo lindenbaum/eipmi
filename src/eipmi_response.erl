@@ -23,7 +23,8 @@
 -module(eipmi_response).
 
 -export([decode/2,
-         get_device_support/1]).
+         get_device_support/1,
+         get_picmg_site_type/1]).
 
 -include("eipmi.hrl").
 
@@ -67,6 +68,25 @@ get_device_support(Support) ->
     G = case Support band 2#10 of 2#10 -> [sdr]; _ -> [] end,
     H = case Support band 2#1 of 2#1 -> [sensor]; _ -> [] end,
     A ++ B ++ C ++ D ++ E ++ F ++ G ++ H.
+
+%%------------------------------------------------------------------------------
+%% @doc
+%% Returns the site PICMG specific site type for an integer code.
+%% @end
+%%------------------------------------------------------------------------------
+get_picmg_site_type(16#00) -> [{site_type, picmg_board}];
+get_picmg_site_type(16#01) -> [{site_type, power_entry}];
+get_picmg_site_type(16#02) -> [{site_type, shelf_fru_information}];
+get_picmg_site_type(16#03) -> [{site_type, dedicated_shelf_management_controller}];
+get_picmg_site_type(16#04) -> [{site_type, fan_tray}];
+get_picmg_site_type(16#05) -> [{site_type, fan_filter_tray}];
+get_picmg_site_type(16#06) -> [{site_type, alarm}];
+get_picmg_site_type(16#07) -> [{site_type, amc}];
+get_picmg_site_type(16#08) -> [{site_type, pmc}];
+get_picmg_site_type(16#09) -> [{site_type, rear_transition_module}];
+get_picmg_site_type(16#0a) -> [{site_type, mch}];
+get_picmg_site_type(16#0b) -> [{site_type, power_module}];
+get_picmg_site_type(_) -> [].
 
 %%%=============================================================================
 %%% internal functions
@@ -189,6 +209,14 @@ decode_picmg(?GET_PICMG_PROPERTIES,
     [{picmg_extension, [Major | [$. | Minor]]},
      {max_fru_id, MaxFruId},
      {ipmc_fru_id, IPMCFruId}];
+decode_picmg(?GET_ADDRESS_INFO,
+             <<?PICMG_ID:8, MCHSite:8, IPMBAddr:8, ?EIPMI_RESERVED:8,
+               FruId:8, SiteN:8, SiteT:8, Carrier:8>>) ->
+    [{mch_site_number, MCHSite}, {ipmb_address, IPMBAddr}]
+        ++ case FruId of 16#ff -> []; _ -> [{fru_id, FruId}] end
+        ++ case SiteN of 0 -> []; _ -> [{site_number, SiteN}] end
+        ++ case SiteT of 16#ff -> []; _ -> get_picmg_site_type(SiteT) end
+        ++ case Carrier of 0 -> []; _ -> [{carrier_number, Carrier}] end;
 decode_picmg(?SET_FRU_ACTIVATION_POLICY, <<?PICMG_ID:8>>) ->
     [];
 decode_picmg(?GET_FRU_ACTIVATION_POLICY,

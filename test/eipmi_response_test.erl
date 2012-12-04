@@ -223,6 +223,17 @@ decode_get_picmg_properties_test() ->
         {ipmc_fru_id, 6}],
        eipmi_response:decode(Resp, Bin)).
 
+decode_get_address_info_test() ->
+    Resp = {?IPMI_NETFN_PICMG_RESPONSE, ?GET_ADDRESS_INFO},
+    Bin = <<16#00, 16#01, 16#02, 16#00, 16#05, 16#05, 16#07, 16#00>>,
+    ?assertEqual(
+       [{mch_site_number, 1},
+        {ipmb_address, 2},
+        {fru_id, 5},
+        {site_number, 5},
+        {site_type, amc}],
+       eipmi_response:decode(Resp, Bin)).
+
 decode_set_fru_activation_policy_test() ->
     Resp = {?IPMI_NETFN_PICMG_RESPONSE, ?SET_FRU_ACTIVATION_POLICY},
     ?assertEqual([], eipmi_response:decode(Resp, <<16#00>>)).
