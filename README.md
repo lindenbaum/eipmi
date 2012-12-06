@@ -549,6 +549,46 @@ Returns:
 [{data, binary()}]
 ```
 
+#### Get Device SDR
+Argument:
+```erlang
+[{reservation_id, non_neg_integer()}, (optional)
+ {record_id, non_neg_integer()},
+ {offset, non_neg_integer()}, (optional)
+ {count, 1..255} (optional)]
+```
+
+Return:
+```erlang
+[{next_record_id, non_neg_integer()},
+ {data, binary()}]
+```
+
+#### Reserve Device SDR Repository
+Argument:
+```erlang
+[]
+```
+
+Return:
+```erlang
+[{reservation_id, non_neg_integer()}]
+```
+
+#### Get Sensor Reading
+Argument:
+```erlang
+[{sensor_number, non_neg_integer()}]
+```
+
+Return:
+```erlang
+[{events_enabled, boolean()},
+ {scanning_enabled, boolean()},
+ {raw_reading, binary()},
+ {state, binary()}]
+```
+
 #### Get PICMG Properties
 Argument:
 ```erlang
