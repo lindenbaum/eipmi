@@ -38,8 +38,7 @@
 %% Start a locally registered event manager.
 %% @end
 %%------------------------------------------------------------------------------
--spec start_link() ->
-                        {ok, pid()} | {error, term()}.
+-spec start_link() -> {ok, pid()} | {error, term()}.
 start_link() ->
     gen_event:start_link({local, ?MODULE}).
 
@@ -48,8 +47,7 @@ start_link() ->
 %% A wrapper for {@link gen_event:add_handler/3}.
 %% @end
 %%------------------------------------------------------------------------------
--spec subscribe(module() | {module(), term()}, term()) ->
-                       ok | {error, term()}.
+-spec subscribe(module() | {module(), term()}, term()) -> ok | {error, term()}.
 subscribe(Handler, Args) ->
     case gen_event:add_handler(?MODULE, Handler, Args) of
         Reason = {'EXIT', _} ->
@@ -63,8 +61,7 @@ subscribe(Handler, Args) ->
 %% A wrapper for {@link gen_event:delete_handler/3}.
 %% @end
 %%------------------------------------------------------------------------------
--spec unsubscribe(module() | {module(), term()}, term()) ->
-                         term().
+-spec unsubscribe(module() | {module(), term()}, term()) -> term().
 unsubscribe(Handler, Args) ->
     gen_event:delete_handler(?MODULE, Handler, Args).
 
@@ -87,8 +84,7 @@ swap(OldHandler, OldArgs, NewHandler, NewArgs) ->
 %% {@link eipmi_session} to publish new events asynchronously.
 %% @end
 %%------------------------------------------------------------------------------
--spec fire(eipmi:session(), inet:ip_address() | inet:hostname(), term()) ->
-                  ok.
+-spec fire(eipmi:session(), inet:ip_address() | inet:hostname(), term()) -> ok.
 fire(Session, Address, Event) ->
     gen_event:notify(?MODULE, {ipmi, Session, Address, Event}).
 
@@ -97,7 +93,6 @@ fire(Session, Address, Event) ->
 %% A wrapper for {@link gen_event:swap_handler/3}.
 %% @end
 %%------------------------------------------------------------------------------
--spec list_handlers() ->
-                           [module() | {module(), term()}].
+-spec list_handlers() -> [module() | {module(), term()}].
 list_handlers() ->
     gen_event:which_handlers(?MODULE).

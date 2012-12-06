@@ -38,8 +38,7 @@
 %% received message.
 %% @end
 %%------------------------------------------------------------------------------
--spec ack(#rmcp_header{}) ->
-                 binary().
+-spec ack(#rmcp_header{}) -> binary().
 ack(Header = #rmcp_header{class = ?RMCP_ASF}) ->
     header(Header, ?RMCP_ACK).
 
@@ -49,8 +48,7 @@ ack(Header = #rmcp_header{class = ?RMCP_ASF}) ->
 %% capabilities of the far end.
 %% @end
 %%------------------------------------------------------------------------------
--spec ping(#rmcp_header{}, #asf_ping{}) ->
-                  binary().
+-spec ping(#rmcp_header{}, #asf_ping{}) -> binary().
 ping(Header = #rmcp_header{class = ?RMCP_ASF}, #asf_ping{iana = I, tag = T}) ->
     HeaderBin = header(Header, ?RMCP_NORMAL),
     PingBin = <<I:32, ?ASF_PING:8, T:8, 0:8, 0:8>>,

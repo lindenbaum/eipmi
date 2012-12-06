@@ -36,8 +36,7 @@
 %% values will be retrieved from the provided property list.
 %% @end
 %%------------------------------------------------------------------------------
--spec encode(eipmi:request(), proplists:proplist()) ->
-                    binary().
+-spec encode(eipmi:request(), proplists:proplist()) -> binary().
 encode({?IPMI_NETFN_SENSOR_EVENT_REQUEST, Cmd}, Properties) ->
     encode_sensor_event(Cmd, Properties);
 encode({?IPMI_NETFN_APPLICATION_REQUEST, Cmd}, Properties) ->
@@ -56,26 +55,22 @@ encode({?IPMI_NETFN_PICMG_REQUEST, Cmd}, Properties) ->
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-encode_sensor_event(_Cmd, _Properties) ->
-    <<>>.
+encode_sensor_event(?GET_DEVICE_SDR, Properties) ->
+    Reservation = eipmi_util:get_val(reservation_id, Properties, 16#0000),
+    Record = eipmi_util:get_val(record_id, Properties),
+    Offset = eipmi_util:get_val(offset, Properties, 16#00),
+    Count = eipmi_util:get_val(count, Properties, 16#ff),
+    true = Record =< 16#ffff,
+    <<Reservation:16/little, Record:16/little, Offset:8, Count:8>>;
+encode_sensor_event(?RESERVE_DEVICE_SDR_REPOSITORY, _Properties) ->
+    <<>>;
+encode_sensor_event(?GET_SENSOR_READING, Properties) ->
+    N = eipmi_util:get_val(sensor_number, Properties),
+    <<N:8>>.
 
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-encode_application(?GET_DEVICE_ID, _Properties) ->
-    <<>>;
-encode_application(?COLD_RESET, _Properties) ->
-    <<>>;
-encode_application(?WARM_RESET, _Properties) ->
-    <<>>;
-encode_application(?GET_SELF_TEST_RESULTS, _Properties) ->
-    <<>>;
-encode_application(?GET_ACPI_POWER_STATE, _Properties) ->
-    <<>>;
-encode_application(?GET_DEVICE_GUID, _Properties) ->
-    <<>>;
-encode_application(?GET_SYSTEM_GUID, _Properties) ->
-    <<>>;
 encode_application(?GET_CHANNEL_AUTHENTICATION_CAPABILITIES, Properties) ->
     P = encode_privilege(eipmi_util:get_val(privilege, Properties)),
     <<0:1, 0:3, ?IPMI_REQUESTED_CHANNEL:4, 0:4,P:4>>;
@@ -92,7 +87,16 @@ encode_application(?ACTIVATE_SESSION, Properties) ->
 encode_application(?SET_SESSION_PRIVILEGE_LEVEL, Properties) ->
     <<0:4, (encode_privilege(eipmi_util:get_val(privilege, Properties))):4>>;
 encode_application(?CLOSE_SESSION, Properties) ->
-    <<(eipmi_util:get_val(session_id, Properties)):32/little>>.
+    <<(eipmi_util:get_val(session_id, Properties)):32/little>>;
+encode_application(Req, _Properties)
+  when Req =:= ?GET_DEVICE_ID orelse
+       Req =:= ?COLD_RESET orelse
+       Req =:= ?WARM_RESET orelse
+       Req =:= ?GET_SELF_TEST_RESULTS orelse
+       Req =:= ?GET_ACPI_POWER_STATE orelse
+       Req =:= ?GET_DEVICE_GUID orelse
+       Req =:= ?GET_SYSTEM_GUID ->
+    <<>>.
 
 %%------------------------------------------------------------------------------
 %% @private
@@ -105,10 +109,6 @@ encode_storage(?READ_FRU_DATA, Properties) ->
     Count = eipmi_util:get_val(count, Properties),
     true = Offset =< 16#ffff,
     <<FruId:8, Offset:16/little, Count:8>>;
-encode_storage(?GET_SEL_INFO, _Properties) ->
-    <<>>;
-encode_storage(?RESERVE_SEL, _Properties) ->
-    <<>>;
 encode_storage(?GET_SEL_ENTRY, Properties) ->
     Record = eipmi_util:get_val(record_id, Properties),
     true = Record =< 16#ffff,
@@ -118,17 +118,19 @@ encode_storage(?CLEAR_SEL, Properties) ->
     Init = eipmi_util:get_val(initiate, Properties, true),
     InitOrGet = case Init of true -> 16#aa; false -> 0 end,
     <<Reservation:16/little, $C:8, $L:8, $R:8, InitOrGet:8>>;
-encode_storage(?GET_SDR_REPOSITORY_INFO, _Properties) ->
-    <<>>;
-encode_storage(?RESERVE_SDR_REPOSITORY, _Properties) ->
-    <<>>;
 encode_storage(?GET_SDR, Properties) ->
     Reservation = eipmi_util:get_val(reservation_id, Properties, 16#0000),
     Record = eipmi_util:get_val(record_id, Properties),
     Offset = eipmi_util:get_val(offset, Properties, 16#00),
     Count = eipmi_util:get_val(count, Properties, 16#ff),
     true = Record =< 16#ffff,
-    <<Reservation:16/little, Record:16/little, Offset:8, Count:8>>.
+    <<Reservation:16/little, Record:16/little, Offset:8, Count:8>>;
+encode_storage(Req, _Properties)
+  when Req =:= ?GET_SEL_INFO orelse
+       Req =:= ?RESERVE_SEL orelse
+       Req =:= ?GET_SDR_REPOSITORY_INFO orelse
+       Req =:= ?RESERVE_SDR_REPOSITORY ->
+    <<>>.
 
 %%------------------------------------------------------------------------------
 %% @private

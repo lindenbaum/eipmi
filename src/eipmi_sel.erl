@@ -44,8 +44,8 @@
           {revision, non_neg_integer()} |
           {sensor_type, eipmi_sensor:type()} |
           {sensor_number, non_neg_integer()} |
-          {sensor_reading, non_neg_integer()} |
-          {sensor_threshold, non_neg_integer()} |
+          {raw_reading, binary()} |
+          {raw_threshold, binary()} |
           eipmi_sensor:value() |
           eipmi_sensor:addr()]}.
 
@@ -64,8 +64,7 @@
 %% BMC the user should not clear the SEL explicitly.
 %% @end
 %%------------------------------------------------------------------------------
--spec read(pid(), boolean()) ->
-                  [entry()].
+-spec read(pid(), boolean()) -> [entry()].
 read(SessionPid, true) ->
     {ok, SelInfo} = eipmi_session:rpc(SessionPid, ?GET_INFO, []),
     Entries = do_read(SessionPid, eipmi_util:get_val(entries, SelInfo)),
@@ -81,8 +80,7 @@ read(SessionPid, false) ->
 %% by any user application.
 %% @end
 %%------------------------------------------------------------------------------
--spec clear(pid()) ->
-                   ok | {error, term()}.
+-spec clear(pid()) -> ok | {error, term()}.
 clear(SessionPid) ->
     do_clear(SessionPid).
 
@@ -159,10 +157,8 @@ decode_system_event0(Acc, <<Time:32/little, Generator:2/binary, Rest/binary>>) -
 %%------------------------------------------------------------------------------
 decode_system_event1(Acc, <<16#04:8, SensorType:8, SensorNum:8, Assertion:1,
                             EventType:7, EventData/binary>>) ->
-    Reading = {_, Sensor} = eipmi_sensor:get_reading(EventType, SensorType),
-    Acc ++ [{revision, 16#04}]
-        ++ eipmi_sensor:get_type(Sensor)
-        ++ [{sensor_number, SensorNum}]
+    Reading = {_, Sensor} = eipmi_sensor:get_type(EventType, SensorType),
+    Acc ++ [{revision, 16#04}, {sensor_type, Sensor}, {sensor_number, SensorNum}]
         ++ decode_event_data(Reading, Assertion, EventData);
 decode_system_event1(Acc, <<Revision:8, Data/binary>>) ->
     Acc ++ [{revision, Revision}, {data, Data}].
@@ -186,7 +182,7 @@ decode_event_data({threshold, Type}, Assertion, Data) ->
     decode_threshold(Type, Assertion, pad_event_data(Data));
 decode_event_data({discrete, Type}, Assertion, Data) ->
     decode_generic(Type, Assertion, pad_event_data(Data));
-decode_event_data({oem, Type}, Assertion, Data) ->
+decode_event_data({{oem, _}, Type}, Assertion, Data) ->
     decode_oem(Type, Assertion, pad_event_data(Data)).
 
 %%------------------------------------------------------------------------------
@@ -194,10 +190,10 @@ decode_event_data({oem, Type}, Assertion, Data) ->
 %%------------------------------------------------------------------------------
 decode_threshold(Type, Assertion, <<1:2, 0:2, Offset:4, B2:8, _:8>>) ->
     eipmi_sensor:get_value(Type, Offset, Assertion, 16#ff, 16#ff)
-        ++ [{sensor_reading, B2}];
+        ++ [{raw_reading, <<B2:8>>}];
 decode_threshold(Type, Assertion, <<1:2, 1:2, Offset:4, B2:8, B3:8>>) ->
     eipmi_sensor:get_value(Type, Offset, Assertion, 16#ff, 16#ff)
-        ++ [{sensor_reading, B2}, {sensor_threshold, B3}];
+        ++ [{raw_reading, <<B2:8>>}, {raw_threshold, <<B3:8>>}];
 decode_threshold(Type, Assertion, <<E2:2, E3:2, Offset:4, B2:8, B3:8>>) ->
     Byte2 = case E2 of 0 -> 16#ff; _ -> B2 end,
     Byte3 = case E3 of 0 -> 16#ff; _ -> B3 end,
@@ -207,7 +203,7 @@ decode_threshold(Type, Assertion, <<E2:2, E3:2, Offset:4, B2:8, B3:8>>) ->
 %% @private
 %%------------------------------------------------------------------------------
 decode_generic(Type, Assertion, <<1:2, E3:2, Offset:4, SOff:4, POff:4, B3:8>>) ->
-    Severity = maybe_value(severity_value, {generic, 16#07}, SOff, 0),
+    Severity = maybe_value(severity_value, severity, SOff, 0),
     Previous = maybe_value(previous_value, Type, POff, Assertion),
     decode_generic(Type, Assertion, <<0:2, E3:2, Offset:4, 16#ff:8, B3:8>>)
         ++ Severity ++ Previous;
@@ -220,7 +216,7 @@ decode_generic(Type, Assertion, <<E2:2, E3:2, Offset:4, B2:8, B3:8>>) ->
 %% @private
 %%------------------------------------------------------------------------------
 decode_oem(Type, Assertion, <<1:2, E3:2, Offset:4, SOff:4, POff:4, B3:8>>) ->
-    Severity = maybe_value(severity_value, {generic, 16#07}, SOff, 0),
+    Severity = maybe_value(severity_value, severity, SOff, 0),
     Previous = maybe_value(previous_value, Type, POff, Assertion),
     decode_oem(Type, Assertion, <<0:2, E3:2, Offset:4, 16#ff:8, B3:8>>)
         ++ Severity ++ Previous;
@@ -247,18 +243,3 @@ maybe_value(_Tag, _Type, 16#f, _Assert) ->
 maybe_value(Tag, Type, Offset, Assert) ->
     Vs = eipmi_sensor:get_value(Type, Offset, Assert, 16#ff, 16#ff),
     [{Tag, eipmi_util:get_val(sensor_value, Vs)}].
-
-%%%=============================================================================
-%%% TESTS
-%%%=============================================================================
-
--ifdef(TEST).
-
--include_lib("eunit/include/eunit.hrl").
-
-decode_test() ->
-    Decoded = decode(<<16#01, 16#00, 16#02, 16#0a, 16#53, 16#1b, 16#00, 16#20,
-                       16#00, 16#04, 16#f3, 16#03, 16#6f, 16#a1, 16#01, 16#0d>>),
-    error_logger:info_msg("~n~p~n", [Decoded]).
-
--endif.

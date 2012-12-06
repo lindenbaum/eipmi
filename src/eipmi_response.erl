@@ -38,8 +38,7 @@
 %% property list with the decoded values.
 %% @end
 %%------------------------------------------------------------------------------
--spec decode(eipmi:response(), binary()) ->
-                    proplists:proplist().
+-spec decode(eipmi:response(), binary()) -> proplists:proplist().
 decode({?IPMI_NETFN_SENSOR_EVENT_RESPONSE, Cmd}, Data) ->
     decode_sensor_event(Cmd, Data);
 decode({?IPMI_NETFN_APPLICATION_RESPONSE, Cmd}, Data) ->
@@ -56,8 +55,7 @@ decode({?IPMI_NETFN_PICMG_RESPONSE, Cmd}, Data) ->
 %% Returns a list of supported capabilities of a device (decoded from integer).
 %% @end
 %%------------------------------------------------------------------------------
--spec get_device_support(non_neg_integer()) ->
-                                [atom()].
+-spec get_device_support(non_neg_integer()) -> [atom()].
 get_device_support(Support) ->
     A = case Support band 2#10000000 of 2#10000000 -> [chassis]; _ -> [] end,
     B = case Support band 2#1000000 of 2#1000000 -> [bridge]; _ -> [] end,
@@ -95,8 +93,17 @@ get_picmg_site_type(_) -> [].
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-decode_sensor_event(_Cmd, _Data) ->
-    [].
+decode_sensor_event(?GET_DEVICE_SDR, <<Next:16/little, Data/binary>>) ->
+    [{next_record_id, Next}, {data, Data}];
+decode_sensor_event(?RESERVE_DEVICE_SDR_REPOSITORY, <<Reservation:16/little>>) ->
+    [{reservation_id, Reservation}];
+decode_sensor_event(?GET_SENSOR_READING,
+                    <<Reading:1/binary, Events:1, Scanning:1, Available:1,
+                      ?EIPMI_RESERVED:5, S/binary>>) ->
+    [{events_enabled, eipmi_util:get_bool(Events)},
+     {scanning_enabled, eipmi_util:get_bool(Scanning)}]
+        ++ case Available of 0 -> [{raw_reading, Reading}]; _ -> [] end
+        ++ case Available of 0 -> get_state(S); _ -> [] end.
 
 %%------------------------------------------------------------------------------
 %% @private
@@ -115,9 +122,9 @@ decode_application(?GET_DEVICE_ID,
      {device_support, get_device_support(Support)},
      {manufacturer_id, Manufacterer},
      {product_id, Product}];
-decode_application(?COLD_RESET, <<>>) ->
+decode_application(?COLD_RESET, _) ->
     [];
-decode_application(?WARM_RESET, <<>>) ->
+decode_application(?WARM_RESET, _) ->
     [];
 decode_application(?GET_SELF_TEST_RESULTS, <<Result:8, Detail:8>>) ->
     [{result, get_self_test_result(Result, Detail)}];
@@ -148,7 +155,7 @@ decode_application(?ACTIVATE_SESSION,
      {privilege, decode_privilege(P)}];
 decode_application(?SET_SESSION_PRIVILEGE_LEVEL, <<?EIPMI_RESERVED:4, P:4>>) ->
     [{privilege, decode_privilege(P)}];
-decode_application(?CLOSE_SESSION, <<>>) ->
+decode_application(?CLOSE_SESSION, _) ->
     [].
 
 %%------------------------------------------------------------------------------
@@ -202,32 +209,53 @@ decode_transport(?GET_LAN_CONFIGURATION_PARAMETERS, <<_Rev:8, Data/binary>>) ->
 
 %%------------------------------------------------------------------------------
 %% @private
+%% we've seen error prone implementation that do not include the PICMG
+%% identifier into the reponse.
 %%------------------------------------------------------------------------------
-decode_picmg(?GET_PICMG_PROPERTIES,
-             <<?PICMG_ID:8, Version:1/binary, MaxFruId:8, IPMCFruId:8>>) ->
+decode_picmg(?GET_PICMG_PROPERTIES, <<?PICMG_ID:8, V:1/binary, M:8, I:8>>) ->
+    decode_picmg_(?GET_PICMG_PROPERTIES, [V, M, I]);
+decode_picmg(?GET_PICMG_PROPERTIES, <<V:1/binary, M:8, I:8>>) ->
+    decode_picmg_(?GET_PICMG_PROPERTIES, [V, M, I]);
+decode_picmg(?GET_ADDRESS_INFO,
+             <<?PICMG_ID:8, M:8, I:8, ?EIPMI_RESERVED:8, F:8, N:8, T:8, C:8>>) ->
+    decode_picmg_(?GET_ADDRESS_INFO, [M, I, F, N, T, C]);
+decode_picmg(?GET_ADDRESS_INFO,
+             <<M:8, I:8, ?EIPMI_RESERVED:8, F:8, N:8, T:8, C:8>>) ->
+    decode_picmg_(?GET_ADDRESS_INFO, [M, I, F, N, T, C]);
+decode_picmg(?SET_FRU_ACTIVATION_POLICY, _) ->
+    [];
+decode_picmg(?GET_FRU_ACTIVATION_POLICY,
+             <<?PICMG_ID:8, ?EIPMI_RESERVED:6, D:1, L:1>>) ->
+    decode_picmg_(?GET_FRU_ACTIVATION_POLICY, [D, L]);
+decode_picmg(?GET_FRU_ACTIVATION_POLICY, <<?EIPMI_RESERVED:6, D:1, L:1>>) ->
+    decode_picmg_(?GET_FRU_ACTIVATION_POLICY, [D, L]);
+decode_picmg(?SET_FRU_ACTIVATION, _) ->
+    [];
+decode_picmg(?FRU_CONTROL, _) ->
+    [];
+decode_picmg(?GET_DEVICE_LOCATOR_RECORD_ID, <<?PICMG_ID:8, I:16/little>>) ->
+    decode_picmg_(?GET_DEVICE_LOCATOR_RECORD_ID, [I]);
+decode_picmg(?GET_DEVICE_LOCATOR_RECORD_ID, <<I:16/little>>) ->
+    decode_picmg_(?GET_DEVICE_LOCATOR_RECORD_ID, [I]).
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+decode_picmg_(?GET_PICMG_PROPERTIES, [Version, MaxFruId, IPMCFruId]) ->
     [Major | Minor] = lists:reverse(eipmi_util:from_bcd_plus(Version)),
     [{picmg_extension, [Major | [$. | Minor]]},
      {max_fru_id, MaxFruId},
      {ipmc_fru_id, IPMCFruId}];
-decode_picmg(?GET_ADDRESS_INFO,
-             <<?PICMG_ID:8, MCHSite:8, IPMBAddr:8, ?EIPMI_RESERVED:8,
-               FruId:8, SiteN:8, SiteT:8, Carrier:8>>) ->
-    [{mch_site_number, MCHSite}, {ipmb_address, IPMBAddr}]
+decode_picmg_(?GET_ADDRESS_INFO, [MCH, Addr, FruId, SiteN, SiteT, Carrier]) ->
+    [{mch_site_number, MCH}, {ipmb_address, Addr}]
         ++ case FruId of 16#ff -> []; _ -> [{fru_id, FruId}] end
         ++ case SiteN of 0 -> []; _ -> [{site_number, SiteN}] end
         ++ case SiteT of 16#ff -> []; _ -> get_picmg_site_type(SiteT) end
         ++ case Carrier of 0 -> []; _ -> [{carrier_number, Carrier}] end;
-decode_picmg(?SET_FRU_ACTIVATION_POLICY, <<?PICMG_ID:8>>) ->
-    [];
-decode_picmg(?GET_FRU_ACTIVATION_POLICY,
-             <<?PICMG_ID:8, ?EIPMI_RESERVED:6, Deactivation:1, Locked:1>>) ->
+decode_picmg_(?GET_FRU_ACTIVATION_POLICY, [Deactivation, Locked]) ->
     [{deactivation_locked, eipmi_util:get_bool(Deactivation)},
      {locked, eipmi_util:get_bool(Locked)}];
-decode_picmg(?SET_FRU_ACTIVATION, <<?PICMG_ID:8>>) ->
-    [];
-decode_picmg(?FRU_CONTROL, <<?PICMG_ID:8>>) ->
-    [];
-decode_picmg(?GET_DEVICE_LOCATOR_RECORD_ID, <<?PICMG_ID:8, Id:16/little>>) ->
+decode_picmg_(?GET_DEVICE_LOCATOR_RECORD_ID, [Id]) ->
     [{record_id, Id}].
 
 %%------------------------------------------------------------------------------
@@ -306,6 +334,21 @@ decode_privilege(1) -> callback;
 decode_privilege(2) -> user;
 decode_privilege(3) -> operator;
 decode_privilege(4) -> administrator.
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+get_state(<<A:8, _:1, B:7>>) ->
+    [{state, <<(reverse(<<A:8>>))/binary, (reverse(<<0:1, B:7>>))/bitstring>>}];
+get_state(<<A:8>>) ->
+    [{state, reverse(<<A:8>>)}].
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+reverse(Bitstring) -> reverse(Bitstring, <<>>).
+reverse(<<>>, Acc) -> Acc;
+reverse(<<B:1, R/bitstring>>, Acc) -> reverse(R, <<B:1, Acc/bitstring>>).
 
 %%------------------------------------------------------------------------------
 %% @private

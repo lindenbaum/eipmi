@@ -38,9 +38,9 @@
          close/1,
          read_fru/2,
          read_fru_inventory/2,
-         read_sdr/2,
-         read_sdr_repository/1,
-         read_sdr_repository/2,
+         get_sdr/2,
+         get_sdr_repository/1,
+         get_sdr_repository/2,
          read_sel/2,
          raw/4,
          sel_to_sdr/2,
@@ -129,8 +129,7 @@
 %% @see ping/2
 %% @end
 %%------------------------------------------------------------------------------
--spec ping(inet:ip_address() | inet:hostname()) ->
-                  pang | pong.
+-spec ping(inet:ip_address() | inet:hostname()) -> pang | pong.
 ping(IPAddress) ->
     ping(IPAddress, 5000).
 
@@ -140,8 +139,7 @@ ping(IPAddress) ->
 %% timeout value in milliseconds.
 %% @end
 %%------------------------------------------------------------------------------
--spec ping(inet:ip_address() | inet:hostname(), timeout()) ->
-                  pang | pong.
+-spec ping(inet:ip_address() | inet:hostname(), timeout()) -> pang | pong.
 ping(IPAddress, Timeout) when is_integer(Timeout) andalso Timeout > 0 ->
     {ok, Socket} = gen_udp:open(0, [binary, {active, false}]),
     try do_ping(IPAddress, Timeout, Socket) of
@@ -266,8 +264,7 @@ open(IPAddress, Options) ->
 %% session is not active any more.
 %% @end
 %%------------------------------------------------------------------------------
--spec close(eipmi:session()) ->
-                   ok | {error, term()}.
+-spec close(eipmi:session()) -> ok | {error, term()}.
 close(Session) ->
     Result = supervisor:terminate_child(?MODULE, Session),
     supervisor:delete_child(?MODULE, Session),
@@ -281,8 +278,7 @@ close(Session) ->
 %% a specific id the returned inventory data is the empty list.
 %% @end
 %%------------------------------------------------------------------------------
--spec read_fru(session(), 0..254) ->
-                      {ok, fru_info()} | {error, term()}.
+-spec read_fru(session(), 0..254) -> {ok, fru_info()} | {error, term()}.
 read_fru(Session, FruId) when FruId >= 0 andalso FruId < 255 ->
     case get_session(Session, supervisor:which_children(?MODULE)) of
         {ok, Pid} ->
@@ -313,12 +309,11 @@ read_fru_inventory(Session, SdrRepository) ->
 %% retried.
 %% @end
 %%------------------------------------------------------------------------------
--spec read_sdr(session(), non_neg_integer()) ->
-                      {ok, sdr()} | {error, term()}.
-read_sdr(Session, RecordId) ->
+-spec get_sdr(session(), non_neg_integer()) -> {ok, sdr()} | {error, term()}.
+get_sdr(Session, RecordId) ->
     case get_session(Session, supervisor:which_children(?MODULE)) of
         {ok, Pid} ->
-            case ?EIPMI_CATCH(eipmi_sdr:read(Pid, RecordId)) of
+            case ?EIPMI_CATCH(eipmi_sdr:get(Pid, RecordId)) of
                 Error = {error, _} ->
                     Error;
                 Entries ->
@@ -340,12 +335,11 @@ read_sdr(Session, RecordId) ->
 %% retried.
 %% @end
 %%------------------------------------------------------------------------------
--spec read_sdr_repository(session()) ->
-                                 {ok, sdr_repository()} | {error, term()}.
-read_sdr_repository(Session) ->
+-spec get_sdr_repository(session()) -> {ok, sdr_repository()} | {error, term()}.
+get_sdr_repository(Session) ->
     case get_session(Session, supervisor:which_children(?MODULE)) of
         {ok, Pid} ->
-            case ?EIPMI_CATCH(eipmi_sdr:read(Pid)) of
+            case ?EIPMI_CATCH(eipmi_sdr:get_repository(Pid)) of
                 Error = {error, _} ->
                     Error;
                 Entries ->
@@ -368,12 +362,12 @@ read_sdr_repository(Session) ->
 %% retried.
 %% @end
 %%------------------------------------------------------------------------------
--spec read_sdr_repository(session(), sdr_repository()) ->
-                                 {ok, sdr_repository()} | {error, term()}.
-read_sdr_repository(Session, SdrRepository) ->
+-spec get_sdr_repository(session(), sdr_repository()) ->
+                                {ok, sdr_repository()} | {error, term()}.
+get_sdr_repository(Session, Previous) ->
     case get_session(Session, supervisor:which_children(?MODULE)) of
         {ok, Pid} ->
-            case ?EIPMI_CATCH(eipmi_sdr:maybe_read(Pid, SdrRepository)) of
+            case ?EIPMI_CATCH(eipmi_sdr:maybe_get_repository(Pid, Previous)) of
                 Error = {error, _} ->
                     Error;
                 Entries ->
@@ -395,8 +389,7 @@ read_sdr_repository(Session, SdrRepository) ->
 %% case the following read may return duplicates of already read events.
 %% @end
 %%------------------------------------------------------------------------------
--spec read_sel(session(), boolean()) ->
-                      {ok, [sel_entry()]} | {error, term()}.
+-spec read_sel(session(), boolean()) -> {ok, [sel_entry()]} | {error, term()}.
 read_sel(Session, Clear) ->
     case get_session(Session, supervisor:which_children(?MODULE)) of
         {ok, Pid} ->
@@ -432,8 +425,7 @@ raw(Session, NetFn, Command, Properties) ->
 %% an entry in the System Event Log (SEL), if any.
 %% @end
 %%------------------------------------------------------------------------------
--spec sel_to_sdr(sel_entry(), sdr_repository()) ->
-                        {ok, sdr()} | {error, term()}.
+-spec sel_to_sdr(sel_entry(), sdr_repository()) -> {ok, sdr()} | {error, term()}.
 sel_to_sdr({_, SelEntryProps}, SdrRepository) ->
     get_element_by_properties(
       maybe_keyfind(sensor_number, 1, SelEntryProps)
@@ -447,8 +439,7 @@ sel_to_sdr({_, SelEntryProps}, SdrRepository) ->
 %% Event Log (SEL), if any.
 %% @end
 %%------------------------------------------------------------------------------
--spec sel_to_fru(sel_entry(), sdr_repository()) ->
-                        {ok, sdr()} | {error, term()}.
+-spec sel_to_fru(sel_entry(), sdr_repository()) -> {ok, sdr()} | {error, term()}.
 sel_to_fru(SelEntry, SdrRepository) ->
     case sel_to_sdr(SelEntry, SdrRepository) of
         {ok, Sdr} ->
@@ -479,8 +470,7 @@ sel_to_fru(SelEntry, SdrRepository, FruInventory) ->
 %% the Sensor Data Record (SDR) repository, if any.
 %% @end
 %%------------------------------------------------------------------------------
--spec sdr_to_fru(sdr(), sdr_repository()) ->
-                        {ok, sdr()} | {error, term()}.
+-spec sdr_to_fru(sdr(), sdr_repository()) -> {ok, sdr()} | {error, term()}.
 sdr_to_fru({_, SensorProps}, SdrRepository) ->
     get_element_by_properties(
       maybe_keyfind(entity_id, 1, SensorProps)
@@ -599,8 +589,7 @@ sdr_to_fru(Sdr, SdrRepository, FruInventory) ->
 %% </dl>
 %% @end
 %%------------------------------------------------------------------------------
--spec subscribe(module() | {module(), term()}, term()) ->
-                       ok | {error, term()}.
+-spec subscribe(module() | {module(), term()}, term()) -> ok | {error, term()}.
 subscribe(Handler, Args) ->
     eipmi_events:subscribe(Handler, Args).
 
@@ -611,8 +600,7 @@ subscribe(Handler, Args) ->
 %% {@link gen_event:delete_handler/3}.
 %% @end
 %%------------------------------------------------------------------------------
--spec unsubscribe(module() | {module(), term()}, term()) ->
-                         term().
+-spec unsubscribe(module() | {module(), term()}, term()) -> term().
 unsubscribe(Handler, Args) ->
     eipmi_events:unsubscribe(Handler, Args).
 

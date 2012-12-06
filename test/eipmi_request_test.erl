@@ -24,6 +24,24 @@
 %%% TESTS
 %%%=============================================================================
 
+encode_get_device_sdr_test() ->
+    Req = {?IPMI_NETFN_SENSOR_EVENT_REQUEST, ?GET_DEVICE_SDR},
+    Properties = [{reservation_id, 16#1122},
+                  {record_id, 16#3344},
+                  {offset, 0},
+                  {count, 5}],
+    ?assertEqual(
+       <<16#22, 16#11, 16#44, 16#33, 16#00, 16#05>>,
+       eipmi_request:encode(Req, Properties)).
+
+encode_reserve_device_sdr_repository_test() ->
+    Req = {?IPMI_NETFN_SENSOR_EVENT_REQUEST, ?RESERVE_DEVICE_SDR_REPOSITORY},
+    ?assertEqual(<<>>, eipmi_request:encode(Req, [])).
+
+encode_get_sensor_reading_test() ->
+    Req = {?IPMI_NETFN_SENSOR_EVENT_REQUEST, ?GET_SENSOR_READING},
+    ?assertEqual(<<16#03>>, eipmi_request:encode(Req, [{sensor_number, 3}])).
+
 encode_get_device_id_test() ->
     Req = {?IPMI_NETFN_APPLICATION_REQUEST, ?GET_DEVICE_ID},
     ?assertEqual(<<>>, eipmi_request:encode(Req, [])).

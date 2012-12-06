@@ -90,8 +90,7 @@
 %% the empty list.
 %% @end
 %%------------------------------------------------------------------------------
--spec read(pid(), 0..254) ->
-                  {ok, info()} | {error, term()}.
+-spec read(pid(), 0..254) -> {ok, info()} | {error, term()}.
 read(SessionPid, FruId) ->
     FruInfo = eipmi_session:rpc(SessionPid, ?GET_INFO, [{fru_id, FruId}]),
     do_read(FruInfo, SessionPid, FruId).
@@ -644,22 +643,3 @@ sum(<<Byte:8, Rest/binary>>, Sum) ->
 %%------------------------------------------------------------------------------
 unit(Unit) ->
     eipmi_sensor:get_unit(Unit).
-
-%%%=============================================================================
-%%% TESTS
-%%%=============================================================================
-
--ifdef(TEST).
-
--include_lib("eunit/include/eunit.hrl").
-
-decode_compatibility_test() ->
-    ?assertEqual(
-       [{entity_id, other},
-        {manufacturer_id, 16#1122},
-        {compatibility_base, 42},
-        {compatible_codes, [10, 11, 12, 13, 14, 15, 16, 22, 23]}],
-       decode_compatibility(
-         <<16#1122:24/little, 1:8, 42:8, 10:8, 2#00111111:8, 2#00011000:8>>)).
-
--endif.

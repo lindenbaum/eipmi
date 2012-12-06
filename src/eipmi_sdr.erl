@@ -22,9 +22,11 @@
 
 -module(eipmi_sdr).
 
--export([read/1,
-         maybe_read/2,
-         read/2,
+-export([get_repository/1,
+         maybe_get_repository/2,
+         get/2,
+         get_sensor_reading/3,
+         get_sensor_reading/2,
          convert/2]).
 
 -include("eipmi.hrl").
@@ -34,6 +36,7 @@
 -define(READ, {?IPMI_NETFN_STORAGE_REQUEST, ?GET_SDR}).
 -define(GET_INFO, {?IPMI_NETFN_STORAGE_REQUEST, ?GET_SDR_REPOSITORY_INFO}).
 -define(RESERVE, {?IPMI_NETFN_STORAGE_REQUEST, ?RESERVE_SDR_REPOSITORY}).
+-define(GET_READING, {?IPMI_NETFN_SENSOR_EVENT_REQUEST, ?GET_SENSOR_READING}).
 
 -type record_type() ::
         full |
@@ -124,7 +127,11 @@
           {operations,
            [delete | partial_add | reserve | get_allocation_info]}]}.
 
--export_type([record_type/0, property/0, entry/0]).
+-type reading() ::
+        eipmi_sensor:value() |
+        {sensor_reading, {number(), eipmi_sensor:unit()}}.
+
+-export_type([record_type/0, property/0, entry/0, reading/0]).
 
 %%%=============================================================================
 %%% API
@@ -135,10 +142,9 @@
 %% Read all entries from the sensor data record repository (SDR).
 %% @end
 %%------------------------------------------------------------------------------
--spec read(pid()) ->
-                  [entry()].
-read(SessionPid) ->
-    maybe_read(SessionPid, []).
+-spec get_repository(pid()) -> [entry()].
+get_repository(SessionPid) ->
+    maybe_get_repository(SessionPid, []).
 
 %%------------------------------------------------------------------------------
 %% @doc
@@ -146,7 +152,8 @@ read(SessionPid) ->
 %% the SDR repository changed since the last read.
 %% @end
 %%------------------------------------------------------------------------------
-maybe_read(SessionPid, OldSdrRepository) ->
+-spec maybe_get_repository(pid(), [entry()]) -> [entry()].
+maybe_get_repository(SessionPid, OldSdrRepository) ->
     {ok, SdrInfo} = eipmi_session:rpc(SessionPid, ?GET_INFO, []),
     OldSdrInfo = eipmi_util:get_val(sdr_info, OldSdrRepository, []),
     LastRecentActionTimestamp = get_recent_action_timestamp(OldSdrInfo),
@@ -155,23 +162,23 @@ maybe_read(SessionPid, OldSdrRepository) ->
         true ->
             Reserve = needs_reservation(SdrInfo),
             Entries = eipmi_util:get_val(entries, SdrInfo),
-            maybe_read(Entries, SessionPid, Reserve, [{sdr_info, SdrInfo}]);
+            maybe_get_repository(Entries, SessionPid, Reserve, SdrInfo);
         false ->
             OldSdrRepository
     end.
-maybe_read(0, _SessionPid, _Reserve, _Acc) ->
-    [];
-maybe_read(_, SessionPid, Reserve, Acc) ->
-    Acc ++ maybe_reserve(SessionPid, fun read_all/2, [SessionPid], Reserve).
+maybe_get_repository(0, _SessionPid, _Reserve, SdrInfo) ->
+    [{sdr_info, SdrInfo}];
+maybe_get_repository(_, SessionPid, Reserve, SdrInfo) ->
+    [{sdr_info, SdrInfo}]
+        ++ maybe_reserve(SessionPid, fun read_all/2, [SessionPid], Reserve).
 
 %%------------------------------------------------------------------------------
 %% @doc
 %% Read one specific entry from the sensor data record repository (SDR).
 %% @end
 %%------------------------------------------------------------------------------
--spec read(pid(), non_neg_integer()) ->
-                  entry().
-read(SessionPid, RecordId) ->
+-spec get(pid(), non_neg_integer()) -> entry().
+get(SessionPid, RecordId) ->
     {ok, SdrInfo} = eipmi_session:rpc(SessionPid, ?GET_INFO, []),
     Args = [SessionPid, RecordId],
     Reserve = lists:member(reserve, eipmi_util:get_val(operations, SdrInfo)),
@@ -180,21 +187,44 @@ read(SessionPid, RecordId) ->
 
 %%------------------------------------------------------------------------------
 %% @doc
+%% Return the current reading of a specific sensor referred to by its number.
+%% @end
+%%------------------------------------------------------------------------------
+-spec get_sensor_reading(pid(), non_neg_integer(), [entry()]) -> [reading()].
+get_sensor_reading(SessionPid, SensorNumber, SdrRepository) ->
+    Pred = fun(Ps) -> lists:member({sensor_number, SensorNumber}, Ps) end,
+    [Sdr] = [Record || Record = {_, Ps} <- SdrRepository, Pred(Ps)],
+    get_sensor_reading(SessionPid, Sdr).
+
+%%------------------------------------------------------------------------------
+%% @doc
+%% Return the current reading of a specific sensor referred to by its number.
+%% @end
+%%------------------------------------------------------------------------------
+-spec get_sensor_reading(pid(), {full | compact, [property()]}) -> [reading()].
+get_sensor_reading(SessionPid, {Type, Properties})
+  when Type =:= full orelse Type =:= compact ->
+    SensorType = eipmi_util:get_val(sensor_type, Properties),
+    Args = [lists:keyfind(sensor_number, 1, Properties)],
+    {ok, Result} = eipmi_session:rpc(SessionPid, ?GET_READING, Args),
+    State = eipmi_util:get_val(state, Result),
+    Raw = eipmi_util:get_val(raw_reading, Result),
+    Reading = get_reading(sensor_reading, Raw, Properties),
+    get_sensor_reading_(SensorType, State) ++ Reading.
+get_sensor_reading_(threshold, <<S:6/bitstring, _:2>>) ->
+    [eipmi_sensor:get_value(threshold, O, 1, 16#ff, 16#ff) || O <- get_offsets(S)];
+get_sensor_reading_(Type, S) ->
+    [eipmi_sensor:get_value(Type, O, 1, 16#ff, 16#ff) || O <- get_offsets(S)].
+
+%%------------------------------------------------------------------------------
+%% @doc
 %% Convert a raw sensor reading into a meaningful value, using the sensors
 %% full SDR record.
 %% @end
 %%------------------------------------------------------------------------------
--spec convert(binary(), {full, [property()]}) ->
-                     {ok, {number(), eipmi_sensor:unit() }} | {error, term()}.
-convert(Raw, {full, Properties}) when is_binary(Raw) ->
-    case get_reading(result, Raw, Properties) of
-        [{result, Result}] ->
-            {ok, Result};
-        _ ->
-            {error, sensor_does_not_return_numeric_reading}
-    end;
-convert(_Raw, {full, _Properties}) ->
-    {error, invalid_sensor_reading}.
+-spec convert(binary(), {full, [property()]}) -> [reading()].
+convert(Raw, {full, Properties}) ->
+    get_reading(sensor_reading, Raw, Properties).
 
 %%%=============================================================================
 %%% Internal functions
@@ -333,14 +363,13 @@ decode_full_sensor_record(
     NominalMaximum:1/binary, NominalMinimum:1/binary, MaximumReading:1/binary,
     MinimumReading:1/binary, _:64, ?EIPMI_RESERVED:16, _OEM:8, _IdLen:8,
     Id/binary>>) ->
-    {_, Type} = eipmi_sensor:get_reading(ReadingType, SensorType),
+    {_, Type} = eipmi_sensor:get_type(ReadingType, SensorType),
     Units = get_units(SensorUnit),
     Properties = get_sensor_properties(SensorProperties, Units),
     eipmi_sensor:get_addr(SensorAddr)
         ++ get_sensor_numbers(SensorNumber, 0)
         ++ eipmi_sensor:get_entity(EntityId, EntityInstance)
-        ++ eipmi_sensor:get_type(Type)
-        ++ Units ++ Properties
+        ++ [{sensor_type, Type}] ++ Units ++ Properties
         ++ get_reading(nominal_reading, NominalReading, Units ++ Properties)
         ++ get_reading(nominal_maximum, NominalMaximum, Units ++ Properties)
         ++ get_reading(nominal_minimum, NominalMinimum, Units ++ Properties)
@@ -356,11 +385,11 @@ decode_compact_sensor_record(
     _:16, SensorType:8, ReadingType:8, _:48, SensorUnit:3/binary, Direction:2,
     Modifier:2, Count:4, Sharing:1/binary, _:16, ?EIPMI_RESERVED:24, _OEM:8,
     _IdLen:8, Id/binary>>) ->
-    {_, Type} = eipmi_sensor:get_reading(ReadingType, SensorType),
+    {_, Type} = eipmi_sensor:get_type(ReadingType, SensorType),
     eipmi_sensor:get_addr(SensorAddr)
         ++ get_sensor_numbers(SensorNumber, Count)
         ++ eipmi_sensor:get_entity(EntityId, EntityInstance)
-        ++ eipmi_sensor:get_type(Type)
+        ++ [{sensor_type, Type}]
         ++ get_units(SensorUnit)
         ++ get_direction(Direction)
         ++ get_id(Count, Sharing, Modifier, eipmi_util:binary_to_string(Id)).
@@ -372,11 +401,11 @@ decode_event_only_record(
   <<SensorAddr:2/binary, SensorNumber:8, EntityId:8, EntityInstance:1/binary,
     SensorType:8, ReadingType:8, Direction:2, Modifier:2, Count:4,
     Sharing:1/binary, ?EIPMI_RESERVED:8, _OEM:8, _IdLen:8, Id/binary>>) ->
-    {_, Type} = eipmi_sensor:get_reading(ReadingType, SensorType),
+    {_, Type} = eipmi_sensor:get_type(ReadingType, SensorType),
     eipmi_sensor:get_addr(SensorAddr)
         ++ get_sensor_numbers(SensorNumber, Count)
         ++ eipmi_sensor:get_entity(EntityId, EntityInstance)
-        ++ eipmi_sensor:get_type(Type)
+        ++ [{sensor_type, Type}]
         ++ get_direction(Direction)
         ++ get_id(Count, Sharing, Modifier, eipmi_util:binary_to_string(Id)).
 
@@ -748,7 +777,7 @@ get_reading(Tag, Raw, Properties) ->
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-get_reading(_, unspecified, _, _, _) ->
+get_reading(_, U, _, _, _) when U =:= unspecified orelse U =:= undefined ->
     [];
 get_reading(Tag, Unit, unsigned, <<Value:8/unsigned>>, Coefficients) ->
     [{Tag, calc_reading(Unit, Value, Coefficients)}];
@@ -771,6 +800,14 @@ calc_reading(Unit, X, {L, M, B, BExp, ResultExp}) ->
 %%------------------------------------------------------------------------------
 needs_reservation(SdrInfo) ->
     lists:member(reserve, eipmi_util:get_val(operations, SdrInfo)).
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+get_offsets(StateBitstring) -> get_offsets(StateBitstring, 0, []).
+get_offsets(<<>>, _, Acc) -> lists:reverse(Acc);
+get_offsets(<<0:1, R/bitstring>>, I, Acc) -> get_offsets(R, I + 1, Acc);
+get_offsets(<<1:1, R/bitstring>>, I, Acc) -> get_offsets(R, I + 1, [I | Acc]).
 
 %%------------------------------------------------------------------------------
 %% @private

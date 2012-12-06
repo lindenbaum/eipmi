@@ -24,6 +24,31 @@
 %%% TESTS
 %%%=============================================================================
 
+decode_get_device_sdr_test() ->
+    Resp = {?IPMI_NETFN_SENSOR_EVENT_RESPONSE, ?GET_DEVICE_SDR},
+    Bin = <<16#22, 16#11, $d, $a, $t, $a>>,
+    ?assertEqual(
+       [{next_record_id, 16#1122},
+        {data, <<$d, $a, $t, $a>>}],
+       eipmi_response:decode(Resp, Bin)).
+
+decode_reserve_device_sdr_repository_test() ->
+    Resp = {?IPMI_NETFN_SENSOR_EVENT_RESPONSE, ?RESERVE_DEVICE_SDR_REPOSITORY},
+    Bin = <<16#22, 16#11>>,
+    ?assertEqual(
+       [{reservation_id, 16#1122}],
+       eipmi_response:decode(Resp, Bin)).
+
+decode_get_sensor_reading_test() ->
+    Resp = {?IPMI_NETFN_SENSOR_EVENT_RESPONSE, ?GET_SENSOR_READING},
+    Bin = <<16#01, 2#11000000, 2#11110000, 2#10000001>>,
+    ?assertEqual(
+       [{events_enabled, true},
+        {scanning_enabled, true},
+        {raw_reading, <<16#01>>},
+        {state, <<2#0000111110000000:16>>}],
+       eipmi_response:decode(Resp, Bin)).
+
 decode_get_device_id_test() ->
     Resp = {?IPMI_NETFN_APPLICATION_RESPONSE, ?GET_DEVICE_ID},
     Bin = <<16#00, 16#82, 16#02, 16#0d, 16#51, 16#3e, 16#78, 16#6c, 16#00,

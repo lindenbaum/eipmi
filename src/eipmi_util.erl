@@ -44,8 +44,7 @@
 %% (in bytes).
 %% @end
 %%------------------------------------------------------------------------------
--spec normalize(non_neg_integer(), string() | binary()) ->
-                       binary().
+-spec normalize(non_neg_integer(), string() | binary()) -> binary().
 normalize(Length, String) when is_list(String) ->
     normalize(Length, list_to_binary(String));
 normalize(Length, Binary) when is_binary(Binary) ->
@@ -63,8 +62,7 @@ normalize(Length, Binary) when is_binary(Binary) ->
 %% A flattening wrapper for {@link io_lib:format/2}.
 %% @end
 %%------------------------------------------------------------------------------
--spec format(string(), [term()]) ->
-                    string().
+-spec format(string(), [term()]) -> string().
 format(Format, Args) ->
     lists:flatten(io_lib:format(Format, Args)).
 
@@ -74,8 +72,7 @@ format(Format, Args) ->
 %% environment.
 %% @end
 %%------------------------------------------------------------------------------
--spec get_env(atom(), term()) ->
-                     term().
+-spec get_env(atom(), term()) -> term().
 get_env(Property, Default) ->
     get_val(Property, application:get_all_env(eipmi), Default).
 
@@ -85,8 +82,7 @@ get_env(Property, Default) ->
 %% @see proplists:get_value/2
 %% @end
 %%------------------------------------------------------------------------------
--spec get_val(atom(), proplists:proplist()) ->
-                     term().
+-spec get_val(atom(), proplists:proplist()) -> term().
 get_val(Property, PropList) ->
     proplists:get_value(Property, PropList).
 
@@ -96,8 +92,7 @@ get_val(Property, PropList) ->
 %% @see proplists:get_value/3
 %% @end
 %%------------------------------------------------------------------------------
--spec get_val(atom(), proplists:proplist(), term()) ->
-                     term().
+-spec get_val(atom(), proplists:proplist(), term()) -> term().
 get_val(Property, PropList, Default) ->
     proplists:get_value(Property, PropList, Default).
 
@@ -107,8 +102,7 @@ get_val(Property, PropList, Default) ->
 %% values associated with the property.
 %% @end
 %%------------------------------------------------------------------------------
--spec update_val(atom(), term(), proplists:proplist()) ->
-                        proplists:proplist().
+-spec update_val(atom(), term(), proplists:proplist()) -> proplists:proplist().
 update_val(Property, Value, PropList) ->
     [{Property, Value} | proplists:delete(Property, PropList)].
 
@@ -155,8 +149,7 @@ merge_vals(PropList1, PropList2) ->
 %% Decodes a BCD plus encoded binary into a string.
 %% @end
 %%------------------------------------------------------------------------------
--spec from_bcd_plus(bitstring()) ->
-                           string().
+-spec from_bcd_plus(bitstring()) -> string().
 from_bcd_plus(Bitstring) ->
     from_bcd_plus(Bitstring, "").
 from_bcd_plus(<<>>, Acc) ->
@@ -199,8 +192,7 @@ from_bcd_plus(<<16#f:4, Rest/bitstring>>, Acc) ->
 %% Decodes a packed 6bit ASCII encoded binary into a string.
 %% @end
 %%------------------------------------------------------------------------------
--spec from_packed_ascii(binary()) ->
-                               string().
+-spec from_packed_ascii(binary()) -> string().
 from_packed_ascii(Binary) ->
     from_packed_ascii1(Binary, "").
 from_packed_ascii1(<<>>, Acc) ->
@@ -222,8 +214,7 @@ from_packed_ascii3(_Carry3, <<>>, Acc) ->
 %% `A' and `25' corresponds to `Z'.
 %% @end
 %%------------------------------------------------------------------------------
--spec from_base26(non_neg_integer()) ->
-                         string().
+-spec from_base26(non_neg_integer()) -> string().
 from_base26(Number) ->
     from_base26(Number, []).
 from_base26(Number, Acc) when Number < 26 ->
@@ -244,7 +235,6 @@ get_bool(_) -> true.
 %% Convert a binary into a string removing all contained zero bytes.
 %% @end
 %%------------------------------------------------------------------------------
--spec binary_to_string(binary()) ->
-                              string().
+-spec binary_to_string(binary()) -> string().
 binary_to_string(Binary) ->
     [C || C <- binary_to_list(Binary), C =/= 0].
