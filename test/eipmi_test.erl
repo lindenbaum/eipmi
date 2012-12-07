@@ -19,8 +19,8 @@
 -include_lib("eunit/include/eunit.hrl").
 
 -define(IP, "10.1.31.11").
-%%-define(GET_HOSTNAME, inet:gethostname()).
--define(GET_HOSTNAME, skip).
+-define(GET_HOSTNAME, inet:gethostname()).
+%%-define(GET_HOSTNAME, skip).
 
 %%%=============================================================================
 %%% TESTS
@@ -67,7 +67,7 @@ parallel_request({ok, "tirana"}) ->
     application:start(eipmi),
     {ok, Session} = eipmi:open(?IP),
     Mon = monitor_session(Session),
-    Action = fun() -> {ok, _} = eipmi:raw(Session, 16#06, 16#3b, []) end,
+    Action = fun() -> {ok, _} = eipmi:get_sel_info(Session) end,
     Pids = lists:map(fun(_) -> spawn_link(Action) end, lists:seq(1, 10)),
     Receive = fun(P) -> receive {'EXIT', P, Reason} -> Reason end end,
     Results = lists:map(Receive, Pids),
@@ -143,7 +143,7 @@ read_sel({ok, "tirana"}) ->
     application:start(eipmi),
     {ok, Session} = eipmi:open(?IP),
     Mon = monitor_session(Session),
-    {ok, Sel} = eipmi:read_sel(Session, false),
+    {ok, Sel} = eipmi:get_sel(Session, false),
     error_logger:info_msg("~n~p~n", [Sel]),
     ?assertEqual(ok, eipmi:close(Session)),
     ?assertEqual(shutdown, receive {'DOWN', Mon, _, _, Reason} -> Reason end),

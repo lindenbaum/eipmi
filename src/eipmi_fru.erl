@@ -61,6 +61,7 @@
         {base_compatibility, proplists:proplist()} |
         {extended_compatibility, proplists:proplist()} |
         {amc_p2p_connectivity, proplists:proplist()} |
+        {mtca_carrier_information, proplists:proplist()} |
         {oem, proplists:proplist()}.
 
 -type info() ::
