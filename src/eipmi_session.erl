@@ -268,7 +268,7 @@ handle_rmcp({error, Reason}, State) ->
 %% @private
 %%------------------------------------------------------------------------------
 handle_ipmi(Packet = #rmcp_ipmi{properties = Properties}, State) ->
-    RqSeqNr = eipmi_util:get_val(rq_seq_nr, Properties),
+    RqSeqNr = proplists:get_value(rq_seq_nr, Properties),
     handle_ipmi_(get_response(Packet), unregister_request(RqSeqNr, State)).
 handle_ipmi_(Message, {[], State}) ->
     fire({unhandled, {ipmi, Message}}, State);
@@ -279,7 +279,7 @@ handle_ipmi_(Message, {Requests, State}) ->
 %% @private
 %%------------------------------------------------------------------------------
 get_response(Packet = #rmcp_ipmi{properties = Ps}) ->
-    get_response(eipmi_util:get_val(completion, Ps), Packet).
+    get_response(proplists:get_value(completion, Ps), Packet).
 get_response(normal, #rmcp_ipmi{cmd = Cmd, data = Data}) ->
     %% Currently all incoming packets are considered to be IPMI responses
     %% and outbound sequence numbers are not tracked/checked.
@@ -359,7 +359,7 @@ maybe_send_ack(Header, State) ->
 %% @private
 %%------------------------------------------------------------------------------
 udp_send(Bin, S = #state{socket = Socket, address = IPAddress}) ->
-    Port = eipmi_util:get_val(port, S#state.properties),
+    Port = proplists:get_value(port, S#state.properties),
     ok = gen_udp:send(Socket, IPAddress, Port, Bin),
     S#state{last_send = to_millis(os:timestamp())}.
 
@@ -378,7 +378,7 @@ handle_get_channel_authentication_capabilites_response({ok, Fields}, State) ->
 %% selection order is none, pwd, md5, md2.
 %%------------------------------------------------------------------------------
 select_auth(Fields, State) ->
-    AuthTypes = eipmi_util:get_val(auth_types, Fields),
+    AuthTypes = proplists:get_value(auth_types, Fields),
     None = lists:member(none, AuthTypes),
     Pwd = lists:member(pwd, AuthTypes),
     Md5 = lists:member(md5, AuthTypes),
@@ -403,7 +403,7 @@ select_auth(Fields, State) ->
 %% have sensible values in the state.
 %%------------------------------------------------------------------------------
 select_login(Fields, State) ->
-    Logins = eipmi_util:get_val(login_status, Fields),
+    Logins = proplists:get_value(login_status, Fields),
     case {lists:member(anonymous, Logins), lists:member(null, Logins)} of
         {true, _} ->
             update_state_val(password, "", update_state_val(user, "", State));
@@ -434,10 +434,9 @@ handle_activate_session_response({ok, Fields}, State) ->
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-handle_set_session_privilege_response({ok, Fields}, State) ->
-    handle_set_session_privilege_response(
-      eipmi_util:get_val(privilege, Fields) =:= get_state_val(privilege, State),
-      Fields, State).
+handle_set_session_privilege_response({ok, Fs}, State) ->
+    P = proplists:get_value(privilege, Fs) =:= get_state_val(privilege, State),
+    handle_set_session_privilege_response(P, Fs, State).
 handle_set_session_privilege_response(true, _, State = #state{queue = Q}) ->
     NewState = State#state{active = true, queue = []},
     keep_alive(
@@ -512,7 +511,7 @@ to_millis({MegaSecs, Secs, MicroSecs}) ->
 %% @private
 %%------------------------------------------------------------------------------
 get_state_val(Property, #state{properties = Ps}) ->
-    eipmi_util:get_val(Property, Ps).
+    proplists:get_value(Property, Ps).
 
 %%------------------------------------------------------------------------------
 %% @private

@@ -155,13 +155,13 @@ get_repository(SessionPid) ->
 -spec maybe_get_repository(pid(), [entry()]) -> [entry()].
 maybe_get_repository(SessionPid, OldSdrRepository) ->
     {ok, SdrInfo} = eipmi_session:rpc(SessionPid, ?GET_INFO, []),
-    OldSdrInfo = eipmi_util:get_val(sdr_info, OldSdrRepository, []),
+    OldSdrInfo = proplists:get_value(sdr_info, OldSdrRepository, []),
     LastRecentActionTimestamp = get_recent_action_timestamp(OldSdrInfo),
     CurrentRecentActionTimestamp = get_recent_action_timestamp(SdrInfo),
     case CurrentRecentActionTimestamp > LastRecentActionTimestamp of
         true ->
             Reserve = needs_reservation(SdrInfo),
-            Entries = eipmi_util:get_val(entries, SdrInfo),
+            Entries = proplists:get_value(entries, SdrInfo),
             maybe_get_repository(Entries, SessionPid, Reserve, SdrInfo);
         false ->
             OldSdrRepository
@@ -181,7 +181,7 @@ maybe_get_repository(_, SessionPid, Reserve, SdrInfo) ->
 get(SessionPid, RecordId) ->
     {ok, SdrInfo} = eipmi_session:rpc(SessionPid, ?GET_INFO, []),
     Args = [SessionPid, RecordId],
-    Reserve = lists:member(reserve, eipmi_util:get_val(operations, SdrInfo)),
+    Reserve = lists:member(reserve, proplists:get_value(operations, SdrInfo)),
     {_, Entry} = maybe_reserve(SessionPid, fun read_one/3, Args, Reserve),
     Entry.
 
@@ -204,11 +204,11 @@ get_sensor_reading(SessionPid, SensorNumber, SdrRepository) ->
 -spec get_sensor_reading(pid(), {full | compact, [property()]}) -> [reading()].
 get_sensor_reading(SessionPid, {Type, Properties})
   when Type =:= full orelse Type =:= compact ->
-    SensorType = eipmi_util:get_val(sensor_type, Properties),
+    SensorType = proplists:get_value(sensor_type, Properties),
     Args = [lists:keyfind(sensor_number, 1, Properties)],
     {ok, Result} = eipmi_session:rpc(SessionPid, ?GET_READING, Args),
-    State = eipmi_util:get_val(state, Result),
-    Raw = eipmi_util:get_val(raw_reading, Result),
+    State = proplists:get_value(state, Result),
+    Raw = proplists:get_value(raw_reading, Result),
     Reading = get_reading(sensor_reading, Raw, Properties),
     get_sensor_reading_(SensorType, State) ++ Reading.
 get_sensor_reading_(threshold, <<S:6/bitstring, _:2>>) ->
@@ -237,7 +237,7 @@ convert(Raw, {full, Properties}) ->
                            [entry()] | {non_neg_integer(), entry()}.
 maybe_reserve(SessionPid, Fun, Args, true) ->
     {ok, Reserve} = eipmi_session:rpc(SessionPid, ?RESERVE, []),
-    ReservationId = eipmi_util:get_val(reservation_id, Reserve),
+    ReservationId = proplists:get_value(reservation_id, Reserve),
     erlang:apply(Fun, Args ++ [ReservationId]);
 maybe_reserve(_SessionPid, Fun, Args, false) ->
     erlang:apply(Fun, Args ++ [16#0000]).
@@ -258,8 +258,8 @@ read_all(SessionPid, ReservationId, RecordId, Acc) ->
 %%------------------------------------------------------------------------------
 read_one(SessionPid, RecordId, ReservationId) ->
     {NextRecordId, Header} = read_header(SessionPid, RecordId, ReservationId),
-    Length = eipmi_util:get_val(record_length, Header),
-    Type = eipmi_util:get_val(record_type, Header),
+    Length = proplists:get_value(record_length, Header),
+    Type = proplists:get_value(record_type, Header),
     Body = read_body(SessionPid, RecordId, ReservationId, Type, Length),
     {NextRecordId, {Type, proplists:delete(record_type, Header) ++ Body}}.
 
@@ -270,8 +270,8 @@ read_header(Pid, Record, Reservation) ->
     Ps = [{reservation_id, Reservation}, {record_id, Record},
           {offset, 0}, {count, 5}],
     {ok, Read} = eipmi_session:rpc(Pid, ?READ, Ps),
-    NextRecordId = eipmi_util:get_val(next_record_id, Read),
-    {NextRecordId, decode_header(eipmi_util:get_val(data, Read))}.
+    NextRecordId = proplists:get_value(next_record_id, Read),
+    {NextRecordId, decode_header(proplists:get_value(data, Read))}.
 
 %%------------------------------------------------------------------------------
 %% @private
@@ -300,7 +300,7 @@ do_read(Pid, Record, Reservation, Count, {Offset, Acc}) ->
     Ps = [{reservation_id, Reservation}, {record_id, Record},
           {offset, 5 + Offset}, {count, Count}],
     {ok, Read} = eipmi_session:rpc(Pid, ?READ, Ps),
-    {Offset + Count, <<Acc/binary, (eipmi_util:get_val(data, Read))/binary>>}.
+    {Offset + Count, <<Acc/binary, (proplists:get_value(data, Read))/binary>>}.
 
 %%------------------------------------------------------------------------------
 %% @private
@@ -586,7 +586,7 @@ get_linearization_fun(_) -> fun(X) -> X end.
 %% @private
 %%------------------------------------------------------------------------------
 get_sensor_properties(Binary, Properties) ->
-    Unit = eipmi_util:get_val(sensor_unit, Properties),
+    Unit = proplists:get_value(sensor_unit, Properties),
     get_sensor_properties(Unit =/= unspecified, Binary, Unit).
 get_sensor_properties(
   true,
@@ -769,9 +769,9 @@ get_rel_contained_from_range(
 %% @private
 %%------------------------------------------------------------------------------
 get_reading(Tag, Raw, Properties) ->
-    Unit = eipmi_util:get_val(sensor_unit, Properties),
-    Format = eipmi_util:get_val(sensor_format, Properties),
-    Coefficients = eipmi_util:get_val(sensor_coefficients, Properties),
+    Unit = proplists:get_value(sensor_unit, Properties),
+    Format = proplists:get_value(sensor_format, Properties),
+    Coefficients = proplists:get_value(sensor_coefficients, Properties),
     get_reading(Tag, Unit, Format, Raw, Coefficients).
 
 %%------------------------------------------------------------------------------
@@ -799,7 +799,7 @@ calc_reading(Unit, X, {L, M, B, BExp, ResultExp}) ->
 %% @private
 %%------------------------------------------------------------------------------
 needs_reservation(SdrInfo) ->
-    lists:member(reserve, eipmi_util:get_val(operations, SdrInfo)).
+    lists:member(reserve, proplists:get_value(operations, SdrInfo)).
 
 %%------------------------------------------------------------------------------
 %% @private
@@ -814,5 +814,5 @@ get_offsets(<<1:1, R/bitstring>>, I, Acc) -> get_offsets(R, I + 1, [I | Acc]).
 %%------------------------------------------------------------------------------
 get_recent_action_timestamp(SdrInfo) ->
     erlang:max(
-      eipmi_util:get_val(most_recent_addition, SdrInfo, 0),
-      eipmi_util:get_val(most_recent_erase, SdrInfo, 0)).
+      proplists:get_value(most_recent_addition, SdrInfo, 0),
+      proplists:get_value(most_recent_erase, SdrInfo, 0)).

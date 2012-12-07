@@ -41,12 +41,6 @@ normalize_test() ->
 format_test() ->
     ?assertEqual("1.2", eipmi_util:format("~B.~B", [1, 2])).
 
-get_val_test() ->
-    ?assertEqual(v, eipmi_util:get_val(k, [{k, v}])),
-    ?assertEqual(undefined, eipmi_util:get_val(k, [])),
-    ?assertEqual(v, eipmi_util:get_val(k, [{k, v}], v0)),
-    ?assertEqual(v, eipmi_util:get_val(k, [], v)).
-
 update_val_test() ->
     ?assertEqual([{k, v1}], eipmi_util:update_val(k, v1, [])),
     ?assertEqual([{k, v1}], eipmi_util:update_val(k, v1, [{k, v0}])).
@@ -59,17 +53,17 @@ copy_val_test() ->
 
 merge_vals_test() ->
     Merged1 = eipmi_util:merge_vals([], [{a, 1}, {b, 2}]),
-    ?assertEqual(1, eipmi_util:get_val(a, Merged1)),
-    ?assertEqual(2, eipmi_util:get_val(b, Merged1)),
+    ?assertEqual(1, proplists:get_value(a, Merged1)),
+    ?assertEqual(2, proplists:get_value(b, Merged1)),
 
     Merged2 = eipmi_util:merge_vals([{a, 1}, {b, 2}], []),
-    ?assertEqual(1, eipmi_util:get_val(a, Merged2)),
-    ?assertEqual(2, eipmi_util:get_val(b, Merged2)),
+    ?assertEqual(1, proplists:get_value(a, Merged2)),
+    ?assertEqual(2, proplists:get_value(b, Merged2)),
 
     Merged3 = eipmi_util:merge_vals([{a, 1}, {b, 2}], [{a, 3}, {c, 4}]),
-    ?assertEqual(1, eipmi_util:get_val(a, Merged3)),
-    ?assertEqual(2, eipmi_util:get_val(b, Merged3)),
-    ?assertEqual(4, eipmi_util:get_val(c, Merged3)).
+    ?assertEqual(1, proplists:get_value(a, Merged3)),
+    ?assertEqual(2, proplists:get_value(b, Merged3)),
+    ?assertEqual(4, proplists:get_value(c, Merged3)).
 
 eipmi_catch_test() ->
     ?assertEqual({error, b}, ?EIPMI_CATCH(a = b)),

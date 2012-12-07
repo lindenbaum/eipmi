@@ -71,9 +71,9 @@ ipmi_response_test() ->
           data = <<16#00, 16#01, 16#19, 16#00, 16#00, 16#00, 16#00, 16#00>>},
        Ipmi),
     Ps = Ipmi#rmcp_ipmi.properties,
-    ?assertEqual(none, eipmi_util:get_val(auth_type, Ps)),
-    ?assertEqual(0, eipmi_util:get_val(outbound_seq_nr, Ps)),
-    ?assertEqual(0, eipmi_util:get_val(session_id, Ps)),
-    ?assertEqual(16#81, eipmi_util:get_val(rq_addr, Ps)),
-    ?assertEqual(0, eipmi_util:get_val(rq_seq_nr, Ps)),
-    ?assertEqual(normal, eipmi_util:get_val(completion, Ps)).
+    ?assertEqual(none, proplists:get_value(auth_type, Ps)),
+    ?assertEqual(0, proplists:get_value(outbound_seq_nr, Ps)),
+    ?assertEqual(0, proplists:get_value(session_id, Ps)),
+    ?assertEqual(16#81, proplists:get_value(rq_addr, Ps)),
+    ?assertEqual(0, proplists:get_value(rq_seq_nr, Ps)),
+    ?assertEqual(normal, proplists:get_value(completion, Ps)).

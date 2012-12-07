@@ -368,7 +368,7 @@ open(IPAddress) ->
 -spec open(inet:ip_address() | inet:hostname(), [option()]) ->
                   {ok, eipmi:session()} | {error, term()}.
 open(IPAddress, Options) ->
-    Target = {IPAddress, eipmi_util:get_val(port, Options, ?RMCP_PORT_NUMBER)},
+    Target = {IPAddress, proplists:get_value(port, Options, ?RMCP_PORT_NUMBER)},
     start_session(Target, IPAddress, Options).
 
 %%------------------------------------------------------------------------------
@@ -972,7 +972,7 @@ start_session(Target, IPAddress, Options) ->
         Error = {error, _} ->
             Error;
         Ok when element(1, Ok) =:= ok ->
-            case eipmi_util:get_val(poll_sel, Options, 0) > 0 of
+            case proplists:get_value(poll_sel, Options, 0) > 0 of
                 false ->
                     {ok, Session};
                 true ->
@@ -1047,7 +1047,7 @@ to_ok_tuple(Result) -> {ok, Result}.
 %%------------------------------------------------------------------------------
 get_fru_ids(SdrRepository) ->
     FruRecords = filter_by_key(fru_device_locator, SdrRepository),
-    FruIds = [eipmi_util:get_val(fru_id, Ps) || {_, Ps} <- FruRecords],
+    FruIds = [proplists:get_value(fru_id, Ps) || {_, Ps} <- FruRecords],
     [FruId || FruId <- FruIds, FruId =/= undefined].
 
 %%------------------------------------------------------------------------------

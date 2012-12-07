@@ -128,7 +128,7 @@ code_change(_OldVsn, State, _Extra) ->
 %% @private
 %%------------------------------------------------------------------------------
 read_sel(State = #state{pid = Pid, properties = Ps}) ->
-    case catch eipmi_sel:read(Pid, eipmi_util:get_val(clear_sel, Ps)) of
+    case catch eipmi_sel:read(Pid, proplists:get_value(clear_sel, Ps)) of
         Entries when is_list(Entries) ->
             lists:foldl(fun fire/2, State, Entries);
         _ ->
@@ -139,7 +139,7 @@ read_sel(State = #state{pid = Pid, properties = Ps}) ->
 %% @private
 %%------------------------------------------------------------------------------
 start_timer(Message, State = #state{properties = Ps}) ->
-    erlang:send_after(eipmi_util:get_val(Message, Ps), self(), Message),
+    erlang:send_after(proplists:get_value(Message, Ps), self(), Message),
     State.
 
 %%------------------------------------------------------------------------------

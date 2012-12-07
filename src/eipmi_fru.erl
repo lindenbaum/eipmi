@@ -108,9 +108,9 @@ do_read({error, {bmc_error, parameter_out_of_range}}, _SessionPid, _FruId) ->
 do_read(Error = {error, _}, _SessionPid, _FruId) ->
     Error;
 do_read({ok, FruInfo}, SessionPid, FruId) ->
-    Access = eipmi_util:get_val(access, FruInfo),
+    Access = proplists:get_value(access, FruInfo),
     Div = case Access of by_words -> 2; by_bytes -> 1 end,
-    AreaSize = eipmi_util:get_val(area_size, FruInfo) div Div,
+    AreaSize = proplists:get_value(area_size, FruInfo) div Div,
     decode(FruId, do_read(SessionPid, FruId, AreaSize, ?MAX_READ_COUNT div Div)).
 
 %%------------------------------------------------------------------------------
@@ -134,8 +134,8 @@ do_read(SessionPid, FruId, Size, BlockSize, {Offset, Acc}) ->
 read_raw(SessionPid, FruId, Offset, Count, Acc) ->
     Ps = [{fru_id, FruId}, {offset, Offset}, {count, Count}],
     {ok, R} = eipmi_session:rpc(SessionPid, ?READ, Ps),
-    Data = eipmi_util:get_val(data, R),
-    {Offset + eipmi_util:get_val(count, R), <<Acc/binary, Data/binary>>}.
+    Data = proplists:get_value(data, R),
+    {Offset + proplists:get_value(count, R), <<Acc/binary, Data/binary>>}.
 
 %%------------------------------------------------------------------------------
 %% @private
@@ -560,7 +560,7 @@ get_mtca_orientation(1) ->
 %% @private
 %%------------------------------------------------------------------------------
 get_mtca_slots(Type, Slots) ->
-    [S || S = {slot, Ps} <- Slots, eipmi_util:get_val(site_type, Ps) =:= Type].
+    [S || S = {slot, Ps} <- Slots, proplists:get_value(site_type, Ps) =:= Type].
 
 %%------------------------------------------------------------------------------
 %% @private

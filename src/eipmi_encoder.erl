@@ -84,10 +84,10 @@ header(#rmcp_header{version = V, seq_nr = S, class = C}, Ack) ->
 %% @private
 %%------------------------------------------------------------------------------
 session(Properties, Data) ->
-    S = eipmi_util:get_val(inbound_seq_nr, Properties),
-    I = eipmi_util:get_val(session_id, Properties),
-    P = eipmi_util:get_val(password, Properties),
-    AuthType = eipmi_util:get_val(auth_type, Properties),
+    S = proplists:get_value(inbound_seq_nr, Properties),
+    I = proplists:get_value(session_id, Properties),
+    P = proplists:get_value(password, Properties),
+    AuthType = proplists:get_value(auth_type, Properties),
     session(AuthType, S, I, P, Data).
 
 %%------------------------------------------------------------------------------
@@ -123,17 +123,17 @@ request(Properties, {NetFn, Cmd}, Data) ->
 %% @private
 %%------------------------------------------------------------------------------
 request_head(NetFn, Properties) ->
-    A = eipmi_util:get_val(rs_addr, Properties),
-    L = eipmi_util:get_val(rs_lun, Properties),
+    A = proplists:get_value(rs_addr, Properties),
+    L = proplists:get_value(rs_lun, Properties),
     <<A:8, NetFn:6, L:2>>.
 
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
 request_tail(Properties, Cmd, Data) ->
-    A = eipmi_util:get_val(rq_addr, Properties),
-    S = eipmi_util:get_val(rq_seq_nr, Properties),
-    L = eipmi_util:get_val(rq_lun, Properties),
+    A = proplists:get_value(rq_addr, Properties),
+    S = proplists:get_value(rq_seq_nr, Properties),
+    L = proplists:get_value(rq_lun, Properties),
     <<A:8, S:6, L:2, Cmd:8, Data/binary>>.
 
 %%------------------------------------------------------------------------------

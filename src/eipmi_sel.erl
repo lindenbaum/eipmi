@@ -67,8 +67,8 @@
 -spec read(pid(), boolean()) -> [entry()].
 read(SessionPid, true) ->
     {ok, SelInfo} = eipmi_session:rpc(SessionPid, ?GET_INFO, []),
-    Entries = do_read(SessionPid, eipmi_util:get_val(entries, SelInfo)),
-    Operations = eipmi_util:get_val(operations, SelInfo),
+    Entries = do_read(SessionPid, proplists:get_value(entries, SelInfo)),
+    Operations = proplists:get_value(operations, SelInfo),
     ?EIPMI_CATCH(do_clear(SessionPid, lists:member(reserve, Operations))),
     Entries;
 read(SessionPid, false) ->
@@ -100,8 +100,8 @@ do_read(_SessionPid, 16#ffff, Acc) ->
 do_read(SessionPid, Id, Acc) ->
     case eipmi_session:rpc(SessionPid, ?READ, [{record_id, Id}]) of
         {ok, Entry} ->
-            NextId = eipmi_util:get_val(next_record_id, Entry),
-            Sel = decode(eipmi_util:get_val(data, Entry)),
+            NextId = proplists:get_value(next_record_id, Entry),
+            Sel = decode(proplists:get_value(data, Entry)),
             do_read(SessionPid, NextId, [Sel | Acc]);
         {error, {bmc_error, _}} ->
             Acc
@@ -112,11 +112,11 @@ do_read(SessionPid, Id, Acc) ->
 %%------------------------------------------------------------------------------
 do_clear(SessionPid) ->
     {ok, SelInfo} = eipmi_session:rpc(SessionPid, ?GET_INFO, []),
-    Operations = eipmi_util:get_val(operations, SelInfo),
+    Operations = proplists:get_value(operations, SelInfo),
     do_clear(SessionPid, lists:member(reserve, Operations)).
 do_clear(SessionPid, true) ->
     {ok, Reserve} = eipmi_session:rpc(SessionPid, ?RESERVE, []),
-    ReservationId = eipmi_util:get_val(reservation_id, Reserve),
+    ReservationId = proplists:get_value(reservation_id, Reserve),
     do_clear(SessionPid, ReservationId, true, false);
 do_clear(SessionPid, false) ->
     do_clear(SessionPid, 16#0000, true, false).
@@ -125,7 +125,7 @@ do_clear(_SessionPid, _ReservationId, _Initiate, true) ->
 do_clear(SessionPid, ReservationId, Initiate, false) ->
     Args = [{reservation_id, ReservationId}, {initiate, Initiate}],
     {ok, Clr} = eipmi_session:rpc(SessionPid, ?CLEAR, Args),
-    Completed = eipmi_util:get_val(progress, Clr) =:= completed,
+    Completed = proplists:get_value(progress, Clr) =:= completed,
     do_clear(SessionPid, ReservationId, false, Completed).
 
 %%------------------------------------------------------------------------------
@@ -242,4 +242,4 @@ maybe_value(_Tag, _Type, 16#f, _Assert) ->
     [];
 maybe_value(Tag, Type, Offset, Assert) ->
     Vs = eipmi_sensor:get_value(Type, Offset, Assert, 16#ff, 16#ff),
-    [{Tag, eipmi_util:get_val(sensor_value, Vs)}].
+    [{Tag, proplists:get_value(sensor_value, Vs)}].

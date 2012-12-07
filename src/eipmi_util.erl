@@ -23,8 +23,6 @@
 -export([normalize/2,
          format/2,
          get_env/2,
-         get_val/2,
-         get_val/3,
          update_val/3,
          copy_val/3,
          merge_vals/2,
@@ -74,27 +72,7 @@ format(Format, Args) ->
 %%------------------------------------------------------------------------------
 -spec get_env(atom(), term()) -> term().
 get_env(Property, Default) ->
-    get_val(Property, application:get_all_env(eipmi), Default).
-
-%%------------------------------------------------------------------------------
-%% @doc
-%% Return the value of a property from a proplist.
-%% @see proplists:get_value/2
-%% @end
-%%------------------------------------------------------------------------------
--spec get_val(atom(), proplists:proplist()) -> term().
-get_val(Property, PropList) ->
-    proplists:get_value(Property, PropList).
-
-%%------------------------------------------------------------------------------
-%% @doc
-%% Return the value of a property from a proplist.
-%% @see proplists:get_value/3
-%% @end
-%%------------------------------------------------------------------------------
--spec get_val(atom(), proplists:proplist(), term()) -> term().
-get_val(Property, PropList, Default) ->
-    proplists:get_value(Property, PropList, Default).
+    proplists:get_value(Property, application:get_all_env(eipmi), Default).
 
 %%------------------------------------------------------------------------------
 %% @doc

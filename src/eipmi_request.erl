@@ -56,38 +56,38 @@ encode({?IPMI_NETFN_PICMG_REQUEST, Cmd}, Properties) ->
 %% @private
 %%------------------------------------------------------------------------------
 encode_sensor_event(?GET_DEVICE_SDR, Properties) ->
-    Reservation = eipmi_util:get_val(reservation_id, Properties, 16#0000),
-    Record = eipmi_util:get_val(record_id, Properties),
-    Offset = eipmi_util:get_val(offset, Properties, 16#00),
-    Count = eipmi_util:get_val(count, Properties, 16#ff),
+    Reservation = proplists:get_value(reservation_id, Properties, 16#0000),
+    Record = proplists:get_value(record_id, Properties),
+    Offset = proplists:get_value(offset, Properties, 16#00),
+    Count = proplists:get_value(count, Properties, 16#ff),
     true = Record =< 16#ffff,
     <<Reservation:16/little, Record:16/little, Offset:8, Count:8>>;
 encode_sensor_event(?RESERVE_DEVICE_SDR_REPOSITORY, _Properties) ->
     <<>>;
 encode_sensor_event(?GET_SENSOR_READING, Properties) ->
-    N = eipmi_util:get_val(sensor_number, Properties),
+    N = proplists:get_value(sensor_number, Properties),
     <<N:8>>.
 
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
 encode_application(?GET_CHANNEL_AUTHENTICATION_CAPABILITIES, Properties) ->
-    P = encode_privilege(eipmi_util:get_val(privilege, Properties)),
+    P = encode_privilege(proplists:get_value(privilege, Properties)),
     <<0:1, 0:3, ?IPMI_REQUESTED_CHANNEL:4, 0:4,P:4>>;
 encode_application(?GET_SESSION_CHALLENGE, Properties) ->
-    A = eipmi_auth:encode_type(eipmi_util:get_val(auth_type, Properties)),
-    U = eipmi_util:normalize(16, eipmi_util:get_val(user, Properties)),
+    A = eipmi_auth:encode_type(proplists:get_value(auth_type, Properties)),
+    U = eipmi_util:normalize(16, proplists:get_value(user, Properties)),
     <<0:4, A:4, U/binary>>;
 encode_application(?ACTIVATE_SESSION, Properties) ->
-    A = eipmi_auth:encode_type(eipmi_util:get_val(auth_type, Properties)),
-    P = encode_privilege(eipmi_util:get_val(privilege, Properties)),
-    C = eipmi_util:normalize(16, eipmi_util:get_val(challenge, Properties)),
-    S = eipmi_util:get_val(initial_outbound_seq_nr, Properties),
+    A = eipmi_auth:encode_type(proplists:get_value(auth_type, Properties)),
+    P = encode_privilege(proplists:get_value(privilege, Properties)),
+    C = eipmi_util:normalize(16, proplists:get_value(challenge, Properties)),
+    S = proplists:get_value(initial_outbound_seq_nr, Properties),
     <<0:4, A:4, 0:4, P:4, C/binary, S:32/little>>;
 encode_application(?SET_SESSION_PRIVILEGE_LEVEL, Properties) ->
-    <<0:4, (encode_privilege(eipmi_util:get_val(privilege, Properties))):4>>;
+    <<0:4, (encode_privilege(proplists:get_value(privilege, Properties))):4>>;
 encode_application(?CLOSE_SESSION, Properties) ->
-    <<(eipmi_util:get_val(session_id, Properties)):32/little>>;
+    <<(proplists:get_value(session_id, Properties)):32/little>>;
 encode_application(Req, _Properties)
   when Req =:= ?GET_DEVICE_ID orelse
        Req =:= ?COLD_RESET orelse
@@ -102,27 +102,27 @@ encode_application(Req, _Properties)
 %% @private
 %%------------------------------------------------------------------------------
 encode_storage(?GET_FRU_INVENTORY_AREA_INFO, Properties) ->
-    <<(eipmi_util:get_val(fru_id, Properties)):8>>;
+    <<(proplists:get_value(fru_id, Properties)):8>>;
 encode_storage(?READ_FRU_DATA, Properties) ->
-    FruId = eipmi_util:get_val(fru_id, Properties),
-    Offset = eipmi_util:get_val(offset, Properties),
-    Count = eipmi_util:get_val(count, Properties),
+    FruId = proplists:get_value(fru_id, Properties),
+    Offset = proplists:get_value(offset, Properties),
+    Count = proplists:get_value(count, Properties),
     true = Offset =< 16#ffff,
     <<FruId:8, Offset:16/little, Count:8>>;
 encode_storage(?GET_SEL_ENTRY, Properties) ->
-    Record = eipmi_util:get_val(record_id, Properties),
+    Record = proplists:get_value(record_id, Properties),
     true = Record =< 16#ffff,
     <<0:16, Record:16/little, 0:8, 16#ff:8>>;
 encode_storage(?CLEAR_SEL, Properties) ->
-    Reservation = eipmi_util:get_val(reservation_id, Properties),
-    Init = eipmi_util:get_val(initiate, Properties, true),
+    Reservation = proplists:get_value(reservation_id, Properties),
+    Init = proplists:get_value(initiate, Properties, true),
     InitOrGet = case Init of true -> 16#aa; false -> 0 end,
     <<Reservation:16/little, $C:8, $L:8, $R:8, InitOrGet:8>>;
 encode_storage(?GET_SDR, Properties) ->
-    Reservation = eipmi_util:get_val(reservation_id, Properties, 16#0000),
-    Record = eipmi_util:get_val(record_id, Properties),
-    Offset = eipmi_util:get_val(offset, Properties, 16#00),
-    Count = eipmi_util:get_val(count, Properties, 16#ff),
+    Reservation = proplists:get_value(reservation_id, Properties, 16#0000),
+    Record = proplists:get_value(record_id, Properties),
+    Offset = proplists:get_value(offset, Properties, 16#00),
+    Count = proplists:get_value(count, Properties, 16#ff),
     true = Record =< 16#ffff,
     <<Reservation:16/little, Record:16/little, Offset:8, Count:8>>;
 encode_storage(Req, _Properties)
@@ -136,13 +136,13 @@ encode_storage(Req, _Properties)
 %% @private
 %%------------------------------------------------------------------------------
 encode_transport(?GET_IP_UDP_RMCP_STATISTICS, Properties) ->
-    Clear = eipmi_util:get_val(clear_statistics, Properties, false),
+    Clear = proplists:get_value(clear_statistics, Properties, false),
     C = case Clear of true -> 1; false -> 0 end,
     <<0:4, ?IPMI_REQUESTED_CHANNEL:4, 0:7, C:1>>;
 encode_transport(?GET_LAN_CONFIGURATION_PARAMETERS, Properties) ->
-    P = eipmi_util:get_val(parameter, Properties),
-    S = eipmi_util:get_val(set, Properties, 0),
-    B = eipmi_util:get_val(block, Properties, 0),
+    P = proplists:get_value(parameter, Properties),
+    S = proplists:get_value(set, Properties, 0),
+    B = proplists:get_value(block, Properties, 0),
     <<1:1, 0:3, ?IPMI_REQUESTED_CHANNEL:4, P:8, S:8 , B:8>>.
 
 %%------------------------------------------------------------------------------
@@ -151,10 +151,10 @@ encode_transport(?GET_LAN_CONFIGURATION_PARAMETERS, Properties) ->
 encode_picmg(?GET_PICMG_PROPERTIES, _Properties) ->
     <<?PICMG_ID:8>>;
 encode_picmg(?GET_ADDRESS_INFO, Properties) ->
-    N = eipmi_util:get_val(site_number, Properties),
-    case eipmi_util:get_val(fru_id, Properties) of
+    N = proplists:get_value(site_number, Properties),
+    case proplists:get_value(fru_id, Properties) of
         undefined ->
-            case eipmi_util:get_val(site_type, Properties) of
+            case proplists:get_value(site_type, Properties) of
                 undefined ->
                     <<?PICMG_ID:8>>;
                 T ->
@@ -165,25 +165,25 @@ encode_picmg(?GET_ADDRESS_INFO, Properties) ->
             <<?PICMG_ID:8, FruId:8>>
     end;
 encode_picmg(?SET_FRU_ACTIVATION_POLICY, Properties) ->
-    FruId = eipmi_util:get_val(fru_id, Properties),
-    D = eipmi_util:get_val(deactivation_locked, Properties),
-    L = eipmi_util:get_val(locked, Properties),
+    FruId = proplists:get_value(fru_id, Properties),
+    D = proplists:get_value(deactivation_locked, Properties),
+    L = proplists:get_value(locked, Properties),
     Mask = set_activation_mask([L, D]),
     Set = set_activation_policy([L, D]),
     <<?PICMG_ID:8, FruId:8, Mask:8, Set:8>>;
 encode_picmg(?GET_FRU_ACTIVATION_POLICY, Properties) ->
-    FruId = eipmi_util:get_val(fru_id, Properties),
+    FruId = proplists:get_value(fru_id, Properties),
     <<?PICMG_ID:8, FruId:8>>;
 encode_picmg(?SET_FRU_ACTIVATION, Properties) ->
-    FruId = eipmi_util:get_val(fru_id, Properties),
-    Activate = eipmi_util:get_val(activate, Properties),
+    FruId = proplists:get_value(fru_id, Properties),
+    Activate = proplists:get_value(activate, Properties),
     <<?PICMG_ID:8, FruId:8, (case Activate of true -> 1; false -> 0 end):8>>;
 encode_picmg(?FRU_CONTROL, Properties) ->
-    FruId = eipmi_util:get_val(fru_id, Properties),
-    Control = eipmi_util:get_val(control, Properties),
+    FruId = proplists:get_value(fru_id, Properties),
+    Control = proplists:get_value(control, Properties),
     <<?PICMG_ID:8, FruId:8, (encode_fru_control(Control)):8>>;
 encode_picmg(?GET_DEVICE_LOCATOR_RECORD_ID, Properties) ->
-    FruId = eipmi_util:get_val(fru_id, Properties),
+    FruId = proplists:get_value(fru_id, Properties),
     <<?PICMG_ID:8, FruId:8>>.
 
 %%------------------------------------------------------------------------------
