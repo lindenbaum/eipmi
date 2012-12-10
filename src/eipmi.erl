@@ -727,7 +727,7 @@ get_device_locator_record_id(Session, FruId) ->
                  ok | {ok, proplists:proplist()} | {error, term()}.
 raw(Session, NetFn, Command, Properties) ->
     F = fun(Pid) -> eipmi_session:rpc(Pid, {NetFn, Command}, Properties) end,
-    with_session(Session, F).
+    maybe_ok_return(with_session(Session, F)).
 
 %%------------------------------------------------------------------------------
 %% @doc
@@ -1001,10 +1001,8 @@ start_poll(Pid, Session, IPAddress, Options) ->
 with_session(Session, Fun) ->
     Children = supervisor:which_children(?MODULE),
     with_session_(get_session(Session, Children), Fun).
-with_session_({ok, Pid}, Fun) -> with_session_(?EIPMI_CATCH(Fun(Pid)));
+with_session_({ok, Pid}, Fun) -> ?EIPMI_CATCH(Fun(Pid));
 with_session_(Error, _Fun) -> Error.
-with_session_({ok, []}) -> ok;
-with_session_(Result) -> Result.
 
 %%------------------------------------------------------------------------------
 %% @private
@@ -1041,6 +1039,12 @@ do_ping_receive(IPAddress, Timeout, Socket) ->
 %%------------------------------------------------------------------------------
 to_ok_tuple(Error = {error, _}) -> Error;
 to_ok_tuple(Result) -> {ok, Result}.
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+maybe_ok_return({ok, []}) -> ok;
+maybe_ok_return(Result) -> Result.
 
 %%------------------------------------------------------------------------------
 %% @private
