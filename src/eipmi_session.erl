@@ -370,7 +370,7 @@ handle_get_channel_authentication_capabilites_response({ok, Fields}, State) ->
     process_request(
       {{?IPMI_NETFN_APPLICATION_REQUEST, ?GET_SESSION_CHALLENGE}, [],
        fun handle_get_session_challenge_response/2},
-      select_auth(Fields, select_login(Fields, State))).
+      select_auth(Fields, check_login(Fields, State))).
 
 %%------------------------------------------------------------------------------
 %% @private
@@ -396,22 +396,23 @@ select_auth(Fields, State) ->
 
 %%------------------------------------------------------------------------------
 %% @private
-%% Selects a login method from the available methods. Preferred selection order
-%% is anonymous, null, non_null. In case anonymous is selected the user and
-%% password contained in the state will be reset, in case of null user only the
-%% state user will be reset, otherwise user and password must exist and must
-%% have sensible values in the state.
+%% Checks the configured user and password according to the available login
+%% methods. In case of anonymous login no field is required. While the null user
+%% login requires at least a password, the normal login will need username and
+%% password set.
 %%------------------------------------------------------------------------------
-select_login(Fields, State) ->
+check_login(Fields, State) ->
     Logins = proplists:get_value(login_status, Fields),
     case {lists:member(anonymous, Logins), lists:member(null, Logins)} of
         {true, _} ->
-            update_state_val(password, "", update_state_val(user, "", State));
+            ok;
         {false, true} ->
-            update_state_val(user, "", State);
+            assert(get_state_val(password, State) /= "", password_required);
         {false, false} ->
-            State
-    end.
+            assert(get_state_val(user, State) /= "", username_required),
+            assert(get_state_val(password, State) /= "", password_required)
+    end,
+    State.
 
 %%------------------------------------------------------------------------------
 %% @private
@@ -434,14 +435,19 @@ handle_activate_session_response({ok, Fields}, State) ->
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-handle_set_session_privilege_response({ok, Fs}, State) ->
+handle_set_session_privilege_response({ok, Fs}, State = #state{queue = Q}) ->
     P = proplists:get_value(privilege, Fs) =:= get_state_val(privilege, State),
-    handle_set_session_privilege_response(P, Fs, State).
-handle_set_session_privilege_response(true, _, State = #state{queue = Q}) ->
+    assert(P, failed_to_set_requested_privilege_level),
     NewState = State#state{active = true, queue = []},
     keep_alive(
       to_millis(os:timestamp()),
       fire(established, lists:foldl(fun process_request/2, NewState, Q))).
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+assert(true, _) -> ok;
+assert(false, MsgTerm) -> throw(MsgTerm).
 
 %%------------------------------------------------------------------------------
 %% @private
