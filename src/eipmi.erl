@@ -54,6 +54,7 @@
          get_sel/2,
          poll_sel/1,
          poll_sel/3,
+         clear_sel/1,
          get_sel_info/1,
          get_ip_udp_rmcp_statistics/2,
          get_picmg_properties/1,
@@ -595,6 +596,15 @@ poll_sel({ok, Pid}, Session, IP, Interval, Clear) ->
     start_poll(Pid, Session, IP, [{read_sel, Interval}, {clear_sel, Clear}]);
 poll_sel(Error, _Session, _IP, _Interval, _Clear) ->
     Error.
+
+%%------------------------------------------------------------------------------
+%% @doc
+%% Clears all current records from the System Event Log (SEL).
+%% @end
+%%------------------------------------------------------------------------------
+-spec clear_sel(session()) -> ok | {error, term()}.
+clear_sel(Session) ->
+    with_session(Session, fun(Pid) -> eipmi_sel:clear(Pid) end).
 
 %%------------------------------------------------------------------------------
 %% @doc
