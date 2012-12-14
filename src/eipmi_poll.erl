@@ -45,7 +45,7 @@
 %%------------------------------------------------------------------------------
 -define(DEFAULTS,
         [
-         {poll_sel, 500},
+         {read_sel, 500},
          {clear_sel, true}
         ]).
 
@@ -84,7 +84,7 @@ init([Pid, S, Addr, Options]) ->
     erlang:monitor(process, Pid),
     Opts = eipmi_util:merge_vals(Options, ?DEFAULTS),
     State = #state{pid = Pid, session = S, address = Addr, properties = Opts},
-    {ok, start_timer(poll_sel, State)}.
+    {ok, start_timers(State)}.
 
 %%------------------------------------------------------------------------------
 %% @private
@@ -103,8 +103,8 @@ handle_cast(Request, State) ->
 %%------------------------------------------------------------------------------
 handle_info({'DOWN', _, process, P, _}, State = #state{pid = P}) ->
     {stop, normal, State};
-handle_info(poll_sel, State) ->
-    {noreply, start_timer(poll_sel, read_sel(State))};
+handle_info(read_sel, State) ->
+    {noreply, start_timer(read_sel, read_sel(State))};
 handle_info(Info, State) ->
     {noreply, fire({unhandled, {info, Info}}, State)}.
 
@@ -124,6 +124,8 @@ code_change(_OldVsn, State, _Extra) ->
 %%% Internal functions
 %%%=============================================================================
 
+-define(is_timer(I), is_integer(I) andalso I > 0).
+
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
@@ -134,6 +136,13 @@ read_sel(State = #state{pid = Pid, properties = Ps}) ->
         _ ->
             State
     end.
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+start_timers(State = #state{properties = Ps}) ->
+    Actions = [Action || {Action, Interval} <- Ps, ?is_timer(Interval)],
+    lists:foldl(fun start_timer/2, State, Actions).
 
 %%------------------------------------------------------------------------------
 %% @private

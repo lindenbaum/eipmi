@@ -52,6 +52,8 @@
          get_sdr_repository/2,
          get_sdr_repository_info/1,
          get_sel/2,
+         poll_sel/1,
+         poll_sel/3,
          get_sel_info/1,
          get_ip_udp_rmcp_statistics/2,
          get_picmg_properties/1,
@@ -104,14 +106,12 @@
 -type privilege() :: callback | user | operator | administrator.
 
 -type option_name() ::
-        clear_sel | initial_outbound_seq_nr | keep_alive_retransmits | password |
-        poll_sel | port | privilege | rq_addr | timeout | user.
+        initial_outbound_seq_nr | keep_alive_retransmits | password | port |
+        privilege | rq_addr | timeout | user.
 -type option() ::
-        {clear_sel, boolean()} |
         {initial_outbound_seq_nr, non_neg_integer()} |
         {keep_alive_retransmits, non_neg_integer()} |
         {password, string()} |
-        {poll_sel, integer()} |
         {port, inet:port_number()} |
         {privilege, privilege()} |
         {rq_addr, 16#81..16#8d} |
@@ -289,13 +289,6 @@ open(IPAddress) ->
 %% Same as {@link open/1} but allows the specification of the following custom
 %% options:
 %% <dl>
-%%   <dt>`{clear_sel, boolean()}'</dt>
-%%   <dd>
-%%     <p>
-%%     Indicates whether the System Event Log is to be cleared after read when
-%%     SEL polling is enabled using `poll_sel', default is `true'.
-%%     </p>
-%%  </dd>
 %%   <dt>`{initial_outbound_seq_nr, non_neg_integer()}'</dt>
 %%   <dd>
 %%     <p>
@@ -315,17 +308,6 @@ open(IPAddress) ->
 %%     <p>
 %%     A password string used for authentication when anonymous login is not
 %%     available, default is `""'.
-%%     </p>
-%%   </dd>
-%%   <dt>`{poll_sel, integer()}'</dt>
-%%   <dd>
-%%     <p>
-%%     Enables/disable automatic polling of the System Event Log (SEL). When
-%%     polling is enabled the SEL will periodically be read and all events will
-%%     be forwarded to the subscribed event handlers registered with
-%%     {@link subscribe/2}. The provided integer will be used as timeout value
-%%     in milliseconds. A zero or negative value will disable automatic SEL
-%%     polling, default is `0' (disabled).
 %%     </p>
 %%   </dd>
 %%   <dt>`{port, inet:port_number()}'</dt>
@@ -579,6 +561,40 @@ get_sdr_repository_info(Session) ->
 get_sel(Session, Clear) ->
     F = fun(Pid) -> eipmi_sel:read(Pid, Clear) end,
     to_ok_tuple(with_session(Session, F)).
+
+%%------------------------------------------------------------------------------
+%% @doc
+%% Will start a dedicated server that polls the system event log using a
+%% specific session every 500ms. When polling is enabled the SEL will
+%% periodically be read and all events will be forwarded to the subscribed event
+%% handlers registered with {@link subscribe/2}.
+%%
+%% The automatic polling can be stopped by shutting down or exiting the returned
+%% process. The process will exit automatically when its corresponding session
+%% is closed or has errors.
+%% @end
+%%------------------------------------------------------------------------------
+-spec poll_sel(session()) -> {ok, pid()} | {error, term()}.
+poll_sel(Session) ->
+    poll_sel(Session, 500, true).
+
+%%------------------------------------------------------------------------------
+%% @doc
+%% Basically the same as {@link poll_sel/1} but allows the specification of the
+%% `Interval' and `Clear' options. While `Interval' specifies the minimum
+%% interval between two consecutive SEL reads the `Clear' flag indicates whether
+%% the SEL should be cleared after a read.
+%% @end
+%%------------------------------------------------------------------------------
+-spec poll_sel(session(), non_neg_integer(), boolean()) ->
+                      {ok, pid()} | {error, term()}.
+poll_sel(Session = {session, {IP, _}, _}, Interval, Clear) when Interval > 0 ->
+    Children = supervisor:which_children(?MODULE),
+    poll_sel(get_session(Session, Children), Session, IP, Interval, Clear).
+poll_sel({ok, Pid}, Session, IP, Interval, Clear) ->
+    start_poll(Pid, Session, IP, [{read_sel, Interval}, {clear_sel, Clear}]);
+poll_sel(Error, _Session, _IP, _Interval, _Clear) ->
+    Error.
 
 %%------------------------------------------------------------------------------
 %% @doc
@@ -972,28 +988,17 @@ start_session(Target, IPAddress, Options) ->
         Error = {error, _} ->
             Error;
         Ok when element(1, Ok) =:= ok ->
-            case proplists:get_value(poll_sel, Options, 0) > 0 of
-                false ->
-                    {ok, Session};
-                true ->
-                    start_poll(element(2, Ok), Session, IPAddress, Options)
-            end
+            {ok, Session}
     end.
 
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-start_poll(Pid, Session, IPAddress, Options) ->
+start_poll(Pid, Session, IP, Options) ->
     Id = {poll, erlang:make_ref()},
-    Start = {eipmi_poll, start_link, [Pid, Session, IPAddress, Options]},
+    Start = {eipmi_poll, start_link, [Pid, Session, IP, Options]},
     Spec = {Id, Start, temporary, brutal_kill, worker, [eipmi_poll]},
-    case supervisor:start_child(?MODULE, Spec) of
-        Error = {error, _} ->
-            close(Session),
-            Error;
-        Ok when element(1, Ok) =:= ok ->
-            {ok, Session}
-    end.
+    supervisor:start_child(?MODULE, Spec).
 
 %%------------------------------------------------------------------------------
 %% @private
