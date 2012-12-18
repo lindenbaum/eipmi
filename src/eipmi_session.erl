@@ -43,6 +43,9 @@
 %%% there's no need to edit the session but extending these modules when
 %%% support for new requests/responses is added.
 %%%
+%%% Currently all incoming packets are considered to be IPMI responses
+%%% and outbound sequence numbers are not tracked/checked.
+%%%
 %%% TODO:
 %%% * Use Activate Session requests for session keep-alive
 %%% @end
@@ -165,7 +168,8 @@ rpc(Pid, Request, Properties) ->
 -spec rpc(pid(), eipmi:request(), proplists:proplist(), non_neg_integer()) ->
                  {ok, proplists:proplist()} | {error, term()}.
 rpc(Pid, Request, Properties, Retransmits) ->
-    F = fun() -> gen_server:call(Pid, {rpc, Request, Properties}, infinity) end,
+    Data = eipmi_request:encode(Request, Properties),
+    F = fun() -> gen_server:call(Pid, {rpc, Request, Data}, infinity) end,
     rpc_(F(), F, Retransmits).
 rpc_({error, timeout}, Fun, Retransmits) when Retransmits > 0 ->
     rpc_(Fun(), Fun, Retransmits - 1);
@@ -180,7 +184,7 @@ rpc_(Result, _Fun, _Retransmits) ->
           active = false :: boolean(),
           keep_alive     :: non_neg_integer(),
           last_send      :: non_neg_integer(),
-          queue = []     :: [{eipmi:request(), proplists:proplist(), term()}],
+          queue = []     :: [{eipmi:request(), binary(), term()}],
           requests = []  :: [{rpc | internal, 0..63, reference(), term()}],
           session        :: eipmi:session(),
           address        :: inet:ip_address() | inet:hostname(),
@@ -195,19 +199,18 @@ init([S, Addr, Options]) ->
     {ok, Sock} = gen_udp:open(0, [binary]),
     Opts = eipmi_util:merge_vals(Options, ?DEFAULTS),
     {ok,
-     process_request(
-       {{?IPMI_NETFN_APPLICATION_REQUEST,
-         ?GET_CHANNEL_AUTHENTICATION_CAPABILITIES}, [],
+     process_internal_request(
+       {{?IPMI_NETFN_APPLICATION_REQUEST, ?GET_CHANNEL_AUTHENTICATION_CAPABILITIES},
         fun handle_get_channel_authentication_capabilites_response/2},
        #state{session = S, address = Addr, socket = Sock, properties = Opts})}.
 
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-handle_call({rpc, Request, Arguments}, From, State = #state{active = true}) ->
-    {noreply, process_request({Request, Arguments, From}, State)};
-handle_call({rpc, Request, Arguments}, From, State = #state{queue = Q}) ->
-    {noreply, State#state{queue = Q ++ [{Request, Arguments, From}]}};
+handle_call({rpc, Request, Data}, From, State = #state{active = true}) ->
+    {noreply, process_request({Request, Data, From}, State)};
+handle_call({rpc, Request, Data}, From, State = #state{queue = Q}) ->
+    {noreply, State#state{queue = Q ++ [{Request, Data, From}]}};
 handle_call(Request, _From, State) ->
     {reply, undef, fire({unhandled, {call, Request}}, State)}.
 
@@ -270,8 +273,6 @@ handle_rmcp({error, Reason}, State) ->
 handle_ipmi(Packet = #rmcp_ipmi{properties = Properties}, State) ->
     RqSeqNr = proplists:get_value(rq_seq_nr, Properties),
     handle_ipmi_(get_response(Packet), unregister_request(RqSeqNr, State)).
-handle_ipmi_(Message, {[], State}) ->
-    fire({unhandled, {ipmi, Message}}, State);
 handle_ipmi_(Message, {Requests, State}) ->
     lists:foldl(reply(Message), State, Requests).
 
@@ -281,8 +282,6 @@ handle_ipmi_(Message, {Requests, State}) ->
 get_response(Packet = #rmcp_ipmi{properties = Ps}) ->
     get_response(proplists:get_value(completion, Ps), Packet).
 get_response(normal, #rmcp_ipmi{cmd = Cmd, data = Data}) ->
-    %% Currently all incoming packets are considered to be IPMI responses
-    %% and outbound sequence numbers are not tracked/checked.
     {ok, eipmi_response:decode(Cmd, Data)};
 get_response(Completion, _Packet) ->
     {error, {bmc_error, Completion}}.
@@ -307,15 +306,22 @@ unregister_request(RqSeqNr, State = #state{requests = Rs}) ->
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-process_request({Request, Arguments, Receiver}, State) ->
-    {RqSeqNr, NewState} = send_request(Request, Arguments, State),
+process_request({Request, Data, Receiver}, State) ->
+    {RqSeqNr, NewState} = send_request(Request, Data, State),
     register_request(RqSeqNr, Receiver, NewState).
 
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-send_request(Request, Arguments, State = #state{properties = Ps}) ->
-    Data = eipmi_request:encode(Request, eipmi_util:merge_vals(Arguments, Ps)),
+process_internal_request({Request, Receiver}, State) ->
+    Data = eipmi_request:encode(Request, State#state.properties),
+    {RqSeqNr, NewState} = send_request(Request, Data, State),
+    register_request(RqSeqNr, Receiver, NewState).
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+send_request(Request, Data, State = #state{properties = Ps}) ->
     Header = #rmcp_header{seq_nr = ?RMCP_NOREPLY, class = ?RMCP_IPMI},
     Bin = eipmi_encoder:ipmi(Header, Ps, Request, Data),
     incr_rq_seq_nr(incr_inbound_seq_nr(udp_send(Bin, State))).
@@ -344,7 +350,8 @@ maybe_close_session(State = #state{active = false}) ->
     State;
 maybe_close_session(State) ->
     Request = {?IPMI_NETFN_APPLICATION_REQUEST, ?CLOSE_SESSION},
-    {_, NewState} = send_request(Request, [], State),
+    Data = eipmi_request:encode(Request, State#state.properties),
+    {_, NewState} = send_request(Request, Data, State),
     NewState.
 
 %%------------------------------------------------------------------------------
@@ -367,8 +374,8 @@ udp_send(Bin, S = #state{socket = Socket, address = IPAddress}) ->
 %% @private
 %%------------------------------------------------------------------------------
 handle_get_channel_authentication_capabilites_response({ok, Fields}, State) ->
-    process_request(
-      {{?IPMI_NETFN_APPLICATION_REQUEST, ?GET_SESSION_CHALLENGE}, [],
+    process_internal_request(
+      {{?IPMI_NETFN_APPLICATION_REQUEST, ?GET_SESSION_CHALLENGE},
        fun handle_get_session_challenge_response/2},
       select_auth(Fields, check_login(Fields, State))).
 
@@ -418,8 +425,8 @@ check_login(Fields, State) ->
 %% @private
 %%------------------------------------------------------------------------------
 handle_get_session_challenge_response({ok, Fields}, State) ->
-    process_request(
-      {{?IPMI_NETFN_APPLICATION_REQUEST, ?ACTIVATE_SESSION}, [],
+    process_internal_request(
+      {{?IPMI_NETFN_APPLICATION_REQUEST, ?ACTIVATE_SESSION},
        fun handle_activate_session_response/2},
       copy_state_vals([challenge, session_id], Fields, State)).
 
@@ -427,8 +434,8 @@ handle_get_session_challenge_response({ok, Fields}, State) ->
 %% @private
 %%------------------------------------------------------------------------------
 handle_activate_session_response({ok, Fields}, State) ->
-    process_request(
-      {{?IPMI_NETFN_APPLICATION_REQUEST, ?SET_SESSION_PRIVILEGE_LEVEL}, [],
+    process_internal_request(
+      {{?IPMI_NETFN_APPLICATION_REQUEST, ?SET_SESSION_PRIVILEGE_LEVEL},
        fun handle_set_session_privilege_response/2},
       copy_state_vals([auth_type, session_id, inbound_seq_nr], Fields, State)).
 
@@ -484,7 +491,7 @@ start_keep_alive_timer(State) ->
 %%------------------------------------------------------------------------------
 send_keep_alive(State) ->
     Request = {?IPMI_NETFN_APPLICATION_REQUEST, ?SET_SESSION_PRIVILEGE_LEVEL},
-    process_request({Request, [], fun handle_keep_alive/2}, State).
+    process_internal_request({Request, fun handle_keep_alive/2}, State).
 
 %%------------------------------------------------------------------------------
 %% @private
