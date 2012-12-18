@@ -361,8 +361,7 @@ decode_full_sensor_record(
     _:16, SensorType:8, ReadingType:8, _:48, SensorUnit:3/binary,
     SensorProperties:7/binary, _:8, NominalReading:1/binary,
     NominalMaximum:1/binary, NominalMinimum:1/binary, MaximumReading:1/binary,
-    MinimumReading:1/binary, _:64, ?EIPMI_RESERVED:16, _OEM:8, _IdLen:8,
-    Id/binary>>) ->
+    MinimumReading:1/binary, _:64, ?EIPMI_RESERVED:16, _OEM:8, Id/binary>>) ->
     {_, Type} = eipmi_sensor:get_type(ReadingType, SensorType),
     Units = get_units(SensorUnit),
     Properties = get_sensor_properties(SensorProperties, Units),
@@ -375,7 +374,7 @@ decode_full_sensor_record(
         ++ get_reading(nominal_minimum, NominalMinimum, Units ++ Properties)
         ++ get_reading(maximum_reading, MaximumReading, Units ++ Properties)
         ++ get_reading(minimum_reading, MinimumReading, Units ++ Properties)
-        ++ [{id, eipmi_util:binary_to_string(Id)}].
+        ++ get_sensor_id(Id).
 
 %%------------------------------------------------------------------------------
 %% @private
@@ -384,7 +383,7 @@ decode_compact_sensor_record(
   <<SensorAddr:2/binary, SensorNumber:8, EntityId:8, EntityInstance:1/binary,
     _:16, SensorType:8, ReadingType:8, _:48, SensorUnit:3/binary, Direction:2,
     Modifier:2, Count:4, Sharing:1/binary, _:16, ?EIPMI_RESERVED:24, _OEM:8,
-    _IdLen:8, Id/binary>>) ->
+    Id/binary>>) ->
     {_, Type} = eipmi_sensor:get_type(ReadingType, SensorType),
     eipmi_sensor:get_addr(SensorAddr)
         ++ get_sensor_numbers(SensorNumber, Count)
@@ -392,7 +391,7 @@ decode_compact_sensor_record(
         ++ [{sensor_type, Type}]
         ++ get_units(SensorUnit)
         ++ get_direction(Direction)
-        ++ get_id(Count, Sharing, Modifier, eipmi_util:binary_to_string(Id)).
+        ++ get_id(Count, Sharing, Modifier, get_id(Id)).
 
 %%------------------------------------------------------------------------------
 %% @private
@@ -400,14 +399,14 @@ decode_compact_sensor_record(
 decode_event_only_record(
   <<SensorAddr:2/binary, SensorNumber:8, EntityId:8, EntityInstance:1/binary,
     SensorType:8, ReadingType:8, Direction:2, Modifier:2, Count:4,
-    Sharing:1/binary, ?EIPMI_RESERVED:8, _OEM:8, _IdLen:8, Id/binary>>) ->
+    Sharing:1/binary, ?EIPMI_RESERVED:8, _OEM:8, Id/binary>>) ->
     {_, Type} = eipmi_sensor:get_type(ReadingType, SensorType),
     eipmi_sensor:get_addr(SensorAddr)
         ++ get_sensor_numbers(SensorNumber, Count)
         ++ eipmi_sensor:get_entity(EntityId, EntityInstance)
         ++ [{sensor_type, Type}]
         ++ get_direction(Direction)
-        ++ get_id(Count, Sharing, Modifier, eipmi_util:binary_to_string(Id)).
+        ++ get_id(Count, Sharing, Modifier, get_id(Id)).
 
 %%------------------------------------------------------------------------------
 %% @private
@@ -437,12 +436,12 @@ decode_device_relative_entity_association_record(
 decode_generic_device_locator_record(
   <<AccessAddr:7, ?EIPMI_RESERVED:1, Addr:3/binary, ?EIPMI_RESERVED:8,
     Type:8, TypeModifier:8, EntityId:8, EntityInstance:1/binary, _OEM:8,
-    _IdLen:8, Id/binary>>) ->
+    Id/binary>>) ->
     [{access_addr, AccessAddr}]
         ++ get_generic_addr(Addr)
         ++ [{device_type, Type}, {device_type_modifier, TypeModifier}]
         ++ eipmi_sensor:get_entity(EntityId, EntityInstance)
-        ++ [{id, eipmi_util:binary_to_string(Id)}].
+        ++ get_sensor_id(Id).
 
 %%------------------------------------------------------------------------------
 %% @private
@@ -450,12 +449,12 @@ decode_generic_device_locator_record(
 decode_fru_device_locator_record(
   <<AccessAddr:7, ?EIPMI_RESERVED:1, DeviceAddr:3/binary, ?EIPMI_RESERVED:8,
     Type:8, TypeModifier:8, EntityId:8, EntityInstance:1/binary, _OEM:8,
-    _IdLen:8, Id/binary>>) ->
+    Id/binary>>) ->
     [{access_addr, AccessAddr}]
         ++ eipmi_sensor:get_addr(DeviceAddr)
         ++ [{device_type, Type}, {device_type_modifier, TypeModifier}]
         ++ eipmi_sensor:get_entity(EntityId, EntityInstance)
-        ++ [{id, eipmi_util:binary_to_string(Id)}].
+        ++ get_sensor_id(Id).
 
 %%------------------------------------------------------------------------------
 %% @private
@@ -463,11 +462,11 @@ decode_fru_device_locator_record(
 decode_management_controller_device_locator_record(
   <<Addr:7, ?EIPMI_RESERVED:5, Channel:4, _PowerStateNotification:4,
     _GlobalInitialization:4, Capabilities:8, ?EIPMI_RESERVED:24,
-    EntityId:8, EntityInstance:1/binary, _OEM:8, _IdLen:8, Id/binary>>) ->
+    EntityId:8, EntityInstance:1/binary, _OEM:8, Id/binary>>) ->
     eipmi_sensor:get_addr(<<Addr:7, 0:1, 0:4, Channel:4>>)
         ++ [{device_support, eipmi_response:get_device_support(Capabilities)}]
         ++ eipmi_sensor:get_entity(EntityId, EntityInstance)
-        ++ [{id, eipmi_util:binary_to_string(Id)}].
+        ++ get_sensor_id(Id).
 
 %%------------------------------------------------------------------------------
 %% @private
@@ -629,6 +628,26 @@ get_sensor_numbers(SensorNumber, ShareCount) ->
 get_direction(0) -> [];
 get_direction(1) -> [{sensor_direction, input}];
 get_direction(2) -> [{sensor_direction, output}].
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+get_sensor_id(Binary) ->
+    [{id, get_id(Binary)}].
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+get_id(<<_:2, ?EIPMI_RESERVED:1, 0:5, _/binary>>) ->
+    "";
+get_id(<<0:2, ?EIPMI_RESERVED:1, _Len:5, Id/utf16-little, _/binary>>) ->
+    Id;
+get_id(<<1:2, ?EIPMI_RESERVED:1, Len:5, Id:Len/binary, _/binary>>) ->
+    eipmi_util:from_bcd_plus(Id);
+get_id(<<2:2, ?EIPMI_RESERVED:1, Len:5, Id:Len/binary, _/binary>>) ->
+    eipmi_util:from_packed_ascii(Id);
+get_id(<<_:2, ?EIPMI_RESERVED:1, Len:5, Id:Len/binary, _/binary>>) ->
+    eipmi_util:binary_to_string(Id).
 
 %%------------------------------------------------------------------------------
 %% @private
