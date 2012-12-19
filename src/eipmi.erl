@@ -74,7 +74,8 @@
          sdr_to_fru/3,
          subscribe/2,
          unsubscribe/2,
-         stats/0]).
+         stats/0,
+         start/0]).
 
 %% Application callbacks
 -export([start/2, stop/1]).
@@ -953,6 +954,24 @@ stats() ->
     Cs = supervisor:which_children(?MODULE),
     [{sessions, [S || {S = {session, _, _}, P, _, _} <- Cs, is_pid(P)]},
      {handlers, eipmi_events:list_handlers()}].
+
+%%------------------------------------------------------------------------------
+%% @doc
+%% Starts the `eipmi' applications and along with all its depdendent
+%% applications. This function is not intended for normal application startup
+%% in an erlang release. It exists only for the purpose of instantly creating an
+%% `eipmi' playground from the erlang shell.
+%% @end
+%%------------------------------------------------------------------------------
+-spec start() -> ok | {error, [term()]}.
+start() ->
+    AppFile = code:where_is_file("eipmi.app"),
+    {ok, [{application, eipmi, Properties}]} = file:consult(AppFile),
+    Applications = proplists:get_value(applications, Properties) ++ [eipmi],
+    Rs = [R || {error, R} <- [application:start(A) || A <- Applications]],
+    start(lists:filter(fun({already_started, _}) -> false; (_) -> true end, Rs)).
+start([]) -> ok;
+start(Errors) -> {error, Errors}.
 
 %%%=============================================================================
 %%% Application callbacks
