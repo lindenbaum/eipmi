@@ -957,10 +957,10 @@ stats() ->
 
 %%------------------------------------------------------------------------------
 %% @doc
-%% Starts the `eipmi' applications and along with all its depdendent
-%% applications. This function is not intended for normal application startup
-%% in an erlang release. It exists only for the purpose of instantly creating an
-%% `eipmi' playground from the erlang shell.
+%% Starts the `eipmi' applications along with all its depdendent applications.
+%% This function is not intended for normal application startup in an erlang
+%% release. It exists only for the purpose of instantly creating an `eipmi'
+%% playground from the erlang shell.
 %% @end
 %%------------------------------------------------------------------------------
 -spec start() -> ok | {error, [term()]}.
