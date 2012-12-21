@@ -23,8 +23,9 @@
 -module(eipmi_events).
 
 -export([start_link/0,
-         subscribe/2,
-         unsubscribe/2,
+         add_handler/2,
+         add_sup_handler/2,
+         delete_handler/2,
          swap/4,
          fire/3,
          list_handlers/0]).
@@ -47,9 +48,24 @@ start_link() ->
 %% A wrapper for {@link gen_event:add_handler/3}.
 %% @end
 %%------------------------------------------------------------------------------
--spec subscribe(module() | {module(), term()}, term()) -> ok | {error, term()}.
-subscribe(Handler, Args) ->
+-spec add_handler(module() | {module(), term()}, term()) -> ok | {error, term()}.
+add_handler(Handler, Args) ->
     case gen_event:add_handler(?MODULE, Handler, Args) of
+        Reason = {'EXIT', _} ->
+            {error, Reason};
+        Other ->
+            Other
+    end.
+
+%%------------------------------------------------------------------------------
+%% @doc
+%% A wrapper for {@link gen_event:add_sup_handler/3}.
+%% @end
+%%------------------------------------------------------------------------------
+-spec add_sup_handler(module() | {module(), term()}, term()) ->
+                             ok | {error, term()}.
+add_sup_handler(Handler, Args) ->
+    case gen_event:add_sup_handler(?MODULE, Handler, Args) of
         Reason = {'EXIT', _} ->
             {error, Reason};
         Other ->
@@ -61,8 +77,8 @@ subscribe(Handler, Args) ->
 %% A wrapper for {@link gen_event:delete_handler/3}.
 %% @end
 %%------------------------------------------------------------------------------
--spec unsubscribe(module() | {module(), term()}, term()) -> term().
-unsubscribe(Handler, Args) ->
+-spec delete_handler(module() | {module(), term()}, term()) -> term().
+delete_handler(Handler, Args) ->
     gen_event:delete_handler(?MODULE, Handler, Args).
 
 %%------------------------------------------------------------------------------

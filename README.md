@@ -89,10 +89,11 @@ to a specific process.
 
 Therefore, EIPMI provides the possibility to distribute asynchronous events for
 all currently existing sessions through a `gen_event`. User can subscribe to
-EIPMI events using `eipmi:subscribe/2`. Subscription can be cancelled using
-`eipmi:unsubscribe/2`. The subscriber must implement the `gen_event` behaviour
-and be prepared to receive the following events on the `handle_event/2`
-callback:
+EIPMI events using `eipmi:add_handler/2` or `eipmi:add_sup_handler/2`.
+Subscription can be cancelled using `eipmi:delete_handler/2`. The functions are
+basically wrappers for the known `gen_event` functions. The subscriber must
+therefore implement the `gen_event` behaviour and be prepared to receive the
+following events on the `handle_event/2` callback:
 
 ```erlang
 {ipmi,

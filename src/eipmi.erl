@@ -72,8 +72,9 @@
          sel_to_fru/3,
          sdr_to_fru/2,
          sdr_to_fru/3,
-         subscribe/2,
-         unsubscribe/2,
+         add_handler/2,
+         add_sup_handler/2,
+         delete_handler/2,
          stats/0,
          start/0]).
 
@@ -569,7 +570,7 @@ get_sel(Session, Clear) ->
 %% Will start a dedicated server that polls the system event log using a
 %% specific session every 500ms. When polling is enabled the SEL will
 %% periodically be read and all events will be forwarded to the subscribed event
-%% handlers registered with {@link subscribe/2}.
+%% handlers registered with {@link add_handler/2} or {@link add_sup_handler/3}.
 %%
 %% The automatic polling can be stopped by shutting down or exiting the returned
 %% process. The process will exit automatically when its corresponding session
@@ -926,20 +927,30 @@ sdr_to_fru(Sdr, SdrRepository, FruInventory) ->
 %% </dl>
 %% @end
 %%------------------------------------------------------------------------------
--spec subscribe(module() | {module(), term()}, term()) -> ok | {error, term()}.
-subscribe(Handler, Args) ->
-    eipmi_events:subscribe(Handler, Args).
+-spec add_handler(module() | {module(), term()}, term()) -> ok | {error, term()}.
+add_handler(Handler, Args) ->
+    eipmi_events:add_handler(Handler, Args).
+
+%%------------------------------------------------------------------------------
+%% @doc
+%% Basically the same than {@link add_handler/2} but with supervised
+%% subscription as described by {@link gen_event:add_sup_handler/3}.
+%% @end
+%%------------------------------------------------------------------------------
+-spec add_sup_handler(module() | {module(), term()}, term()) -> ok | {error, term()}.
+add_sup_handler(Handler, Args) ->
+    eipmi_events:add_sup_handler(Handler, Args).
 
 %%------------------------------------------------------------------------------
 %% @doc
 %% Unregisters/removes a handler for session related events previously added
-%% using {@link subscribe/2}. For more information refer to on the arguments
-%% {@link gen_event:delete_handler/3}.
+%% using {@link add_handler/2} or {@link add_sup_handler/2}. For more
+%% information refer to on the arguments {@link gen_event:delete_handler/3}.
 %% @end
 %%------------------------------------------------------------------------------
--spec unsubscribe(module() | {module(), term()}, term()) -> term().
-unsubscribe(Handler, Args) ->
-    eipmi_events:unsubscribe(Handler, Args).
+-spec delete_handler(module() | {module(), term()}, term()) -> term().
+delete_handler(Handler, Args) ->
+    eipmi_events:delete_handler(Handler, Args).
 
 %%------------------------------------------------------------------------------
 %% @doc

@@ -33,11 +33,11 @@
 
 event_test() ->
     ?assertMatch({ok, _}, eipmi_events:start_link()),
-    ?assertEqual(ok, eipmi_events:subscribe(?MODULE, self())),
+    ?assertEqual(ok, eipmi_events:add_handler(?MODULE, self())),
     ?assertMatch([?MODULE], eipmi_events:list_handlers()),
     eipmi_events:fire(session, address, event),
     receive {ipmi, session, address, event} -> ok end,
-    ?assertEqual(ok, eipmi_events:unsubscribe(?MODULE, self())),
+    ?assertEqual(ok, eipmi_events:delete_handler(?MODULE, self())),
     ?assertMatch([], eipmi_events:list_handlers()).
 
 %%%=============================================================================
