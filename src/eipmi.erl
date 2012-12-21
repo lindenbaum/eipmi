@@ -966,8 +966,8 @@ stats() ->
 -spec start() -> ok | {error, [term()]}.
 start() ->
     AppFile = code:where_is_file("eipmi.app"),
-    {ok, [{application, eipmi, Properties}]} = file:consult(AppFile),
-    Applications = proplists:get_value(applications, Properties) ++ [eipmi],
+    {ok, [{application, ?MODULE, Properties}]} = file:consult(AppFile),
+    Applications = proplists:get_value(applications, Properties) ++ [?MODULE],
     Rs = [R || {error, R} <- [application:start(A) || A <- Applications]],
     start(lists:filter(fun({already_started, _}) -> false; (_) -> true end, Rs)).
 start([]) -> ok;
