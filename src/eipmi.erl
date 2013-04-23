@@ -66,6 +66,7 @@
          set_fru_activation/3,
          fru_control/3,
          get_device_locator_record_id/2,
+         send_message/6,
          raw/4,
          sel_to_sdr/2,
          sel_to_fru/2,
@@ -743,6 +744,26 @@ fru_control(Session, FruId, Action) ->
 get_device_locator_record_id(Session, FruId) ->
     Args = [{fru_id, FruId}],
     raw(Session, ?IPMI_NETFN_PICMG_REQUEST, ?GET_DEVICE_LOCATOR_RECORD_ID, Args).
+
+%%------------------------------------------------------------------------------
+%% @doc
+%% Will issue a 'Send Message' request to the specified device (addr/lun)
+%% located behind the BMC on the primary IPMB. The contained request has to be
+%% given in `raw' format.
+%% @see raw/4
+%% @end
+%%------------------------------------------------------------------------------
+-spec send_message(session(),
+                   0..255,
+                   0..4,
+                   req_net_fn(),
+                   0..255,
+                   proplists:proplist()) ->
+                          ok | {ok, proplists:proplist()} | {error, term()}.
+send_message(Session, TargetAddr, TargetLun, NetFn, Command, Properties) ->
+    Data = [{rs_addr, TargetAddr}, {rs_lun, TargetLun}] ++ Properties,
+    Args = [{net_fn, NetFn}, {cmd, Command}, {data, Data}],
+    raw(Session, ?IPMI_NETFN_APPLICATION_REQUEST, ?SEND_MESSAGE, Args).
 
 %%------------------------------------------------------------------------------
 %% @doc

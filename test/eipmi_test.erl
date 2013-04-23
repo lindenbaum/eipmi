@@ -19,8 +19,8 @@
 -include_lib("eunit/include/eunit.hrl").
 
 -define(IP, "10.1.31.11").
--define(GET_HOSTNAME, inet:gethostname()).
-%%-define(GET_HOSTNAME, skip).
+%%-define(GET_HOSTNAME, inet:gethostname()).
+-define(GET_HOSTNAME, skip).
 
 %%%=============================================================================
 %%% TESTS

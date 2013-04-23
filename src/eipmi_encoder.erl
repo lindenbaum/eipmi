@@ -22,7 +22,8 @@
 
 -export([ack/1,
          ping/2,
-         ipmi/4]).
+         ipmi/4,
+         request/3]).
 
 -include("eipmi.hrl").
 
@@ -70,6 +71,21 @@ ipmi(Header = #rmcp_header{class = ?RMCP_IPMI}, Properties, Req, Data) ->
     Length = size(RequestBin),
     <<HeaderBin/binary, SessionBin/binary, Length:8, RequestBin/binary>>.
 
+%%------------------------------------------------------------------------------
+%% @doc
+%% Encodes a raw IPMB request according the standard format:
+%%   `rsSA, netFn/rsLUN, chk1, rqSA, rqSeq/rqLUN, cmd, <data>, chk2'
+%% Calling this directly is useful for e.g. bridged requests. Refer to chapter
+%% 6.13, BMC Message Bridging in the IPMI specification.
+%% @end
+%%------------------------------------------------------------------------------
+request(Properties, {NetFn, Cmd}, Data) ->
+    Head = request_head(NetFn, Properties),
+    HeadSum = checksum(Head),
+    Tail = request_tail(Properties, Cmd, Data),
+    TailSum = checksum(Tail),
+    <<Head/binary, HeadSum:8/signed, Tail/binary, TailSum:8/signed>>.
+
 %%%=============================================================================
 %%% Internal functions
 %%%=============================================================================
@@ -108,16 +124,6 @@ session(T, S, I, P, Data) ->
     ToEncrypt = <<C/binary, I:32/little, Data/binary, S:32/little, C/binary>>,
     Ci = eipmi_auth:encrypt(T, ToEncrypt),
     <<0:4, Type:4, S:32/little, I:32/little, Ci/binary>>.
-
-%%------------------------------------------------------------------------------
-%% @private
-%%------------------------------------------------------------------------------
-request(Properties, {NetFn, Cmd}, Data) ->
-    Head = request_head(NetFn, Properties),
-    HeadSum = checksum(Head),
-    Tail = request_tail(Properties, Cmd, Data),
-    TailSum = checksum(Tail),
-    <<Head/binary, HeadSum:8/signed, Tail/binary, TailSum:8/signed>>.
 
 %%------------------------------------------------------------------------------
 %% @private
