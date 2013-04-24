@@ -62,12 +62,12 @@ process can immediatelly start using a session. All requests received before the
 session is established will be queued and issued after the session is
 established.
 
-All authentication mechanism mentioned in the specification are supported,
+All authentication mechanisms mentioned in the specification are supported,
 including *anonymous*, *null user* and *non-null user*. Additionally, all
 digester algorithms proposed by the specification are supported.
 
 In case the target BMC only supports *non-null* users the options `user` and
-`password` need to be passed to a call to `eipmi:open/2`. In case *null users*
+`password` need to be passed in a call to `eipmi:open/2`. In case *null users*
 are configured on the BMC only the `password` option will be required. If the
 BMC supports *anonymous* logins no options need to be set.
 
@@ -84,13 +84,13 @@ An established session will be kept alive by the session state machine until
 
 The API of EIPMI has been designed to be as similar as possible to existing
 erlang protocol implementations (e.g. `gen_udp`). However, since sessions may be
-share between multiple processes it is not possible to send asynchronous events
+shared between multiple processes it is not possible to send asynchronous events
 to a specific process.
 
 Therefore, EIPMI provides the possibility to distribute asynchronous events for
-all currently existing sessions through a `gen_event`. User can subscribe to
+all currently existing sessions through a `gen_event`. Users can subscribe to
 EIPMI events using `eipmi:add_handler/2` or `eipmi:add_sup_handler/2`.
-Subscription can be cancelled using `eipmi:delete_handler/2`. The functions are
+Subscriptions can be cancelled using `eipmi:delete_handler/2`. The functions are
 basically wrappers for the known `gen_event` functions. The subscriber must
 therefore implement the `gen_event` behaviour and be prepared to receive the
 following events on the `handle_event/2` callback:
