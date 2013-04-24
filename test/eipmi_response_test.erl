@@ -98,6 +98,16 @@ decode_get_device_guid_test() ->
     Properties = eipmi_response:decode(Resp, Bin),
     ?assertEqual("hello", proplists:get_value(guid, Properties)).
 
+decode_send_message_test() ->
+    Resp = {?IPMI_NETFN_APPLICATION_RESPONSE, ?SEND_MESSAGE},
+    Bin = <<16#20, 16#2c, 16#b4, 16#82, 16#60, 16#23, 16#00, 16#01, 16#00,
+            16#34, 16#41, 16#fa, 16#14, 16#f0, 16#41, 16#46>>,
+    [{data, {ok, Properties}}] = eipmi_response:decode(Resp, Bin),
+    ?assertEqual(
+       [{next_record_id, 16#0001},
+        {data, <<16#34, 16#41, 16#fa, 16#14, 16#f0, 16#41>>}],
+       Properties).
+
 decode_get_system_guid_test() ->
     Resp = {?IPMI_NETFN_APPLICATION_RESPONSE, ?GET_SYSTEM_GUID},
     Bin = <<$h, $e, $l, $l, $o>>,
@@ -281,3 +291,8 @@ decode_get_device_locator_record_id_test() ->
     Resp = {?IPMI_NETFN_PICMG_RESPONSE, ?GET_DEVICE_LOCATOR_RECORD_ID},
     Bin = <<16#00, 16#34, 16#12>>,
     ?assertEqual([{record_id, 16#1234}], eipmi_response:decode(Resp, Bin)).
+
+decode_oem_test() ->
+    Resp = {16#2f, 16#01},
+    Bin = <<$d, $a, $t, $a>>,
+    ?assertEqual([{data, Bin}], eipmi_response:decode(Resp, Bin)).

@@ -42,6 +42,7 @@
          get_self_test_results/1,
          get_acpi_power_state/1,
          get_device_guid/1,
+         send_message/6,
          get_system_guid/1,
          set_session_privilege_level/2,
          read_fru/2,
@@ -66,7 +67,7 @@
          set_fru_activation/3,
          fru_control/3,
          get_device_locator_record_id/2,
-         send_message/6,
+         oem/4,
          raw/4,
          sel_to_sdr/2,
          sel_to_fru/2,
@@ -91,18 +92,8 @@
 
 -type session() :: {session, target(), reference()}.
 
--type req_net_fn()  ::
-        ?IPMI_NETFN_SENSOR_EVENT_REQUEST |
-        ?IPMI_NETFN_APPLICATION_REQUEST |
-        ?IPMI_NETFN_STORAGE_REQUEST |
-        ?IPMI_NETFN_TRANSPORT_REQUEST |
-        ?IPMI_NETFN_PICMG_REQUEST.
--type resp_net_fn() ::
-        ?IPMI_NETFN_SENSOR_EVENT_RESPONSE |
-        ?IPMI_NETFN_APPLICATION_RESPONSE |
-        ?IPMI_NETFN_STORAGE_RESPONSE |
-        ?IPMI_NETFN_TRANSPORT_RESPONSE |
-        ?IPMI_NETFN_PICMG_RESPONSE.
+-type req_net_fn()  :: 0..62. %% 0x00-0x3e
+-type resp_net_fn() :: 1..63. %% 0x01-0xef
 
 -type request() :: {req_net_fn(), Command :: 0..255}.
 -type response() :: {resp_net_fn(), Command :: 0..255}.
@@ -432,6 +423,31 @@ get_device_guid(Session) ->
 
 %%------------------------------------------------------------------------------
 %% @doc
+%% Will issue a 'Send Message' request to the specified device (addr/lun)
+%% located behind the BMC on the primary IPMB. The contained request has to be
+%% given in `raw' format.
+%% @see raw/4
+%% @end
+%%------------------------------------------------------------------------------
+-spec send_message(session(),
+                   0..255,
+                   0..4,
+                   req_net_fn(),
+                   0..255,
+                   proplists:proplist()) ->
+                          ok | {ok, proplists:proplist()} | {error, term()}.
+send_message(Session, TargetAddr, TargetLun, NetFn, Command, Properties) ->
+    Data = [{rs_addr, TargetAddr}, {rs_lun, TargetLun}] ++ Properties,
+    Args = [{net_fn, NetFn}, {cmd, Command}, {data, Data}],
+    case raw(Session, ?IPMI_NETFN_APPLICATION_REQUEST, ?SEND_MESSAGE, Args) of
+        {ok, [{data, Response}]} ->
+            maybe_ok_return(Response);
+        Other ->
+            Other
+    end.
+
+%%------------------------------------------------------------------------------
+%% @doc
 %% Will issue a 'Get System GUID' request using the provided session.
 %% @end
 %%------------------------------------------------------------------------------
@@ -747,23 +763,22 @@ get_device_locator_record_id(Session, FruId) ->
 
 %%------------------------------------------------------------------------------
 %% @doc
-%% Will issue a 'Send Message' request to the specified device (addr/lun)
-%% located behind the BMC on the primary IPMB. The contained request has to be
-%% given in `raw' format.
-%% @see raw/4
+%% Sends an OEM specific IPMI command over a given session. DO NOT USE THIS
+%% unless you really know what you're doing! The request data has to be given as
+%% binary, the response will also be provided in binary format.
 %% @end
 %%------------------------------------------------------------------------------
--spec send_message(session(),
-                   0..255,
-                   0..4,
-                   req_net_fn(),
-                   0..255,
-                   proplists:proplist()) ->
-                          ok | {ok, proplists:proplist()} | {error, term()}.
-send_message(Session, TargetAddr, TargetLun, NetFn, Command, Properties) ->
-    Data = [{rs_addr, TargetAddr}, {rs_lun, TargetLun}] ++ Properties,
-    Args = [{net_fn, NetFn}, {cmd, Command}, {data, Data}],
-    raw(Session, ?IPMI_NETFN_APPLICATION_REQUEST, ?SEND_MESSAGE, Args).
+-spec oem(session(), req_net_fn(), 0..255, binary()) ->
+                 ok | {ok, binary()} | {error, term()}.
+oem(Session, NetFn, Command, Binary) ->
+    case raw(Session, NetFn, Command, [{data, Binary}]) of
+        {ok, [{data, <<>>}]} ->
+            ok;
+        {ok, [{data, Data}]} ->
+            {ok, Data};
+        Other ->
+            Other
+    end.
 
 %%------------------------------------------------------------------------------
 %% @doc

@@ -46,7 +46,9 @@ encode({?IPMI_NETFN_STORAGE_REQUEST, Cmd}, Properties) ->
 encode({?IPMI_NETFN_TRANSPORT_REQUEST, Cmd}, Properties) ->
     encode_transport(Cmd, Properties);
 encode({?IPMI_NETFN_PICMG_REQUEST, Cmd}, Properties) ->
-    encode_picmg(Cmd, Properties).
+    encode_picmg(Cmd, Properties);
+encode({NetFn, Cmd}, Properties) when NetFn >= 16#2e ->
+    encode_oem(NetFn, Cmd, Properties).
 
 %%%=============================================================================
 %%% Internal functions
@@ -201,6 +203,11 @@ encode_picmg(?FRU_CONTROL, Properties) ->
 encode_picmg(?GET_DEVICE_LOCATOR_RECORD_ID, Properties) ->
     FruId = proplists:get_value(fru_id, Properties),
     <<?PICMG_ID:8, FruId:8>>.
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+encode_oem(_, _, [{data, Data} | _]) when is_binary(Data) -> Data.
 
 %%------------------------------------------------------------------------------
 %% @private

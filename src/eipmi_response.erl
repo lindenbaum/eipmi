@@ -48,7 +48,9 @@ decode({?IPMI_NETFN_STORAGE_RESPONSE, Cmd}, Data) ->
 decode({?IPMI_NETFN_TRANSPORT_RESPONSE, Cmd}, Data) ->
     decode_transport(Cmd, Data);
 decode({?IPMI_NETFN_PICMG_RESPONSE, Cmd}, Data) ->
-    decode_picmg(Cmd, Data).
+    decode_picmg(Cmd, Data);
+decode({NetFn, Cmd}, Data) when NetFn >= 16#2f ->
+    decode_oem(NetFn, Cmd, Data).
 
 %%------------------------------------------------------------------------------
 %% @doc
@@ -133,6 +135,18 @@ decode_application(?GET_ACPI_POWER_STATE, <<_:1, System:7, _:1, Device:7>>) ->
      {device, get_device_power_state(Device)}];
 decode_application(?GET_DEVICE_GUID, <<GUID/binary>>) ->
     [{guid, eipmi_util:binary_to_string(GUID)}];
+decode_application(?SEND_MESSAGE, <<Binary/binary>>) ->
+    case eipmi_decoder:response(Binary) of
+        {ok, #rmcp_ipmi{properties = Ps, cmd = Cmd, data = Data}} ->
+            case proplists:get_value(completion, Ps) of
+                normal ->
+                    [{data, {ok, decode(Cmd, Data)}}];
+                Error ->
+                    [{data, {error, {slave_error, Error}}}]
+            end;
+        Error ->
+            [{data, Error}]
+    end;
 decode_application(?GET_SYSTEM_GUID, <<GUID/binary>>) ->
     [{guid, eipmi_util:binary_to_string(GUID)}];
 decode_application(?GET_CHANNEL_AUTHENTICATION_CAPABILITIES,
@@ -257,6 +271,11 @@ decode_picmg_(?GET_FRU_ACTIVATION_POLICY, [Deactivation, Locked]) ->
      {locked, eipmi_util:get_bool(Locked)}];
 decode_picmg_(?GET_DEVICE_LOCATOR_RECORD_ID, [Id]) ->
     [{record_id, Id}].
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+decode_oem(_, _, Data) -> [{data, Data}].
 
 %%------------------------------------------------------------------------------
 %% @private

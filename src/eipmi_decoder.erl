@@ -20,7 +20,8 @@
 
 -module(eipmi_decoder).
 
--export([packet/1]).
+-export([packet/1,
+         response/1]).
 
 -include("eipmi.hrl").
 
@@ -41,6 +42,17 @@ packet(<<?RMCP_VERSION:8, ?EIPMI_RESERVED:8, SeqNr:8, Rest/binary>>) ->
     class(SeqNr, Rest);
 packet(_Binary) ->
     {error, not_rmcp_packet}.
+
+%%------------------------------------------------------------------------------
+%% @doc
+%% Decodes a raw IPMB response according the standard format:
+%%   `rqSA, netFn/rqLUN, chk1, rsSA, rqSeq/rsLUN, cmd, completion, <data>, chk2'
+%% Calling this directly is useful for e.g. responses for bridged requests.
+%% Refer to chapter 6.13, BMC Message Bridging in the IPMI specification.
+%% @end
+%%------------------------------------------------------------------------------
+-spec response(binary()) -> {ok, #rmcp_ipmi{}} | {error, term()}.
+response(Binary) -> response(#rmcp_ipmi{}, byte_size(Binary) - 4, Binary).
 
 %%%=============================================================================
 %%% Internal functions
@@ -77,11 +89,16 @@ asf(_Asf, _Binary) ->
 %%------------------------------------------------------------------------------
 ipmi(Ipmi, Binary) ->
     {SessionProps, <<Size:8, Rest:Size/binary>>} = session(Binary),
-    Len = (Size - 4),
+    response(Ipmi#rmcp_ipmi{properties = SessionProps}, Size - 4, Rest).
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+response(I, Len, Rest) ->
     <<Head:2/binary, Sum1:8/signed, Tail:Len/binary, Sum2:8/signed>> = Rest,
     case has_integrity(Head, Sum1) andalso has_integrity(Tail, Sum2) of
         true ->
-            lan(Ipmi#rmcp_ipmi{properties = SessionProps}, Head, Tail);
+            lan(I, Head, Tail);
         false ->
             {error, corrupted_ipmi_message}
     end.

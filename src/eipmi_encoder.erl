@@ -79,6 +79,8 @@ ipmi(Header = #rmcp_header{class = ?RMCP_IPMI}, Properties, Req, Data) ->
 %% 6.13, BMC Message Bridging in the IPMI specification.
 %% @end
 %%------------------------------------------------------------------------------
+-spec request(proplists:proplist(), {eipmi:req_net_fn(), 0..255}, binary()) ->
+                     binary().
 request(Properties, {NetFn, Cmd}, Data) ->
     Head = request_head(NetFn, Properties),
     HeadSum = checksum(Head),

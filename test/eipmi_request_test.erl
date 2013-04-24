@@ -242,3 +242,8 @@ encode_get_device_locator_record_id_test() ->
     Req = {?IPMI_NETFN_PICMG_REQUEST, ?GET_DEVICE_LOCATOR_RECORD_ID},
     Properties = [{fru_id, 5}],
     ?assertEqual(<<16#00, 16#05>>, eipmi_request:encode(Req, Properties)).
+
+encode_oem_test() ->
+    Req = {16#30, 16#01},
+    Properties = [{data, <<16#0, 16#0, 16#8a>>}],
+    ?assertEqual(<<16#0, 16#0, 16#8a>>, eipmi_request:encode(Req, Properties)).
