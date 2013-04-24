@@ -23,7 +23,11 @@ perl -pi -e "s/\'\'\'erlang/\`\`\`/g" README.md
 echo "@title EIPMI - A native Erlang IMPI library" > doc/overview.edoc
 echo "@copyright 2012 Lindenbaum GmbH" >> doc/overview.edoc
 echo "" >> doc/overview.edoc
-sed -r -f tmp/bin/markedoc.sed README.md >> doc/overview.edoc
+if [ `uname -s` == "Darwin" ]; then
+    sed -E -f tmp/bin/markedoc.sed README.md >> doc/overview.edoc
+else
+    sed -r -f tmp/bin/markedoc.sed README.md >> doc/overview.edoc
+fi
 
 # restore original README.md
 mv README.md.bak README.md
