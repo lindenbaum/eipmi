@@ -70,28 +70,20 @@ encode_get_system_guid_test() ->
     Req = {?IPMI_NETFN_APPLICATION_REQUEST, ?GET_SYSTEM_GUID},
     ?assertEqual(<<>>, eipmi_request:encode(Req, [])).
 
-encode_send_message_raw_test() ->
-    Req = {?IPMI_NETFN_APPLICATION_REQUEST, ?SEND_MESSAGE},
-    ?assertEqual(
-       <<16#80, $h, $e, $l, $l, $o>>,
-       eipmi_request:encode(Req, [{data, <<$h, $e, $l, $l, $o>>}])).
-
 encode_send_message_test() ->
     Req = {?IPMI_NETFN_APPLICATION_REQUEST, ?SEND_MESSAGE},
-    Embedded = [{rs_addr, 16#82},
+    Embedded = [{net_fn, ?IPMI_NETFN_STORAGE_REQUEST},
+                {cmd, ?GET_SDR},
+                {rs_addr, 16#82},
                 {rs_lun, 0},
-                {rq_addr, 16#20},
-                {rq_lun, 0},
                 {rq_seq_nr, 16#22},
                 {reservation_id, 16#099b},
                 {record_id, 16#0001},
                 {offset, 25},
                 {count, 6}],
-    Properties = [{net_fn, ?IPMI_NETFN_STORAGE_REQUEST},
-                  {cmd, ?GET_SDR},
-                  {data, Embedded}],
+    Properties = [{channel, 0}, {request, Embedded}],
     ?assertEqual(
-       <<16#00, 16#82, 16#28, 16#56, 16#20, 16#88, 16#23, 16#9b,
+       <<16#40, 16#82, 16#28, 16#56, 16#20, 16#88, 16#23, 16#9b,
          16#09, 16#01, 16#00, 16#19, 16#06, 16#71>>,
        eipmi_request:encode(Req, Properties)).
 

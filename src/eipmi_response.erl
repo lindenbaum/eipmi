@@ -140,12 +140,12 @@ decode_application(?SEND_MESSAGE, <<Binary/binary>>) ->
         {ok, #rmcp_ipmi{properties = Ps, cmd = Cmd, data = Data}} ->
             case proplists:get_value(completion, Ps) of
                 normal ->
-                    [{data, {ok, decode(Cmd, Data)}}];
+                    decode(Cmd, Data);
                 Error ->
-                    [{data, {error, {slave_error, Error}}}]
+                    [{error, {slave_error, Error}}]
             end;
         Error ->
-            [{data, Error}]
+            [Error]
     end;
 decode_application(?GET_SYSTEM_GUID, <<GUID/binary>>) ->
     [{guid, eipmi_util:binary_to_string(GUID)}];

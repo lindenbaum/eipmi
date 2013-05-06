@@ -32,13 +32,16 @@
 %%%=============================================================================
 
 event_test() ->
-    ?assertMatch({ok, _}, eipmi_events:start_link()),
+    process_flag(trap_exit, true),
+    {ok, Pid} = eipmi_events:start_link(),
     ?assertEqual(ok, eipmi_events:add_handler(?MODULE, self())),
     ?assertMatch([?MODULE], eipmi_events:list_handlers()),
     eipmi_events:fire(session, address, event),
     receive {ipmi, session, address, event} -> ok end,
     ?assertEqual(ok, eipmi_events:delete_handler(?MODULE, self())),
-    ?assertMatch([], eipmi_events:list_handlers()).
+    ?assertMatch([], eipmi_events:list_handlers()),
+    exit(Pid, shutdown),
+    receive {'EXIT', Pid, shutdown} -> ok end.
 
 %%%=============================================================================
 %%% Test gen_event handler

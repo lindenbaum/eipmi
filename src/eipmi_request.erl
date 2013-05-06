@@ -74,21 +74,18 @@ encode_sensor_event(?GET_SENSOR_READING, Properties) ->
 %% @private
 %%------------------------------------------------------------------------------
 encode_application(?SEND_MESSAGE, Properties) ->
-    case proplists:get_value(data, Properties) of
-        Raw when is_binary(Raw) ->
-            %% currently only primary IPMB is supported
-            <<2:2, 0:2, 0:4, Raw/binary>>;
-        Embedded when is_list(Embedded) ->
-            NetFn = proplists:get_value(net_fn, Properties),
-            Cmd = proplists:get_value(cmd, Properties),
-            Combined = Embedded ++ [{rq_addr, ?IPMI_RESPONDER_ADDR},
-                                    {rq_lun, ?IPMI_RESPONDER_LUN},
-                                    {rq_seq_nr, 0}],
-            Data = encode({NetFn, Cmd}, Embedded),
-            Request = eipmi_encoder:request(Combined, {NetFn, Cmd}, Data),
-            %% currently only primary IPMB is supported
-            <<0:4, 0:4, Request/binary>>
-    end;
+    Channel = proplists:get_value(channel, Properties),
+    Embedded = proplists:get_value(request, Properties),
+    RsAddr = proplists:get_value(rec_rs_addr, Properties, ?IPMI_RESPONDER_ADDR),
+    RsLun = proplists:get_value(rec_rs_lun, Properties, ?IPMI_RESPONDER_LUN),
+    NetFn = proplists:get_value(net_fn, Embedded),
+    Cmd = proplists:get_value(cmd, Embedded),
+    RecursiveRs = [{rec_rs_addr, RsAddr}, {rec_rs_lun, RsLun}],
+    Data = encode({NetFn, Cmd}, Embedded ++ RecursiveRs),
+    Rq = [{rq_addr, RsAddr}, {rq_lun, RsLun}, {rq_seq_nr, 0}],
+    Request = eipmi_encoder:request(Embedded ++ Rq, {NetFn, Cmd}, Data),
+    %% currently, only tracked requests are supported
+    <<1:2, 0:2, Channel:4, Request/binary>>;
 encode_application(?GET_CHANNEL_AUTHENTICATION_CAPABILITIES, Properties) ->
     P = encode_privilege(proplists:get_value(privilege, Properties)),
     <<0:1, 0:3, ?IPMI_REQUESTED_CHANNEL:4, 0:4,P:4>>;
@@ -207,7 +204,7 @@ encode_picmg(?GET_DEVICE_LOCATOR_RECORD_ID, Properties) ->
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-encode_oem(_, _, [{data, Data} | _]) when is_binary(Data) -> Data.
+encode_oem(_, _, Properties) -> proplists:get_value(data, Properties).
 
 %%------------------------------------------------------------------------------
 %% @private

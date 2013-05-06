@@ -42,7 +42,7 @@
          get_self_test_results/1,
          get_acpi_power_state/1,
          get_device_guid/1,
-         send_message/6,
+         send_message/7,
          get_system_guid/1,
          set_session_privilege_level/2,
          read_fru/2,
@@ -424,24 +424,38 @@ get_device_guid(Session) ->
 %%------------------------------------------------------------------------------
 %% @doc
 %% Will issue a 'Send Message' request to the specified device (addr/lun)
-%% located behind the BMC on the primary IPMB. The contained request has to be
-%% given in `raw' format.
-%% @see raw/4
+%% located on a bus behind the BMC. Please note that currently only 'tracked
+%% requests' are supported. For more information refer to section 6.13.3 in the
+%% IPMI reference. This is an example for a PICMG 'Double Bridged' request
+%% sending an OEM specific command to the controller with the address `16#14'
+%% located on an IPMB-L bus behind the BMC:
+%% ```
+%% eipmi:send_message(
+%%   Session, 16#82, 0, 0, ?IPMI_NETFN_APPLICATION_REQUEST, ?SEND_MESSAGE,
+%%   [{channel, 7},
+%%    {request,
+%%    [{net_fn,  16#30},
+%%     {cmd,     16#02},
+%%     {rs_addr, 16#14},
+%%     {rs_lun,  16#00},
+%%     {data,    <<0, 0, 16#80, 0>>}]}])
+%% '''
 %% @end
 %%------------------------------------------------------------------------------
 -spec send_message(session(),
                    0..255,
                    0..4,
+                   0..15,
                    req_net_fn(),
                    0..255,
                    proplists:proplist()) ->
                           ok | {ok, proplists:proplist()} | {error, term()}.
-send_message(Session, TargetAddr, TargetLun, NetFn, Command, Properties) ->
-    Data = [{rs_addr, TargetAddr}, {rs_lun, TargetLun}] ++ Properties,
-    Args = [{net_fn, NetFn}, {cmd, Command}, {data, Data}],
+send_message(Session, TargetAddr, TargetLun, Channel, NetFn, Cmd, Properties) ->
+    Data = [{net_fn, NetFn}, {cmd, Cmd}, {rs_addr, TargetAddr}, {rs_lun, TargetLun}],
+    Args = [{channel, Channel}, {request, Data ++ Properties}],
     case raw(Session, ?IPMI_NETFN_APPLICATION_REQUEST, ?SEND_MESSAGE, Args) of
-        {ok, [{data, Response}]} ->
-            maybe_ok_return(Response);
+        {ok, [Error = {error, _} | _]} ->
+            Error;
         Other ->
             Other
     end.
@@ -772,9 +786,9 @@ get_device_locator_record_id(Session, FruId) ->
                  ok | {ok, binary()} | {error, term()}.
 oem(Session, NetFn, Command, Binary) ->
     case raw(Session, NetFn, Command, [{data, Binary}]) of
-        {ok, [{data, <<>>}]} ->
+        {ok, [{data, <<>>} | _]} ->
             ok;
-        {ok, [{data, Data}]} ->
+        {ok, [{data, Data} | _]} ->
             {ok, Data};
         Other ->
             Other

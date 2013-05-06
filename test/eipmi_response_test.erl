@@ -102,11 +102,10 @@ decode_send_message_test() ->
     Resp = {?IPMI_NETFN_APPLICATION_RESPONSE, ?SEND_MESSAGE},
     Bin = <<16#20, 16#2c, 16#b4, 16#82, 16#60, 16#23, 16#00, 16#01, 16#00,
             16#34, 16#41, 16#fa, 16#14, 16#f0, 16#41, 16#46>>,
-    [{data, {ok, Properties}}] = eipmi_response:decode(Resp, Bin),
     ?assertEqual(
        [{next_record_id, 16#0001},
         {data, <<16#34, 16#41, 16#fa, 16#14, 16#f0, 16#41>>}],
-       Properties).
+       eipmi_response:decode(Resp, Bin)).
 
 decode_get_system_guid_test() ->
     Resp = {?IPMI_NETFN_APPLICATION_RESPONSE, ?GET_SYSTEM_GUID},
