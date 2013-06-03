@@ -180,50 +180,50 @@ decode_oem_non_timestamped(Acc, <<Data/binary>>) ->
 %%------------------------------------------------------------------------------
 decode_event_data({threshold, Type}, Assertion, Data) ->
     decode_threshold(Type, Assertion, pad_event_data(Data));
-decode_event_data({discrete, Type}, Assertion, Data) ->
-    decode_generic(Type, Assertion, pad_event_data(Data));
-decode_event_data({{oem, _}, Type}, Assertion, Data) ->
-    decode_oem(Type, Assertion, pad_event_data(Data)).
+decode_event_data({Reading, Type}, Assertion, Data) when is_atom(Reading) ->
+    decode_generic(Reading, Type, Assertion, pad_event_data(Data));
+decode_event_data({Reading, Type}, Assertion, Data) when is_integer(Reading) ->
+    decode_oem(Reading, Type, Assertion, pad_event_data(Data)).
 
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
 decode_threshold(Type, Assertion, <<1:2, 0:2, Offset:4, B2:8, _:8>>) ->
-    eipmi_sensor:get_value(Type, Offset, Assertion, 16#ff, 16#ff)
+    eipmi_sensor:get_value(threshold, Type, Offset, Assertion, 16#ff, 16#ff)
         ++ [{raw_reading, <<B2:8>>}];
 decode_threshold(Type, Assertion, <<1:2, 1:2, Offset:4, B2:8, B3:8>>) ->
-    eipmi_sensor:get_value(Type, Offset, Assertion, 16#ff, 16#ff)
+    eipmi_sensor:get_value(threshold, Type, Offset, Assertion, 16#ff, 16#ff)
         ++ [{raw_reading, <<B2:8>>}, {raw_threshold, <<B3:8>>}];
 decode_threshold(Type, Assertion, <<E2:2, E3:2, Offset:4, B2:8, B3:8>>) ->
     Byte2 = case E2 of 0 -> 16#ff; _ -> B2 end,
     Byte3 = case E3 of 0 -> 16#ff; _ -> B3 end,
-    eipmi_sensor:get_value(Type, Offset, Assertion, Byte2, Byte3).
+    eipmi_sensor:get_value(threshold, Type, Offset, Assertion, Byte2, Byte3).
 
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-decode_generic(Type, Assertion, <<1:2, E3:2, Offset:4, SOff:4, POff:4, B3:8>>) ->
-    Severity = maybe_value(severity_value, severity, SOff, 0),
-    Previous = maybe_value(previous_value, Type, POff, Assertion),
-    decode_generic(Type, Assertion, <<0:2, E3:2, Offset:4, 16#ff:8, B3:8>>)
+decode_generic(Reading, Type, Assertion, <<1:2, E3:2, Off:4, SOff:4, POff:4, B3:8>>) ->
+    Severity = maybe_value(severity_value, severity, Type, SOff, 0),
+    Previous = maybe_value(previous_value, Reading, Type, POff, Assertion),
+    decode_generic(Reading, Type, Assertion, <<0:2, E3:2, Off:4, 16#ff:8, B3:8>>)
         ++ Severity ++ Previous;
-decode_generic(Type, Assertion, <<E2:2, E3:2, Offset:4, B2:8, B3:8>>) ->
+decode_generic(Reading, Type, Assertion, <<E2:2, E3:2, Offset:4, B2:8, B3:8>>) ->
     Byte2 = case E2 of 0 -> 16#ff; _ -> B2 end,
     Byte3 = case E3 of 0 -> 16#ff; _ -> B3 end,
-    eipmi_sensor:get_value(Type, Offset, Assertion, Byte2, Byte3).
+    eipmi_sensor:get_value(Reading, Type, Offset, Assertion, Byte2, Byte3).
 
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-decode_oem(Type, Assertion, <<1:2, E3:2, Offset:4, SOff:4, POff:4, B3:8>>) ->
-    Severity = maybe_value(severity_value, severity, SOff, 0),
-    Previous = maybe_value(previous_value, Type, POff, Assertion),
-    decode_oem(Type, Assertion, <<0:2, E3:2, Offset:4, 16#ff:8, B3:8>>)
+decode_oem(Reading, Type, Assertion, <<1:2, E3:2, Off:4, SOff:4, POff:4, B3:8>>) ->
+    Severity = maybe_value(severity_value, severity, Type, SOff, 0),
+    Previous = maybe_value(previous_value, Reading, Type, POff, Assertion),
+    decode_oem(Reading, Type, Assertion, <<0:2, E3:2, Off:4, 16#ff:8, B3:8>>)
         ++ Severity ++ Previous;
-decode_oem(Type, Assertion, <<E2:2, E3:2, Offset:4, B2:8, B3:8>>) ->
+decode_oem(Reading, Type, Assertion, <<E2:2, E3:2, Offset:4, B2:8, B3:8>>) ->
     Byte2 = case E2 of 2 -> B2; _ -> 16#ff end,
     Byte3 = case E3 of 2 -> B3; _ -> 16#ff end,
-    eipmi_sensor:get_value(Type, Offset, Assertion, Byte2, Byte3).
+    eipmi_sensor:get_value(Reading, Type, Offset, Assertion, Byte2, Byte3).
 
 %%------------------------------------------------------------------------------
 %% @private
@@ -238,8 +238,8 @@ pad_event_data(Data = <<_:3/binary>>) ->
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-maybe_value(_Tag, _Type, 16#f, _Assert) ->
+maybe_value(_Tag, _Reading, _Type, 16#f, _Assert) ->
     [];
-maybe_value(Tag, Type, Offset, Assert) ->
-    Vs = eipmi_sensor:get_value(Type, Offset, Assert, 16#ff, 16#ff),
+maybe_value(Tag, Reading, Type, Offset, Assert) ->
+    Vs = eipmi_sensor:get_value(Reading, Type, Offset, Assert, 16#ff, 16#ff),
     [{Tag, proplists:get_value(sensor_value, Vs)}].

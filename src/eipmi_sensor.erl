@@ -23,7 +23,7 @@
 
 -export([get_addr/1,
          get_type/2,
-         get_value/5,
+         get_value/6,
          get_entity/2,
          get_entity_id/1,
          get_unit/1]).
@@ -65,20 +65,23 @@
         {entity_type, logical | physical} |
         {entity_instance, non_neg_integer()}.
 
--type type() ::
+-type reading() ::
         threshold | dmi_usage | state | predictive_failure | limit |
         performance | severity | availability0 | availability1 | availability2 |
-        redundancy | acpi_power_state | temperature | voltage | current | fan |
-        intrusion | violation_attempt | processor | power_supply | power_unit |
-        cooling_unit | other_unit | memory | drive_slot | post_memory_resize |
-        system_firmware | event_logging | watchdog_old | system_event |
-        critical_interrupt | switch | board | microcontroller | add_in_card |
-        chassis | chip_set | other_fru | interconnect | terminator |
-        system_boot | boot_error | os_boot | os_shutdown | slot |
-        system_acpi_power_state | watchdog | platform_alert | entity_presence |
-        monitor_asic_ic | lan | management_subsystem_health | battery | session |
-        version | fru_state | fru_hot_swap | ipmb_physical | module_hot_swap |
-        power_channel | telco_alarm | non_neg_integer().
+        redundancy | acpi_power_state | specific | non_neg_integer().
+
+-type type() ::
+        temperature | voltage | current | fan | intrusion | violation_attempt |
+        processor | power_supply | power_unit | cooling_unit | other_unit |
+        memory | drive_slot | post_memory_resize | system_firmware |
+        event_logging | watchdog_old | system_event | critical_interrupt |
+        switch | board | microcontroller | add_in_card | chassis | chip_set |
+        other_fru | interconnect | terminator | system_boot | boot_error |
+        os_boot | os_shutdown | slot | system_acpi_power_state | watchdog |
+        platform_alert | entity_presence | monitor_asic_ic | lan |
+        management_subsystem_health | battery | session | version | fru_state |
+        fru_hot_swap | ipmb_physical | module_hot_swap | power_channel |
+        telco_alarm | non_neg_integer().
 
 -type value() ::
         {sensor_value, term()} |
@@ -105,6 +108,7 @@
 -export_type([addr/0,
               entity_id/0,
               entity/0,
+              reading/0,
               type/0,
               value/0,
               unit/0]).
@@ -142,18 +146,9 @@ get_addr(<<Id:7, 1:1, C:4, FLun:2, 0:2>>) ->
 %% information.
 %% @end
 %%------------------------------------------------------------------------------
--spec get_type(non_neg_integer(), non_neg_integer()) ->
-                      {threshold | discrete | {oem, non_neg_integer()}, type()}.
-get_type(16#01, _SensorType) ->
-    {threshold, get_sensor_type({threshold, 16#01})};
-get_type(ReadingType, _SensorType)
-  when ReadingType >= 16#02 andalso ReadingType =< 16#0c ->
-    {discrete, get_sensor_type({generic, ReadingType})};
-get_type(16#6f, SensorType) ->
-    {discrete, get_sensor_type({specific, SensorType})};
-get_type(ReadingType, SensorType)
-  when ReadingType >= 16#70 andalso ReadingType =< 16#7f ->
-    {{oem, ReadingType}, get_sensor_type({oem, SensorType})}.
+-spec get_type(non_neg_integer(), non_neg_integer()) -> {reading(), type()}.
+get_type(ReadingType, SensorType) ->
+    {get_sensor_reading(ReadingType), get_sensor_type(SensorType)}.
 
 %%------------------------------------------------------------------------------
 %% @doc
@@ -161,9 +156,10 @@ get_type(ReadingType, SensorType)
 %% into human readable values (at least for threshold based sensors).
 %% @end
 %%------------------------------------------------------------------------------
--spec get_value(type(), non_neg_integer(), 0 | 1, 0..255, 0..255) -> [value()].
-get_value(Type, Offset, Assertion, Value1, Value2) ->
-    map(Type, Offset, Assertion, Value1, Value2).
+-spec get_value(reading(), type(), non_neg_integer(), 0 | 1, 0..255, 0..255) ->
+                       [value()].
+get_value(Reading, Type, Offset, Assertion, Value1, Value2) ->
+    map(Type, Reading, Offset, Assertion, Value1, Value2).
 
 %%------------------------------------------------------------------------------
 %% @doc
@@ -368,163 +364,169 @@ get_unit(_)  ->  unspecified.
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-get_sensor_type({threshold, 16#01}) -> threshold;
-get_sensor_type({generic,   16#02}) -> dmi_usage;
-get_sensor_type({generic,   16#03}) -> state;
-get_sensor_type({generic,   16#04}) -> predictive_failure;
-get_sensor_type({generic,   16#05}) -> limit;
-get_sensor_type({generic,   16#06}) -> performance;
-get_sensor_type({generic,   16#07}) -> severity;
-get_sensor_type({generic,   16#08}) -> availability0;
-get_sensor_type({generic,   16#09}) -> availability1;
-get_sensor_type({generic,   16#0a}) -> availability2;
-get_sensor_type({generic,   16#0b}) -> redundancy;
-get_sensor_type({generic,   16#0c}) -> acpi_power_state;
-get_sensor_type({specific,  16#01}) -> temperature;
-get_sensor_type({specific,  16#02}) -> voltage;
-get_sensor_type({specific,  16#03}) -> current;
-get_sensor_type({specific,  16#04}) -> fan;
-get_sensor_type({specific,  16#05}) -> intrusion;
-get_sensor_type({specific,  16#06}) -> violation_attempt;
-get_sensor_type({specific,  16#07}) -> processor;
-get_sensor_type({specific,  16#08}) -> power_supply;
-get_sensor_type({specific,  16#09}) -> power_unit;
-get_sensor_type({specific,  16#0a}) -> cooling_unit;
-get_sensor_type({specific,  16#0b}) -> other_unit;
-get_sensor_type({specific,  16#0c}) -> memory;
-get_sensor_type({specific,  16#0d}) -> drive_slot;
-get_sensor_type({specific,  16#0e}) -> post_memory_resize;
-get_sensor_type({specific,  16#0f}) -> system_firmware;
-get_sensor_type({specific,  16#10}) -> event_logging;
-get_sensor_type({specific,  16#11}) -> watchdog_old;
-get_sensor_type({specific,  16#12}) -> system_event;
-get_sensor_type({specific,  16#13}) -> critical_interrupt;
-get_sensor_type({specific,  16#14}) -> switch;
-get_sensor_type({specific,  16#15}) -> board;
-get_sensor_type({specific,  16#16}) -> microcontroller;
-get_sensor_type({specific,  16#17}) -> add_in_card;
-get_sensor_type({specific,  16#18}) -> chassis;
-get_sensor_type({specific,  16#19}) -> chip_set;
-get_sensor_type({specific,  16#1a}) -> other_fru;
-get_sensor_type({specific,  16#1b}) -> interconnect;
-get_sensor_type({specific,  16#1c}) -> terminator;
-get_sensor_type({specific,  16#1d}) -> system_boot;
-get_sensor_type({specific,  16#1e}) -> boot_error;
-get_sensor_type({specific,  16#1f}) -> os_boot;
-get_sensor_type({specific,  16#20}) -> os_shutdown;
-get_sensor_type({specific,  16#21}) -> slot;
-get_sensor_type({specific,  16#22}) -> system_acpi_power_state;
-get_sensor_type({specific,  16#23}) -> watchdog;
-get_sensor_type({specific,  16#24}) -> platform_alert;
-get_sensor_type({specific,  16#25}) -> entity_presence;
-get_sensor_type({specific,  16#26}) -> monitor_asic_ic;
-get_sensor_type({specific,  16#27}) -> lan;
-get_sensor_type({specific,  16#28}) -> management_subsystem_health;
-get_sensor_type({specific,  16#29}) -> battery;
-get_sensor_type({specific,  16#2a}) -> session;
-get_sensor_type({specific,  16#2b}) -> version;
-get_sensor_type({specific,  16#2c}) -> fru_state;
-get_sensor_type({specific,  16#f0}) -> fru_hot_swap;
-get_sensor_type({specific,  16#f1}) -> ipmb_physical;
-get_sensor_type({specific,  16#f2}) -> module_hot_swap;
-get_sensor_type({specific,  16#f3}) -> power_channel;
-get_sensor_type({specific,  16#f4}) -> telco_alarm;
-get_sensor_type(Type)               -> Type.
+get_sensor_type(16#01) -> temperature;
+get_sensor_type(16#02) -> voltage;
+get_sensor_type(16#03) -> current;
+get_sensor_type(16#04) -> fan;
+get_sensor_type(16#05) -> intrusion;
+get_sensor_type(16#06) -> violation_attempt;
+get_sensor_type(16#07) -> processor;
+get_sensor_type(16#08) -> power_supply;
+get_sensor_type(16#09) -> power_unit;
+get_sensor_type(16#0a) -> cooling_unit;
+get_sensor_type(16#0b) -> other_unit;
+get_sensor_type(16#0c) -> memory;
+get_sensor_type(16#0d) -> drive_slot;
+get_sensor_type(16#0e) -> post_memory_resize;
+get_sensor_type(16#0f) -> system_firmware;
+get_sensor_type(16#10) -> event_logging;
+get_sensor_type(16#11) -> watchdog_old;
+get_sensor_type(16#12) -> system_event;
+get_sensor_type(16#13) -> critical_interrupt;
+get_sensor_type(16#14) -> switch;
+get_sensor_type(16#15) -> board;
+get_sensor_type(16#16) -> microcontroller;
+get_sensor_type(16#17) -> add_in_card;
+get_sensor_type(16#18) -> chassis;
+get_sensor_type(16#19) -> chip_set;
+get_sensor_type(16#1a) -> other_fru;
+get_sensor_type(16#1b) -> interconnect;
+get_sensor_type(16#1c) -> terminator;
+get_sensor_type(16#1d) -> system_boot;
+get_sensor_type(16#1e) -> boot_error;
+get_sensor_type(16#1f) -> os_boot;
+get_sensor_type(16#20) -> os_shutdown;
+get_sensor_type(16#21) -> slot;
+get_sensor_type(16#22) -> system_acpi_power_state;
+get_sensor_type(16#23) -> watchdog;
+get_sensor_type(16#24) -> platform_alert;
+get_sensor_type(16#25) -> entity_presence;
+get_sensor_type(16#26) -> monitor_asic_ic;
+get_sensor_type(16#27) -> lan;
+get_sensor_type(16#28) -> management_subsystem_health;
+get_sensor_type(16#29) -> battery;
+get_sensor_type(16#2a) -> session;
+get_sensor_type(16#2b) -> version;
+get_sensor_type(16#2c) -> fru_state;
+get_sensor_type(16#f0) -> fru_hot_swap;
+get_sensor_type(16#f1) -> ipmb_physical;
+get_sensor_type(16#f2) -> module_hot_swap;
+get_sensor_type(16#f3) -> power_channel;
+get_sensor_type(16#f4) -> telco_alarm;
+get_sensor_type(Type)  -> Type.
 
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-map(threshold,                   A, _, _, _) ->
+get_sensor_reading(16#01)   -> threshold;
+get_sensor_reading(16#02)   -> dmi_usage;
+get_sensor_reading(16#03)   -> state;
+get_sensor_reading(16#04)   -> predictive_failure;
+get_sensor_reading(16#05)   -> limit;
+get_sensor_reading(16#06)   -> performance;
+get_sensor_reading(16#07)   -> severity;
+get_sensor_reading(16#08)   -> availability0;
+get_sensor_reading(16#09)   -> availability1;
+get_sensor_reading(16#0a)   -> availability2;
+get_sensor_reading(16#0b)   -> redundancy;
+get_sensor_reading(16#0c)   -> acpi_power_state;
+get_sensor_reading(16#6f)   -> specific;
+get_sensor_reading(Reading) -> Reading.
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+map(_,                           threshold,          A, _, _, _) ->
     get_threshold(A);
-map(dmi_usage,                   A, _, _, _) ->
+map(_,                           dmi_usage,          A, _, _, _) ->
     get_dmi_usage(A);
-map(state,                       A, _, _, _) ->
+map(_,                           state,              A, _, _, _) ->
     get_assertion(A);
-map(predictive_failure,          A, _, _, _) ->
+map(_,                           predictive_failure, A, _, _, _) ->
     get_assertion(A);
-map(limit,                       A, _, _, _) ->
+map(_,                           limit,              A, _, _, _) ->
     get_limit(A);
-map(performance,                 A, _, _, _) ->
+map(_,                           performance,        A, _, _, _) ->
     get_performance(A);
-map(severity,                    A, _, _, _) ->
+map(_,                           severity,           A, _, _, _) ->
     get_severity(A);
-map(availability0,               A, _, _, _) ->
+map(_,                           availability0,      A, _, _, _) ->
     get_availability08(A);
-map(availability1,               A, _, _, _) ->
+map(_,                           availability1,      A, _, _, _) ->
     get_availability09(A);
-map(availability2,               A, _, _, _) ->
+map(_,                           availability2,      A, _, _, _) ->
     get_availability0a(A);
-map(redundancy,                  A, _, _, _) ->
+map(_,                           redundancy,         A, _, _, _) ->
     get_redundancy(A);
-map(acpi_power_state,            A, _, _, _) ->
+map(_,                           acpi_power_state,   A, _, _, _) ->
     get_acpi_power_state(A);
-map(intrusion,                   A, _, _, _) ->
+map(intrusion,                   specific,           A, _, _, _) ->
     get_intrusion(A);
-map(violation_attempt,           A, _, _, _) ->
+map(violation_attempt,           specific,           A, _, _, _) ->
     get_violation_attempt(A);
-map(processor,                   A, _, _, _) ->
+map(processor,                   specific,           A, _, _, _) ->
     get_processor_failure(A);
-map(power_supply,                A, _, _, D) ->
+map(power_supply,                specific,           A, _, _, D) ->
     get_power_supply_event(A, D);
-map(power_unit,                  A, _, _, _) ->
+map(power_unit,                  specific,           A, _, _, _) ->
     get_power_unit_event(A);
-map(memory,                      A, _, _, D) ->
+map(memory,                      specific,           A, _, _, D) ->
     get_memory_event(A, D);
-map(drive_slot,                  A, _, _, _) ->
+map(drive_slot,                  specific,           A, _, _, _) ->
     get_drive_slot_state(A);
-map(system_firmware,             A, _, C, _) ->
+map(system_firmware,             specific,           A, _, C, _) ->
     get_system_firmware_event(A, C);
-map(event_logging,               A, _, C, D) ->
+map(event_logging,               specific,           A, _, C, D) ->
     get_event_logging_event(A, C, D);
-map(watchdog_old,                A, _, _, _) ->
+map(watchdog_old,                specific,           A, _, _, _) ->
     get_watchdog_old(A);
-map(system_event,                A, _, C, _) ->
+map(system_event,                specific,           A, _, C, _) ->
     get_system_event(A, C);
-map(critical_interrupt,          A, _, _, _) ->
+map(critical_interrupt,          specific,           A, _, _, _) ->
     get_critical_interrupt(A);
-map(switch,                      A, _, _, _) ->
+map(switch,                      specific,           A, _, _, _) ->
     get_switch_event(A);
-map(chip_set,                    A, _, C, D) ->
+map(chip_set,                    specific,           A, _, C, D) ->
     get_chip_set_event(A, C, D);
-map(interconnect,                A, _, _, _) ->
+map(interconnect,                specific,           A, _, _, _) ->
     get_interconnect(A);
-map(system_boot,                 A, _, C, D) ->
+map(system_boot,                 specific,           A, _, C, D) ->
     get_system_boot_event(A, C, D);
-map(boot_error,                  A, _, _, _) ->
+map(boot_error,                  specific,           A, _, _, _) ->
     get_boot_error(A);
-map(os_boot,                     A, _, _, _) ->
+map(os_boot,                     specific,           A, _, _, _) ->
     get_os_boot_event(A);
-map(os_shutdown,                 A, _, _, _) ->
+map(os_shutdown,                 specific,           A, _, _, _) ->
     get_os_shutdown_event(A);
-map(slot,                        A, _, C, D) ->
+map(slot,                        specific,           A, _, C, D) ->
     get_slot_event(A, C, D);
-map(system_acpi_power_state,     A, _, _, _) ->
+map(system_acpi_power_state,     specific,           A, _, _, _) ->
     get_power_state(A);
-map(watchdog,                    A, _, C, _) ->
+map(watchdog,                    specific,           A, _, C, _) ->
     get_watchdog_new(A, C);
-map(platform_alert,              A, _, _, _) ->
+map(platform_alert,              specific,           A, _, _, _) ->
     get_platform_alert(A);
-map(entity_presence,             A, B, _, _) ->
+map(entity_presence,             specific,           A, B, _, _) ->
     get_entity_presence(A, B);
-map(lan,                         A, _, _, _) ->
+map(lan,                         specific,           A, _, _, _) ->
     get_lan_event(A);
-map(management_subsystem_health, A, _, C, D) ->
+map(management_subsystem_health, specific,           A, _, C, D) ->
     get_management_subsystem_health(A, C, D);
-map(battery,                     A, _, _, _) ->
+map(battery,                     specific,           A, _, _, _) ->
     get_battery_state(A);
-map(session,                     A, _, C, D) ->
+map(session,                     specific,           A, _, C, D) ->
     get_session_event(A, C, D);
-map(version,                     A, B, C, _) ->
+map(version,                     specific,           A, B, C, _) ->
     get_version_change(A, B, C);
-map(fru_state,                   A, _, C, _) ->
+map(fru_state,                   specific,           A, _, C, _) ->
     get_fru_event(A, C);
-map(fru_hot_swap,                A, _, C, D) ->
+map(fru_hot_swap,                specific,           A, _, C, D) ->
     get_fru_hot_swap_event(A, C, D);
-map(module_hot_swap,             A, _, _, _) ->
+map(module_hot_swap,             specific,           A, _, _, _) ->
     get_module_hot_swap_event(A);
-map(power_channel,               A, _, C, D) ->
+map(power_channel,               specific,           A, _, C, D) ->
     get_power_channel_notification(A, C, D);
-map(_,                           A, B, C, D) ->
+map(_,                           _,                  A, B, C, D) ->
     [{offset, A}, {data2, C}, {data3, D}, {asserted, not eipmi_util:get_bool(B)}].
 
 %%------------------------------------------------------------------------------
@@ -868,15 +870,16 @@ get_event_logging_event(16#06,    Id,     _) ->
 get_event_logging_event(16#01, 16#ff, 16#ff) ->
     [{sensor_value, disabled}];
 get_event_logging_event(16#01, RType,  Byte) ->
-    Sensor = get_event(RType, Byte band 16#0f, (Byte band 16#10) bsr 4),
-    [{sensor_value, disabled}, {component, Sensor}].
+    Event = get_event(RType, Byte band 16#0f, (Byte band 16#10) bsr 4),
+    [{sensor_value, disabled}, {component, Event}].
 
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
 get_event(ReadingType, Offset, Assertion) ->
-    {_, Type} = get_type(ReadingType, 16#00),
-    [{sensor_type, Type}] ++ map(Type, Offset, Assertion, 16#ff, 16#ff).
+    [{reading_type, get_sensor_reading(ReadingType)},
+     {offset, Offset},
+     {asserted, not eipmi_util:get_bool(Assertion)}].
 
 %%------------------------------------------------------------------------------
 %% @private

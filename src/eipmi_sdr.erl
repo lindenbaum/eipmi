@@ -113,6 +113,8 @@
           integer(), integer(), integer(), integer()}} |
         {sensor_number, non_neg_integer()} |
         {sensor_numbers, [non_neg_integer()]} |
+        {sensor_type, eipmi_sensor:type()} |
+        {reading_type, eipmi_sensor:reading()} |
         {sensor_direction, input | output}.
 
 -type entry() ::
@@ -204,17 +206,18 @@ get_sensor_reading(SessionPid, SensorNumber, SdrRepository) ->
 -spec get_sensor_reading(pid(), {full | compact, [property()]}) -> [reading()].
 get_sensor_reading(SessionPid, {Type, Properties})
   when Type =:= full orelse Type =:= compact ->
+    ReadingType = proplists:get_value(reading_type, Properties),
     SensorType = proplists:get_value(sensor_type, Properties),
     Args = [lists:keyfind(sensor_number, 1, Properties)],
     {ok, Result} = eipmi_session:rpc(SessionPid, ?GET_READING, Args),
     State = proplists:get_value(state, Result),
     Raw = proplists:get_value(raw_reading, Result),
     Reading = get_reading(sensor_reading, Raw, Properties),
-    get_sensor_reading_(SensorType, State) ++ Reading.
-get_sensor_reading_(threshold, <<S:6/bitstring, _:2>>) ->
-    [eipmi_sensor:get_value(threshold, O, 1, 16#ff, 16#ff) || O <- get_offsets(S)];
-get_sensor_reading_(Type, S) ->
-    [eipmi_sensor:get_value(Type, O, 1, 16#ff, 16#ff) || O <- get_offsets(S)].
+    get_sensor_reading_(ReadingType, SensorType, State) ++ Reading.
+get_sensor_reading_(R, T, <<S:6/bitstring, _:2>>) ->
+    [eipmi_sensor:get_value(R, T, O, 1, 16#ff, 16#ff) || O <- get_offsets(S)];
+get_sensor_reading_(R, T, S) ->
+    [eipmi_sensor:get_value(R, T, O, 1, 16#ff, 16#ff) || O <- get_offsets(S)].
 
 %%------------------------------------------------------------------------------
 %% @doc
@@ -362,13 +365,13 @@ decode_full_sensor_record(
     SensorProperties:7/binary, _:8, NominalReading:1/binary,
     NominalMaximum:1/binary, NominalMinimum:1/binary, MaximumReading:1/binary,
     MinimumReading:1/binary, _:64, ?EIPMI_RESERVED:16, _OEM:8, Id/binary>>) ->
-    {_, Type} = eipmi_sensor:get_type(ReadingType, SensorType),
+    {Reading, Type} = eipmi_sensor:get_type(ReadingType, SensorType),
     Units = get_units(SensorUnit),
     Properties = get_sensor_properties(SensorProperties, Units),
     eipmi_sensor:get_addr(SensorAddr)
         ++ get_sensor_numbers(SensorNumber, 0)
         ++ eipmi_sensor:get_entity(EntityId, EntityInstance)
-        ++ [{sensor_type, Type}] ++ Units ++ Properties
+        ++ [{sensor_type, Type}, {reading_type, Reading}] ++ Units ++ Properties
         ++ get_reading(nominal_reading, NominalReading, Units ++ Properties)
         ++ get_reading(nominal_maximum, NominalMaximum, Units ++ Properties)
         ++ get_reading(nominal_minimum, NominalMinimum, Units ++ Properties)
@@ -384,11 +387,11 @@ decode_compact_sensor_record(
     _:16, SensorType:8, ReadingType:8, _:48, SensorUnit:3/binary, Direction:2,
     Modifier:2, Count:4, Sharing:1/binary, _:16, ?EIPMI_RESERVED:24, _OEM:8,
     Id/binary>>) ->
-    {_, Type} = eipmi_sensor:get_type(ReadingType, SensorType),
+    {Reading, Type} = eipmi_sensor:get_type(ReadingType, SensorType),
     eipmi_sensor:get_addr(SensorAddr)
         ++ get_sensor_numbers(SensorNumber, Count)
         ++ eipmi_sensor:get_entity(EntityId, EntityInstance)
-        ++ [{sensor_type, Type}]
+        ++ [{sensor_type, Type}, {reading_type, Reading}]
         ++ get_units(SensorUnit)
         ++ get_direction(Direction)
         ++ get_id(Count, Sharing, Modifier, get_id(Id)).
@@ -400,11 +403,11 @@ decode_event_only_record(
   <<SensorAddr:2/binary, SensorNumber:8, EntityId:8, EntityInstance:1/binary,
     SensorType:8, ReadingType:8, Direction:2, Modifier:2, Count:4,
     Sharing:1/binary, ?EIPMI_RESERVED:8, _OEM:8, Id/binary>>) ->
-    {_, Type} = eipmi_sensor:get_type(ReadingType, SensorType),
+    {Reading, Type} = eipmi_sensor:get_type(ReadingType, SensorType),
     eipmi_sensor:get_addr(SensorAddr)
         ++ get_sensor_numbers(SensorNumber, Count)
         ++ eipmi_sensor:get_entity(EntityId, EntityInstance)
-        ++ [{sensor_type, Type}]
+        ++ [{sensor_type, Type}, {reading_type, Reading}]
         ++ get_direction(Direction)
         ++ get_id(Count, Sharing, Modifier, get_id(Id)).
 
