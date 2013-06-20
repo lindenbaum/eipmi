@@ -26,7 +26,8 @@
          get_value/6,
          get_entity/2,
          get_entity_id/1,
-         get_unit/1]).
+         get_unit/1,
+         to_list/1]).
 
 -include("eipmi.hrl").
 
@@ -355,7 +356,18 @@ get_unit(89) -> correctable_error;
 get_unit(90) -> uncorrectable_error;
 get_unit(91) -> fatal_error;
 get_unit(92) -> grams;
-get_unit(_)  ->  unspecified.
+get_unit(_)  -> unspecified.
+
+%%------------------------------------------------------------------------------
+%% @doc
+%% Return the string representation of an entity id, a sensor type or a sensor
+%% unit.
+%% @end
+%%------------------------------------------------------------------------------
+-spec to_list(entity_id() | type() | unit()) -> string().
+to_list(Int)  when is_integer(Int) -> to_list(integer_to_list(Int));
+to_list(Atom) when is_atom(Atom)   -> to_list(atom_to_list(Atom));
+to_list(List) when is_list(List)   -> string:to_upper(List).
 
 %%%=============================================================================
 %%% Internal functions

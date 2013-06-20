@@ -30,7 +30,8 @@
          from_packed_ascii/1,
          from_base26/1,
          get_bool/1,
-         binary_to_string/1]).
+         binary_to_string/1,
+         join_nl/1]).
 
 %%%=============================================================================
 %%% API
@@ -216,3 +217,11 @@ get_bool(_) -> true.
 -spec binary_to_string(binary()) -> string().
 binary_to_string(Binary) ->
     [C || C <- binary_to_list(Binary), C =/= 0].
+
+%%------------------------------------------------------------------------------
+%% @doc
+%% Convert a binary into a string removing all contained zero bytes.
+%% @end
+%%------------------------------------------------------------------------------
+-spec join_nl([string()]) -> string().
+join_nl(StringList) -> string:join(StringList, io_lib:nl()).

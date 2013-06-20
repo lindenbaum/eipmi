@@ -27,7 +27,8 @@
          get/2,
          get_sensor_reading/3,
          get_sensor_reading/2,
-         convert/2]).
+         convert/2,
+         to_list/1]).
 
 -include("eipmi.hrl").
 
@@ -228,6 +229,30 @@ get_sensor_reading_(R, T, S) ->
 -spec convert(binary(), {full, [property()]}) -> [reading()].
 convert(Raw, {full, Properties}) ->
     get_reading(sensor_reading, Raw, Properties).
+
+%%------------------------------------------------------------------------------
+%% @doc
+%% Returns a string representation of the SDR repository or of a single SDR.
+%% @end
+%%------------------------------------------------------------------------------
+-spec to_list(entry() | [entry()]) -> string().
+to_list(SdrRepository) when is_list(SdrRepository) ->
+    eipmi_util:join_nl(
+      ["RECORD                TYPE            NUM ENTITY          ID",
+       "---------------------------------------------------------------------"]
+      ++ [to_list(E) || E = {T, _} <- SdrRepository, T =/= sdr_info]);
+to_list({T, Properties}) ->
+    RecordId = proplists:get_value(record_id, Properties),
+    RecordType = string:to_upper(atom_to_list(T)),
+    Type = eipmi_sensor:to_list(proplists:get_value(sensor_type, Properties, "-")),
+    Num = eipmi_sensor:to_list(proplists:get_value(sensor_number, Properties, "-")),
+    EntityId = proplists:get_value(entity_id, Properties, "-"),
+    Inst = proplists:get_value(entity_instance, Properties, -1),
+    EntityStr = io_lib:format("~s/~-2.B", [eipmi_sensor:to_list(EntityId), Inst]),
+    Id = proplists:get_value(id, Properties, "-"),
+    eipmi_util:format(
+      "~-6.B ~-14.14s ~-15.15s ~-3.3s ~-15.15s ~s",
+      [RecordId, RecordType, Type, Num, EntityStr, Id]).
 
 %%%=============================================================================
 %%% Internal functions

@@ -20,7 +20,7 @@
 
 -include("eipmi.hrl").
 
--define(IP, "10.1.40.101").
+-define(IP, "10.100.111.21").
 %%-define(GET_HOSTNAME, inet:gethostname()).
 -define(GET_HOSTNAME, skip).
 
@@ -71,7 +71,7 @@ read_fru({ok, "tirana"}) ->
     {ok, Session} = eipmi:open(?IP),
     Mon = monitor_session(Session),
     {ok, Fru} = eipmi:read_fru(Session, 253),
-    error_logger:info_msg("~n~p~n", [Fru]),
+    error_logger:info_msg("~s~n", [eipmi_fru:to_list(Fru)]),
     ?assertEqual(ok, eipmi:close(Session)),
     ?assertEqual(shutdown, receive {'DOWN', Mon, _, _, Reason} -> Reason end),
     stop();
@@ -84,7 +84,7 @@ get_sdr_repository({ok, "tirana"}) ->
     {ok, Session} = eipmi:open(?IP),
     Mon = monitor_session(Session),
     {ok, SDRRepository} = eipmi:get_sdr_repository(Session),
-    error_logger:info_msg("~n~p~n", [SDRRepository]),
+    error_logger:info_msg("~s~n", [eipmi_sdr:to_list(SDRRepository)]),
     ?assertEqual(ok, eipmi:close(Session)),
     ?assertEqual(shutdown, receive {'DOWN', Mon, _, _, Reason} -> Reason end),
     stop();
@@ -99,7 +99,7 @@ read_fru_inventory({ok, "tirana"}) ->
     Mon = monitor_session(Session),
     {ok, SDRRepository} = eipmi:get_sdr_repository(Session),
     {ok, FruInventory} = eipmi:read_fru_inventory(Session, SDRRepository),
-    error_logger:info_msg("~n~p~n", [FruInventory]),
+    error_logger:info_msg("~s~n", [eipmi_fru:to_list(FruInventory)]),
     ?assertEqual(ok, eipmi:close(Session)),
     ?assertEqual(shutdown, receive {'DOWN', Mon, _, _, Reason} -> Reason end),
     stop();

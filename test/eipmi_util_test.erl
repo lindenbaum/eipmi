@@ -103,3 +103,7 @@ binary_to_string_test() ->
     ?assertEqual("abc", eipmi_util:binary_to_string(<<$a, $b, $c>>)),
     ?assertEqual("abc", eipmi_util:binary_to_string(<<$a, $b, $c, 0>>)),
     ?assertEqual("abc", eipmi_util:binary_to_string(<<$a, $b, $c, 0, 0>>)).
+
+join_nl_test() ->
+    ?assertEqual("a", eipmi_util:join_nl(["a"])),
+    ?assertEqual("a" ++ io_lib:nl() ++ "b", eipmi_util:join_nl(["a", "b"])).

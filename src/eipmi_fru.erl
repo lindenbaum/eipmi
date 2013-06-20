@@ -21,7 +21,8 @@
 
 -module(eipmi_fru).
 
--export([read/2]).
+-export([read/2,
+         to_list/1]).
 
 -include("eipmi.hrl").
 
@@ -34,12 +35,13 @@
 -define(GET_INFO, {?IPMI_NETFN_STORAGE_REQUEST, ?GET_FRU_INVENTORY_AREA_INFO}).
 
 -type chassis_info() ::
-        {type, string()} |
+        {type, non_neg_integer()} |
         {part_number, string()} |
         {serial_number, string()} |
         {custom, term()}.
 
 -type board_info() ::
+        {manufacturing_date, non_neg_integer()} |
         {manufacturer, string()} |
         {name, string()} |
         {serial_number, string()} |
@@ -95,6 +97,26 @@
 read(SessionPid, FruId) ->
     FruInfo = eipmi_session:rpc(SessionPid, ?GET_INFO, [{fru_id, FruId}]),
     do_read(FruInfo, SessionPid, FruId).
+
+%%------------------------------------------------------------------------------
+%% @doc
+%% Returns a string representation of one or more FRU inventory entries.
+%% @end
+%%------------------------------------------------------------------------------
+-spec to_list(info() | [info()]) -> string().
+to_list(FruInventory) when is_list(FruInventory) ->
+    eipmi_util:join_nl([to_list(FruInfo) || FruInfo <- FruInventory]);
+to_list({fru_data, Properties}) ->
+    FruId = integer_to_list(proplists:get_value(fru_id, Properties, -1)),
+    eipmi_util:join_nl(
+      ["---------------------------------------",
+       "FRU Info for device " ++ FruId ++ ":",
+       "---------------------------------------",
+       to_list_chassis(proplists:get_value(chassis_area, Properties, [])),
+       "---------------------------------------",
+       to_list_board(proplists:get_value(board_area, Properties, [])),
+       "---------------------------------------",
+       to_list_product(proplists:get_value(product_area, Properties, []))]).
 
 %%%=============================================================================
 %%% Internal functions
@@ -616,31 +638,79 @@ decode_field(Name, _Lang, <<3:2, _Len:6, Data/utf16-little, Rest/binary>>) ->
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-non_zero(List) ->
-    [Elem || Elem <- List, Elem > 0].
+non_zero(List) -> [Elem || Elem <- List, Elem > 0].
 
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-is_header_sane(<<Header:8/binary, _/binary>>) ->
-    is_binary_sane(Header).
+is_header_sane(<<Header:8/binary, _/binary>>) -> is_binary_sane(Header).
 
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-is_binary_sane(Binary) ->
-    sum(Binary, 0) =:= 0.
+is_binary_sane(Binary) -> sum(Binary, 0) =:= 0.
 
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-sum(<<>>, Sum) ->
-    Sum rem 256;
-sum(<<Byte:8, Rest/binary>>, Sum) ->
-    sum(Rest, Sum + Byte).
+sum(<<>>, Sum)                    -> Sum rem 256;
+sum(<<Byte:8, Rest/binary>>, Sum) -> sum(Rest, Sum + Byte).
 
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-unit(Unit) ->
-    eipmi_sensor:get_unit(Unit).
+unit(Unit) -> eipmi_sensor:get_unit(Unit).
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+to_list_chassis([]) -> "Chassis Info Area      : -";
+to_list_chassis(Area) ->
+    Type = proplists:get_value(type, Area, "-"),
+    Part = proplists:get_value(part_number, Area, "-"),
+    Serial = proplists:get_value(serial_number, Area, "-"),
+    eipmi_util:join_nl(
+      ["Chassis Info Area",
+       "Chassis Type           : " ++ eipmi_util:format("~p", [Type]),
+       "Chassis Part Number    : " ++ Part,
+       "Chassis Serial Number  : " ++ Serial]).
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+to_list_board([]) -> "Board Info Area        : -";
+to_list_board(Area) ->
+    Manufacturer = proplists:get_value(manufacturer, Area, "-"),
+    Name = proplists:get_value(name, Area, "-"),
+    Serial = proplists:get_value(serial_number, Area, "-"),
+    Part = proplists:get_value(part_number, Area, "-"),
+    File = proplists:get_value(fru_file_id, Area, "-"),
+    eipmi_util:join_nl(
+      ["Board Info Area",
+       "Manufacturer           : " ++ Manufacturer,
+       "Board Name             : " ++ Name,
+       "Serial Number          : " ++ Serial,
+       "Part Number            : " ++ Part,
+       "FRU file ID            : " ++ File]).
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+to_list_product([]) -> "Product Info Area      : -";
+to_list_product(Area) ->
+    Manufacturer = proplists:get_value(manufacturer, Area, "-"),
+    Name = proplists:get_value(name, Area, "-"),
+    Serial = proplists:get_value(serial_number, Area, "-"),
+    Part = proplists:get_value(part_number, Area, "-"),
+    File = proplists:get_value(fru_file_id, Area, "-"),
+    Version = proplists:get_value(version, Area, "-"),
+    Tag = proplists:get_value(asset_tag, Area, "-"),
+    eipmi_util:join_nl(
+      ["Product Info Area",
+       "Manufacturer           : " ++ Manufacturer,
+       "Product Name           : " ++ Name,
+       "Product Number         : " ++ Part,
+       "Part Version           : " ++ Version,
+       "Product Serial Number  : " ++ Serial,
+       "Asset Tag              : " ++ Tag,
+       "FRU file ID            : " ++ File]).
