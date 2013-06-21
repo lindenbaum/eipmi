@@ -364,7 +364,7 @@ get_unit(_)  -> unspecified.
 %% unit.
 %% @end
 %%------------------------------------------------------------------------------
--spec to_list(entity_id() | type() | unit()) -> string().
+-spec to_list(atom() | string() | integer()) -> string().
 to_list(Int)  when is_integer(Int) -> to_list(integer_to_list(Int));
 to_list(Atom) when is_atom(Atom)   -> to_list(atom_to_list(Atom));
 to_list(List) when is_list(List)   -> string:to_upper(List).
