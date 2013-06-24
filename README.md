@@ -9,6 +9,7 @@ with other Erlang/OTP concepts and solutions.
 
 * [Code](http://github.com/lindenbaum/eipmi)
 * [EDoc](http://lindenbaum.github.com/eipmi)
+* [![Build Status](https://travis-ci.org/lindenbaum/eipmi.png?branch=master)](https://travis-ci.org/lindenbaum/eipmi)
 
 Initial planned features
 ------------------------
