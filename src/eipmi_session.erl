@@ -188,7 +188,7 @@ rpc_(Result, _Fun, _Retransmits) ->
           requests = []  :: [{rpc | internal, 0..63, reference(), term()}],
           session        :: eipmi:session(),
           address        :: inet:ip_address() | inet:hostname(),
-          socket         :: gen_udp:socket(),
+          socket         :: inet:socket(),
           properties     :: [property()]}).
 
 %%------------------------------------------------------------------------------
