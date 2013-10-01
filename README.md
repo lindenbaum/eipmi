@@ -153,6 +153,14 @@ The session received an invalid message.
 ```
 A forwarded entry from the System Event Log (only when automatic SEL polling is
 enabled).
+```erlang
+{ipmi,
+ Session :: eipmi:session(),
+ Address :: inet:ip_address() | inet:hostname(),
+ {sel_read_error, Reason :: term()}}
+```
+An error occured when polling the System Event Log (only when automatic SEL
+polling is enabled).
 
 ### Building
 
