@@ -159,9 +159,8 @@ rpc(Pid, Request, Properties) ->
 
 %%------------------------------------------------------------------------------
 %% @doc
-%% Send a synchronous IPMI RPC over this session. If the session is not yet
-%% established the request will be queued. The last arguments specifies the
-%% number of allowed retransmits. Since requests get sent over UDP packet
+%% Send a synchronous IPMI RPC over this session. The last arguments specifies
+%% the number of allowed retransmits. Since requests get sent over UDP packet
 %% delivery may be unreliable and requests could get lost.
 %% @end
 %%------------------------------------------------------------------------------
@@ -181,10 +180,8 @@ rpc_(Result, _Fun, _Retransmits) ->
 %%%=============================================================================
 
 -record(state, {
-          active = false :: boolean(),
           keep_alive     :: non_neg_integer(),
           last_send      :: non_neg_integer(),
-          queue = []     :: [{eipmi:request(), binary(), term()}],
           requests = []  :: [{rpc | internal, 0..63, reference(), term()}],
           session        :: eipmi:session(),
           address        :: inet:ip_address() | inet:hostname(),
@@ -196,21 +193,26 @@ rpc_(Result, _Fun, _Retransmits) ->
 %%------------------------------------------------------------------------------
 init([S, Addr, Options]) ->
     process_flag(trap_exit, true),
-    {ok, Sock} = gen_udp:open(0, [binary]),
     Opts = eipmi_util:merge_vals(Options, ?DEFAULTS),
-    {ok,
-     process_internal_request(
-       {{?IPMI_NETFN_APPLICATION_REQUEST, ?GET_CHANNEL_AUTHENTICATION_CAPABILITIES},
-        fun handle_get_channel_authentication_capabilites_response/2},
-       #state{session = S, address = Addr, socket = Sock, properties = Opts})}.
+    {ok, Sock} = gen_udp:open(0, [binary, {active, false}]),
+    State = #state{session = S, address = Addr, socket = Sock, properties = Opts},
+    try
+        {ok, State1} = get_authentication_capabilities(State),
+        {ok, State2} = get_session_challenge(State1),
+        {ok, State3} = activate_session(State2),
+        {ok, State4} = set_session_privilege_level(State3),
+        ok = inet:setopts(Sock, [{active, true}]),
+        {ok, State4}
+    catch
+        _:{badmatch, Reason} -> {stop, {shutdown, Reason}};
+        _:Reason             -> {stop, {shutdown, Reason}}
+    end.
 
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-handle_call({rpc, Request, Data}, From, State = #state{active = true}) ->
+handle_call({rpc, Request, Data}, From, State) ->
     {noreply, process_request({Request, Data, From}, State)};
-handle_call({rpc, Request, Data}, From, State = #state{queue = Q}) ->
-    {noreply, State#state{queue = Q ++ [{Request, Data, From}]}};
 handle_call(Request, _From, State) ->
     {reply, undef, fire({unhandled, {call, Request}}, State)}.
 
@@ -241,7 +243,7 @@ handle_info(Info, State) ->
 %%------------------------------------------------------------------------------
 terminate(Reason, State = #state{requests = Requests}) ->
     NewState = lists:foldl(reply({error, {closed, Reason}}), State, Requests),
-    fire({closed, Reason}, maybe_close_session(NewState)),
+    fire({closed, Reason}, close_session(NewState)),
     gen_udp:close(NewState#state.socket),
     ok.
 
@@ -254,6 +256,66 @@ code_change(_OldVsn, State, _Extra) ->
 %%%=============================================================================
 %%% Internal functions
 %%%=============================================================================
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+get_authentication_capabilities(State = #state{socket = Socket}) ->
+    Request = {?IPMI_NETFN_APPLICATION_REQUEST,
+               ?GET_CHANNEL_AUTHENTICATION_CAPABILITIES},
+    Data = eipmi_request:encode(Request, State#state.properties),
+    State1 = element(2, send_request(Request, Data, State)),
+    Timeout = get_state_val(timeout, State1),
+    {ok, {_, _, Bin}} = gen_udp:recv(Socket, 2000, Timeout),
+    {ok, Packet = #rmcp_ipmi{header = Header}} = eipmi_decoder:packet(Bin),
+    State2 = maybe_send_ack(Header, State1),
+    {ok, Fields} = get_response(Packet),
+    {ok, select_auth(Fields, check_login(Fields, State2))}.
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+get_session_challenge(State = #state{socket = Socket}) ->
+    Request = {?IPMI_NETFN_APPLICATION_REQUEST, ?GET_SESSION_CHALLENGE},
+    Data = eipmi_request:encode(Request, State#state.properties),
+    State1 = element(2, send_request(Request, Data, State)),
+    Timeout = get_state_val(timeout, State1),
+    {ok, {_, _, Bin}} = gen_udp:recv(Socket, 2000, Timeout),
+    {ok, Packet = #rmcp_ipmi{header = Header}} = eipmi_decoder:packet(Bin),
+    State2 = maybe_send_ack(Header, State1),
+    {ok, Fields} = get_response(Packet),
+    {ok, copy_state_vals([challenge, session_id], Fields, State2)}.
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+activate_session(State = #state{socket = Socket}) ->
+    Request = {?IPMI_NETFN_APPLICATION_REQUEST, ?ACTIVATE_SESSION},
+    Data = eipmi_request:encode(Request, State#state.properties),
+    State1 = element(2, send_request(Request, Data, State)),
+    Timeout = get_state_val(timeout, State1),
+    {ok, {_, _, Bin}} = gen_udp:recv(Socket, 2000, Timeout),
+    {ok, Packet = #rmcp_ipmi{header = Header}} = eipmi_decoder:packet(Bin),
+    State2 = maybe_send_ack(Header, State1),
+    {ok, Fields} = get_response(Packet),
+    {ok, copy_state_vals([auth_type, session_id, inbound_seq_nr], Fields, State2)}.
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+set_session_privilege_level(State = #state{socket = Socket}) ->
+    Request = {?IPMI_NETFN_APPLICATION_REQUEST, ?SET_SESSION_PRIVILEGE_LEVEL},
+    Data = eipmi_request:encode(Request, State#state.properties),
+    State1 = element(2, send_request(Request, Data, State)),
+    Timeout = get_state_val(timeout, State1),
+    {ok, {_, _, Bin}} = gen_udp:recv(Socket, 2000, Timeout),
+    {ok, Packet = #rmcp_ipmi{header = Header}} = eipmi_decoder:packet(Bin),
+    State2 = maybe_send_ack(Header, State1),
+    {ok, Fields} = get_response(Packet),
+    RequestedPrivilege = get_state_val(privilege, State),
+    assert(RequestedPrivilege == proplists:get_value(privilege, Fields),
+           failed_to_set_requested_privilege),
+    {ok, keep_alive(to_millis(os:timestamp()), fire(established, State2))}.
 
 %%------------------------------------------------------------------------------
 %% @private
@@ -308,15 +370,7 @@ unregister_request(RqSeqNr, State = #state{requests = Rs}) ->
 %%------------------------------------------------------------------------------
 process_request({Request, Data, Receiver}, State) ->
     {RqSeqNr, NewState} = send_request(Request, Data, State),
-    register_request(RqSeqNr, Receiver, NewState).
-
-%%------------------------------------------------------------------------------
-%% @private
-%%------------------------------------------------------------------------------
-process_internal_request({Request, Receiver}, State) ->
-    Data = eipmi_request:encode(Request, State#state.properties),
-    {RqSeqNr, NewState} = send_request(Request, Data, State),
-    register_request(RqSeqNr, Receiver, NewState).
+    register_request(RqSeqNr, Receiver, incr_inbound_seq_nr(NewState)).
 
 %%------------------------------------------------------------------------------
 %% @private
@@ -324,7 +378,7 @@ process_internal_request({Request, Receiver}, State) ->
 send_request(Request, Data, State = #state{properties = Ps}) ->
     Header = #rmcp_header{seq_nr = ?RMCP_NOREPLY, class = ?RMCP_IPMI},
     Bin = eipmi_encoder:ipmi(Header, Ps, Request, Data),
-    incr_rq_seq_nr(incr_inbound_seq_nr(udp_send(Bin, State))).
+    incr_rq_seq_nr(udp_send(Bin, State)).
 
 %%------------------------------------------------------------------------------
 %% @private
@@ -337,8 +391,6 @@ incr_rq_seq_nr(State) ->
 %% @private
 %% if prior to a session the inbound seq nr will not be updated
 %%------------------------------------------------------------------------------
-incr_inbound_seq_nr(State = #state{active = false}) ->
-    State;
 incr_inbound_seq_nr(State) ->
     SeqNr = get_state_val(inbound_seq_nr, State),
     update_state_val(inbound_seq_nr, (SeqNr + 1) rem (16#ffffffff + 1), State).
@@ -346,13 +398,10 @@ incr_inbound_seq_nr(State) ->
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-maybe_close_session(State = #state{active = false}) ->
-    State;
-maybe_close_session(State) ->
+close_session(State) ->
     Request = {?IPMI_NETFN_APPLICATION_REQUEST, ?CLOSE_SESSION},
     Data = eipmi_request:encode(Request, State#state.properties),
-    {_, NewState} = send_request(Request, Data, State),
-    NewState.
+    element(2, send_request(Request, Data, State)).
 
 %%------------------------------------------------------------------------------
 %% @private
@@ -369,15 +418,6 @@ udp_send(Bin, S = #state{socket = Socket, address = IPAddress}) ->
     Port = proplists:get_value(port, S#state.properties),
     ok = gen_udp:send(Socket, IPAddress, Port, Bin),
     S#state{last_send = to_millis(os:timestamp())}.
-
-%%------------------------------------------------------------------------------
-%% @private
-%%------------------------------------------------------------------------------
-handle_get_channel_authentication_capabilites_response({ok, Fields}, State) ->
-    process_internal_request(
-      {{?IPMI_NETFN_APPLICATION_REQUEST, ?GET_SESSION_CHALLENGE},
-       fun handle_get_session_challenge_response/2},
-      select_auth(Fields, check_login(Fields, State))).
 
 %%------------------------------------------------------------------------------
 %% @private
@@ -424,35 +464,6 @@ check_login(Fields, State) ->
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-handle_get_session_challenge_response({ok, Fields}, State) ->
-    process_internal_request(
-      {{?IPMI_NETFN_APPLICATION_REQUEST, ?ACTIVATE_SESSION},
-       fun handle_activate_session_response/2},
-      copy_state_vals([challenge, session_id], Fields, State)).
-
-%%------------------------------------------------------------------------------
-%% @private
-%%------------------------------------------------------------------------------
-handle_activate_session_response({ok, Fields}, State) ->
-    process_internal_request(
-      {{?IPMI_NETFN_APPLICATION_REQUEST, ?SET_SESSION_PRIVILEGE_LEVEL},
-       fun handle_set_session_privilege_response/2},
-      copy_state_vals([auth_type, session_id, inbound_seq_nr], Fields, State)).
-
-%%------------------------------------------------------------------------------
-%% @private
-%%------------------------------------------------------------------------------
-handle_set_session_privilege_response({ok, Fs}, State = #state{queue = Q}) ->
-    P = proplists:get_value(privilege, Fs) =:= get_state_val(privilege, State),
-    assert(P, failed_to_set_requested_privilege_level),
-    NewState = State#state{active = true, queue = []},
-    keep_alive(
-      to_millis(os:timestamp()),
-      fire(established, lists:foldl(fun process_request/2, NewState, Q))).
-
-%%------------------------------------------------------------------------------
-%% @private
-%%------------------------------------------------------------------------------
 assert(true, _) -> ok;
 assert(false, MsgTerm) -> throw(MsgTerm).
 
@@ -491,7 +502,8 @@ start_keep_alive_timer(State) ->
 %%------------------------------------------------------------------------------
 send_keep_alive(State) ->
     Request = {?IPMI_NETFN_APPLICATION_REQUEST, ?SET_SESSION_PRIVILEGE_LEVEL},
-    process_internal_request({Request, fun handle_keep_alive/2}, State).
+    Data = eipmi_request:encode(Request, State#state.properties),
+    process_request({Request, Data, fun handle_keep_alive/2}, State).
 
 %%------------------------------------------------------------------------------
 %% @private
