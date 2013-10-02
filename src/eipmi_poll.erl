@@ -133,9 +133,8 @@ read_sel(State = #state{pid = Pid, properties = Ps}) ->
     case catch eipmi_sel:read(Pid, proplists:get_value(clear_sel, Ps)) of
         Entries when is_list(Entries) ->
             lists:foldl(fun fire/2, State, Entries);
-        {error, Reason} ->
-            fire({sel_read_error, Reason}, State);
         Reason ->
+            eipmi_session:stop(Pid, lost_connection),
             fire({sel_read_error, Reason}, State)
     end.
 

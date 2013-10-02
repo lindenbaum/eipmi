@@ -57,7 +57,8 @@
 %% API
 -export([start_link/3,
          rpc/3,
-         rpc/4]).
+         rpc/4,
+         stop/2]).
 
 %% gen_server callbacks
 -export([init/1,
@@ -175,6 +176,16 @@ rpc_({error, timeout}, Fun, Retransmits) when Retransmits > 0 ->
 rpc_(Result, _Fun, _Retransmits) ->
     Result.
 
+%%------------------------------------------------------------------------------
+%% @doc
+%% Stop the session process with the specified reason. This is a handy function
+%% to be used by e.g. {@link eipmi_poll} to be able to notify errors to the
+%% session server.
+%% @end
+%%------------------------------------------------------------------------------
+-spec stop(pid(), term()) -> ok.
+stop(Pid, Reason) -> gen_server:cast(Pid, {stop, Reason}).
+
 %%%=============================================================================
 %%% gen_server Callbacks
 %%%=============================================================================
@@ -182,7 +193,7 @@ rpc_(Result, _Fun, _Retransmits) ->
 -record(state, {
           keep_alive     :: non_neg_integer(),
           last_send      :: non_neg_integer(),
-          requests = []  :: [{rpc | internal, 0..63, reference(), term()}],
+          requests = []  :: [{0..63, reference(), term()}],
           session        :: eipmi:session(),
           address        :: inet:ip_address() | inet:hostname(),
           socket         :: inet:socket(),
@@ -219,20 +230,32 @@ handle_call(Request, _From, State) ->
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
+handle_cast({stop, Reason}, State) ->
+    {stop, {shutdown, Reason}, State};
 handle_cast(Request, State) ->
     {noreply, fire({unhandled, {cast, Request}}, State)}.
 
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-handle_info({udp_closed, Socket}, S) when S#state.socket =:= Socket ->
-    {stop, socket_closed, S};
-handle_info({udp, Socket, _, _, Bin}, S) when S#state.socket =:= Socket ->
-    {noreply, handle_rmcp(eipmi_decoder:packet(Bin), S)};
+handle_info({udp_closed, Socket}, State = #state{socket = Socket}) ->
+    {stop, socket_closed, State};
+handle_info({udp, Socket, _, _, Bin}, State = #state{socket = Socket}) ->
+    try {noreply, handle_rmcp(eipmi_decoder:packet(Bin), State)}
+    catch
+        throw:Reason         -> {stop, {shutdown, Reason}, State};
+        _:{badmatch, Reason} -> {stop, {shutdown, Reason}, State};
+        _:Reason             -> {stop, {shutdown, Reason}, State}
+    end;
 handle_info({timeout, RqSeqNr}, State) ->
     NewState1 = fire({timeout, RqSeqNr}, State),
     {Requests, NewState2} = unregister_request(RqSeqNr, NewState1),
-    {noreply, lists:foldl(reply({error, timeout}), NewState2, Requests)};
+    try {noreply, lists:foldl(reply({error, timeout}), NewState2, Requests)}
+    catch
+        throw:Reason         -> {stop, {shutdown, Reason}, NewState2};
+        _:{badmatch, Reason} -> {stop, {shutdown, Reason}, NewState2};
+        _:Reason             -> {stop, {shutdown, Reason}, NewState2}
+    end;
 handle_info(keep_alive, State) ->
     {noreply, keep_alive(to_millis(os:timestamp()), State)};
 handle_info(Info, State) ->
@@ -241,10 +264,11 @@ handle_info(Info, State) ->
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-terminate(Reason, State = #state{requests = Requests}) ->
+terminate(Reason, State = #state{socket = Socket, requests = Requests}) ->
     NewState = lists:foldl(reply({error, {closed, Reason}}), State, Requests),
-    fire({closed, Reason}, close_session(NewState)),
-    gen_udp:close(NewState#state.socket),
+    fire({closed, Reason}, NewState),
+    close_session(NewState),
+    gen_udp:close(Socket),
     ok.
 
 %%------------------------------------------------------------------------------
@@ -354,15 +378,13 @@ get_response(Completion, _Packet) ->
 register_request(RqSeqNr, Receiver, State = #state{requests = Rs}) ->
     Timeout = get_state_val(timeout, State),
     Ref = erlang:send_after(Timeout, self(), {timeout, RqSeqNr}),
-    Tag = case is_function(Receiver) of true -> internal; _ -> external end,
-    State#state{requests = [{Tag, RqSeqNr, Ref, Receiver} | Rs]}.
+    State#state{requests = [{RqSeqNr, Ref, Receiver} | Rs]}.
 
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
 unregister_request(RqSeqNr, State = #state{requests = Rs}) ->
-    Pred = fun({_, S, _, _}) -> RqSeqNr =:= S end,
-    {Request, NewRs} = lists:partition(Pred, Rs),
+    {Request, NewRs} = lists:partition(fun({S, _, _}) -> RqSeqNr =:= S end, Rs),
     {Request, State#state{requests = NewRs}}.
 
 %%------------------------------------------------------------------------------
@@ -401,7 +423,8 @@ incr_inbound_seq_nr(State) ->
 close_session(State) ->
     Request = {?IPMI_NETFN_APPLICATION_REQUEST, ?CLOSE_SESSION},
     Data = eipmi_request:encode(Request, State#state.properties),
-    element(2, send_request(Request, Data, State)).
+    catch send_request(Request, Data, State),
+    ok.
 
 %%------------------------------------------------------------------------------
 %% @private
@@ -485,14 +508,6 @@ keep_alive(_, State) ->
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-handle_keep_alive({error, timeout}, S = #state{keep_alive = C}) when C > 0 ->
-    send_keep_alive(S#state{keep_alive = C - 1});
-handle_keep_alive({ok, _Fields}, State) ->
-    start_keep_alive_timer(State).
-
-%%------------------------------------------------------------------------------
-%% @private
-%%------------------------------------------------------------------------------
 start_keep_alive_timer(State) ->
     erlang:send_after(?KEEP_ALIVE_TIMER, self(), keep_alive),
     State#state{keep_alive = get_state_val(keep_alive_retransmits, State)}.
@@ -503,21 +518,25 @@ start_keep_alive_timer(State) ->
 send_keep_alive(State) ->
     Request = {?IPMI_NETFN_APPLICATION_REQUEST, ?SET_SESSION_PRIVILEGE_LEVEL},
     Data = eipmi_request:encode(Request, State#state.properties),
-    process_request({Request, Data, fun handle_keep_alive/2}, State).
+    process_request({Request, Data, keep_alive}, State).
 
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
 reply(Message) ->
     fun(Request, State) -> reply(Message, Request, State) end.
-reply(Message, {Type, _RqSeqNr, TimerRef, Receiver}, State) ->
+reply(Message, {_RqSeqNr, TimerRef, Receiver}, State) ->
     erlang:cancel_timer(TimerRef),
-    reply(Message, Type, Receiver, State).
-reply(Message, external, From, State) ->
+    reply_(Message, Receiver, State).
+reply_({error, timeout}, keep_alive, S = #state{keep_alive = C}) when C > 0 ->
+    send_keep_alive(S#state{keep_alive = C - 1});
+reply_({error, _}, keep_alive, _State) ->
+    throw(lost_connection);
+reply_({ok, _}, keep_alive, State) ->
+    start_keep_alive_timer(State);
+reply_(Message, From, State) ->
     catch gen_server:reply(From, Message),
-    State;
-reply(Message, internal, Fun, State) ->
-    Fun(Message, State).
+    State.
 
 %%------------------------------------------------------------------------------
 %% @private
