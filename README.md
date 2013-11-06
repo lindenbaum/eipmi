@@ -11,19 +11,6 @@ with other Erlang/OTP concepts and solutions.
 * [EDoc](http://lindenbaum.github.com/eipmi)
 * [![Build Status](https://travis-ci.org/lindenbaum/eipmi.png?branch=master)](https://travis-ci.org/lindenbaum/eipmi)
 
-Initial planned features
-------------------------
-
-* Simple API and user work-flow
-* Extensible design, open for contributions
-* RMCP presence ping/pong
-* Session initiation and activation
-* Some basic IPMI queries
-
-We really want to provide a simple enough basic implementation, that is open
-for extension, and not going for a complete coverage of the specification right
-away - that should be added by the community as the needs appear.
-
 Contributing
 ------------
 
@@ -229,3 +216,31 @@ privilege to `administrator`.
 NewPrivilege = proplists:get_value(privilege, Response),
 error_logger:info_msg("New privilege level is ~p.~n", [NewPrivilege]),
 ```
+
+History
+-------
+
+### Master
+
+* Development, currently no difference to version 1.2.0.
+
+### Version 1.2.0
+
+* Improved session startup (now synchronous)
+* Improved connection loss detection
+
+### Version 1.1.0
+
+* Support the *Send Message* command (needed for OEM requests) as well as
+  *double bridged* requests
+* New `to_list` functions for FRU and SDR entries
+* Fix sensor readings for threshold and generic sensors
+
+### Version 1.0.0
+
+* Compliant to IPMI v1.5 (LAN interface only)
+* Presence Ping
+* Session management including session keep alive
+* Support for lots of requests/responses/sensors from the IPMI v1.5 standard
+* Support for lots of requests/responses/sensors defined by the PICMG (ATCA/µTCA)
+* Automatic polling of the System Event Log (SEL)
