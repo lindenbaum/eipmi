@@ -675,6 +675,8 @@ get_id(<<1:2, ?EIPMI_RESERVED:1, Len:5, Id:Len/binary, _/binary>>) ->
 get_id(<<2:2, ?EIPMI_RESERVED:1, Len:5, Id:Len/binary, _/binary>>) ->
     eipmi_util:from_packed_ascii(Id);
 get_id(<<_:2, ?EIPMI_RESERVED:1, Len:5, Id:Len/binary, _/binary>>) ->
+    eipmi_util:binary_to_string(Id);
+get_id(<<_:8, Id/binary>>) ->
     eipmi_util:binary_to_string(Id).
 
 %%------------------------------------------------------------------------------
