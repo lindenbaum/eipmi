@@ -47,7 +47,7 @@ encrypt(none, _Ignored) ->
 encrypt(md2, Binary) ->
     md2:hash(Binary);
 encrypt(md5, Binary) ->
-    crypto:md5(Binary);
+    crypto:hash(md5, Binary);
 encrypt(pwd, Password) ->
     eipmi_util:normalize(16, Password).
 
