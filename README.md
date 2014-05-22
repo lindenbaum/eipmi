@@ -220,9 +220,14 @@ error_logger:info_msg("New privilege level is ~p.~n", [NewPrivilege]),
 History
 -------
 
-### Master
+### Master (1.3.0)
 
-* Development, currently no difference to version 1.2.0.
+* Development, currently no difference to version 1.2.1.
+
+### Version 1.2.1
+
+* Allow non-standard sensor ids (plain string without type)
+* Fix calls to deprecated crypto API
 
 ### Version 1.2.0
 
