@@ -1,3 +1,5 @@
+[![Build Status](https://travis-ci.org/lindenbaum/eipmi.png?branch=master)](https://travis-ci.org/lindenbaum/eipmi)
+
 EIPMI
 =====
 
@@ -6,10 +8,6 @@ to implement the remote console part of the IPMI LAN interface, as specified
 [here](http://www.intel.com/design/servers/ipmi/spec.htm). We would like to
 provide a low threshold for learning and using EIPMI, aiming to make it fit well
 with other Erlang/OTP concepts and solutions.
-
-* [Code](http://github.com/lindenbaum/eipmi)
-* [EDoc](http://lindenbaum.github.com/eipmi)
-* [![Build Status](https://travis-ci.org/lindenbaum/eipmi.png?branch=master)](https://travis-ci.org/lindenbaum/eipmi)
 
 Contributing
 ------------
@@ -156,7 +154,7 @@ and want to use EIPMI just drop the following line into the `deps` section of
 your `rebar.config`:
 
 ```erlang
-{eipmi, "1.0.0", {git, "https://github.com/lindenbaum/eipmi.git", {tag, "1.0.0"}}}
+{eipmi, "1.2.1", {git, "https://github.com/lindenbaum/eipmi.git", {tag, "1.2.1"}}}
 ```
 
 ### Usage
