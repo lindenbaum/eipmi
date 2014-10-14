@@ -74,7 +74,7 @@
          sel_to_fru/3,
          sdr_to_fru/2,
          sdr_to_fru/3,
-         stats/0,
+         info/0,
          start/0]).
 
 %% Application callbacks
@@ -975,10 +975,13 @@ sdr_to_fru(Sdr, SdrRepository, FruInventory) ->
 %% Returns statistical information about the currently opened sessions.
 %% @end
 %%------------------------------------------------------------------------------
--spec stats() -> [{sessions, [session()]}].
-stats() ->
+-spec info() -> [session()].
+info() ->
     Cs = supervisor:which_children(?MODULE),
-    [{sessions, [S || {S = {session, _, _}, P, _, _} <- Cs, is_pid(P)]}].
+    Sessions = [S || {S = {session, _, _}, P, _, _} <- Cs, is_pid(P)],
+    io:format("~w IPMI sessions:~n", [length(Sessions)]),
+    [io:format(" * ~w~n", [Session]) || Session <- Sessions],
+    Sessions.
 
 %%------------------------------------------------------------------------------
 %% @doc

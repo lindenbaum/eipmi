@@ -42,6 +42,7 @@ open_close({ok, "tirana"}) ->
     {ok, Session} = eipmi:open(?IP),
     Mon = monitor_session(Session),
     receive {ipmi, Session, ?IP, established} -> ok end,
+    ?assertEqual([Session], eipmi:info()),
     ?assertEqual(ok, eipmi:close(Session)),
     ?assertEqual(shutdown, receive {'DOWN', Mon, _, _, Reason} -> Reason end),
     stop();
@@ -71,7 +72,7 @@ read_fru({ok, "tirana"}) ->
     {ok, Session} = eipmi:open(?IP),
     Mon = monitor_session(Session),
     {ok, Fru} = eipmi:read_fru(Session, 253),
-    error_logger:info_msg("~s~n", [eipmi_fru:to_list(Fru)]),
+    io:format(standard_error, "~s~n", [eipmi_fru:to_list(Fru)]),
     ?assertEqual(ok, eipmi:close(Session)),
     ?assertEqual(shutdown, receive {'DOWN', Mon, _, _, Reason} -> Reason end),
     stop();
@@ -84,7 +85,7 @@ get_sdr_repository({ok, "tirana"}) ->
     {ok, Session} = eipmi:open(?IP),
     Mon = monitor_session(Session),
     {ok, SDRRepository} = eipmi:get_sdr_repository(Session),
-    error_logger:info_msg("~s~n", [eipmi_sdr:to_list(SDRRepository)]),
+    io:format(standard_error, "~s~n", [eipmi_sdr:to_list(SDRRepository)]),
     ?assertEqual(ok, eipmi:close(Session)),
     ?assertEqual(shutdown, receive {'DOWN', Mon, _, _, Reason} -> Reason end),
     stop();
@@ -99,7 +100,7 @@ read_fru_inventory({ok, "tirana"}) ->
     Mon = monitor_session(Session),
     {ok, SDRRepository} = eipmi:get_sdr_repository(Session),
     {ok, FruInventory} = eipmi:read_fru_inventory(Session, SDRRepository),
-    error_logger:info_msg("~s~n", [eipmi_fru:to_list(FruInventory)]),
+    io:format(standard_error, "~s~n", [eipmi_fru:to_list(FruInventory)]),
     ?assertEqual(ok, eipmi:close(Session)),
     ?assertEqual(shutdown, receive {'DOWN', Mon, _, _, Reason} -> Reason end),
     stop();
@@ -112,7 +113,7 @@ read_sel({ok, "tirana"}) ->
     {ok, Session} = eipmi:open(?IP),
     Mon = monitor_session(Session),
     {ok, Sel} = eipmi:get_sel(Session, false),
-    error_logger:info_msg("~n~p~n", [Sel]),
+    io:format(standard_error, "~n~p~n", [Sel]),
     ?assertEqual(ok, eipmi:close(Session)),
     ?assertEqual(shutdown, receive {'DOWN', Mon, _, _, Reason} -> Reason end),
     stop();
@@ -125,7 +126,8 @@ auto_read_sel({ok, "tirana"}) ->
     {ok, Session} = eipmi:open(?IP),
     {ok, _} = eipmi:poll_sel(Session, 500, false),
     Mon = monitor_session(Session),
-    receive after 2000 -> ok end,
+    receive {ipmi, Session, ?IP, established} -> ok end,
+    receive {ipmi, Session, ?IP, {system_event, _}} -> ok after 500 -> ok end,
     ?assertEqual(ok, eipmi:close(Session)),
     ?assertEqual(shutdown, receive {'DOWN', Mon, _, _, Reason} -> Reason end),
     stop();

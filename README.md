@@ -211,6 +211,7 @@ History
 
 ### Master (1.3.0)
 
+* Rename `eipmi:stats/0` to `eipmi:info/0`
 * Switch asynchronous notifications from `gen_event` to Erlang messages
 * Introduce the concept of session owners
 
