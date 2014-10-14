@@ -3,11 +3,11 @@
 EIPMI
 =====
 
-EIPMI is a native Erlang/OTP library application for RMCP/IPMI 1.5. The goal is
-to implement the remote console part of the IPMI LAN interface, as specified
-[here](http://www.intel.com/design/servers/ipmi/spec.htm). We would like to
-provide a low threshold for learning and using EIPMI, aiming to make it fit well
-with other Erlang/OTP concepts and solutions.
+EIPMI is a native Erlang/OTP application for RMCP/IPMI 1.5. It implements the
+remote console part of the IPMI LAN interface, as specified
+[here](http://www.intel.com/design/servers/ipmi/spec.htm). To provide a low
+threshold for learning and using EIPMI it is designed close to the well known
+`inet` API (think of `gen_udp`).
 
 Contributing
 ------------
@@ -63,23 +63,11 @@ will not block each other. However, flow control is not performed by the session
 and a user has to ensure that only a limited number of processes issue
 concurrent requests over the same session.
 
-An established session will be kept alive by the session state machine until
-`eipmi:close/1` gets called.
-
-### Asynchronous Events
-
 The API of EIPMI has been designed to be as similar as possible to existing
-erlang protocol implementations (e.g. `gen_udp`). However, since sessions may be
-shared between multiple processes it is not possible to send asynchronous events
-to a specific process.
-
-Therefore, EIPMI provides the possibility to distribute asynchronous events for
-all currently existing sessions through a `gen_event`. Users can subscribe to
-EIPMI events using `eipmi:add_handler/2` or `eipmi:add_sup_handler/2`.
-Subscriptions can be cancelled using `eipmi:delete_handler/2`. The functions are
-basically wrappers for the known `gen_event` functions. The subscriber must
-therefore implement the `gen_event` behaviour and be prepared to receive the
-following events on the `handle_event/2` callback:
+erlang protocol implementations (e.g. `gen_udp`). Therefore, the session owner
+(the process calling `open/1,2`) will get asynchronous messages for its
+sessions. The messages are sent using ordinary Erlang messaging and should be
+handled accordingly. Be prepared to receive the messages of the following form:
 
 ```erlang
 {ipmi,
@@ -146,6 +134,9 @@ enabled).
 ```
 An error occured when polling the System Event Log (only when automatic SEL
 polling is enabled).
+
+An established session will be kept alive by the session state machine until
+either `eipmi:close/1` gets called or the owner process exits.
 
 ### Building
 
@@ -220,7 +211,8 @@ History
 
 ### Master (1.3.0)
 
-* Development, currently no difference to version 1.2.1.
+* Switch asynchronous notifications from `gen_event` to Erlang messages
+* Introduce the concept of session owners
 
 ### Version 1.2.1
 

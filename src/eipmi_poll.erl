@@ -19,8 +19,8 @@
 %%% exits as soon as the session gets down.
 %%%
 %%% Currently only polling of the target's System Event Log (SEL) is supported.
-%%% All entries retrieved from the SEL will be forwarded as asynchronous events
-%%% to the currently subscribed handlers using {@link eipmi_events}.
+%%% All entries retrieved from the SEL will be forwarded as messages
+%%% to the session owner.
 %%% @end
 %%%=============================================================================
 -module(eipmi_poll).
@@ -28,7 +28,7 @@
 -behaviour(gen_server).
 
 %% API
--export([start_link/4]).
+-export([start_link/5]).
 
 %% gen_server callbacks
 -export([init/1,
@@ -60,11 +60,12 @@
 %%------------------------------------------------------------------------------
 -spec start_link(pid(),
                  eipmi:session(),
+                 pid(),
                  inet:ip_address() | inet:hostname(),
                  [eipmi:option()]) ->
                         {ok, pid()} | {error, term()}.
-start_link(SessionPid, Session, IPAddress, Options) ->
-    Args = [SessionPid, Session, IPAddress, Options],
+start_link(SessionPid, Session, OwnerPid, IPAddress, Options) ->
+    Args = [SessionPid, Session, OwnerPid, IPAddress, Options],
     gen_server:start_link(?MODULE, Args, []).
 
 %%%=============================================================================
@@ -73,6 +74,7 @@ start_link(SessionPid, Session, IPAddress, Options) ->
 
 -record(state, {
           pid        :: pid(),
+          owner      :: pid(),
           session    :: eipmi:session(),
           address    :: inet:ip_address() | inet:hostname(),
           properties :: [eipmi:option()]}).
@@ -80,11 +82,14 @@ start_link(SessionPid, Session, IPAddress, Options) ->
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-init([Pid, S, Addr, Options]) ->
+init([Pid, Session, Owner, Addr, Options]) ->
     erlang:monitor(process, Pid),
     Opts = eipmi_util:merge_vals(Options, ?DEFAULTS),
-    State = #state{pid = Pid, session = S, address = Addr, properties = Opts},
-    {ok, start_timers(State)}.
+    {ok, start_timers(#state{pid = Pid,
+                             session = Session,
+                             owner = Owner,
+                             address = Addr,
+                             properties = Opts})}.
 
 %%------------------------------------------------------------------------------
 %% @private
@@ -156,5 +161,5 @@ start_timer(Message, State = #state{properties = Ps}) ->
 %% @private
 %%------------------------------------------------------------------------------
 fire(Event, State = #state{session = Session, address = Address}) ->
-    eipmi_events:fire(Session, Address, Event),
+    State#state.owner ! {ipmi, Session, Address, Event},
     State.

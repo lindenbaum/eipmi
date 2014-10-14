@@ -17,7 +17,7 @@
   [{description, "A native Erlang IMPI library."},
    {id, "eu.lindenbaum.ims"},
    {vsn, "1.3.0"},
-   {registered, [eipmi, eipmi_events]},
+   {registered, [eipmi]},
    {applications, [kernel, stdlib, sasl, crypto, md2]},
    {mod, {eipmi, []}},
    {env, []}]}.

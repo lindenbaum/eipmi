@@ -74,9 +74,6 @@
          sel_to_fru/3,
          sdr_to_fru/2,
          sdr_to_fru/3,
-         add_handler/2,
-         add_sup_handler/2,
-         delete_handler/2,
          stats/0,
          start/0]).
 
@@ -90,7 +87,7 @@
 
 -type target() :: {inet:ip_address() | inet:hostname(), inet:port_number()}.
 
--type session() :: {session, target(), reference()}.
+-type session() :: {session, target(), pid()}.
 
 -type req_net_fn()  :: 0..62. %% 0x00-0x3e
 -type resp_net_fn() :: 1..63. %% 0x01-0xef
@@ -270,6 +267,97 @@ ping(IPAddress, Timeout) when is_integer(Timeout) andalso Timeout > 0 ->
 %% The returned handle can be used to send requests to the target BMC using one
 %% of the functions provided by this module (e.g. {@link raw/4}) or close the
 %% session using {@link close/1}.
+%%
+%% While the session may be used by arbitrary processes, the opening process is
+%% simultaneously the session owner that will receive asynchronous messages
+%% regarding the session. The session is terminated automatically, when the
+%% owning process exits. The messages will be sent using ordinary Erlang
+%% messaging and can be one of the following:
+%% <dl>
+%%   <dt>
+%%     `{ipmi,
+%%       Session :: session(),
+%%       Address :: inet:ip_address() | inet:hostname(),
+%%       established}'
+%%   </dt>
+%%   <dd>
+%%     <p>the session was successfully established and activated</p>
+%%   </dd>
+%%   <dt>
+%%     `{ipmi,
+%%       Session :: session(),
+%%       Address :: inet:ip_address() | inet:hostname(),
+%%       {closed, Reason :: term()}}'
+%%   </dt>
+%%   <dd>
+%%     <p>the session was closed with the provided reason</p>
+%%   </dd>
+%%   <dt>
+%%     `{ipmi,
+%%       Session :: session(),
+%%       Address :: inet:ip_address() | inet:hostname(),
+%%       {decode_error, Reason :: term()}}'
+%%   </dt>
+%%   <dd>
+%%     <p>a received packet could not be decoded</p>
+%%   </dd>
+%%   <dt>
+%%     `{ipmi,
+%%       Session :: session(),
+%%       Address :: inet:ip_address() | inet:hostname(),
+%%       {timeout, RqSeqNr :: 0..63}}'
+%%   </dt>
+%%   <dd>
+%%     <p>the corresponding request timed out</p>
+%%   </dd>
+%%   <dt>
+%%     `{ipmi,
+%%       Session :: session(),
+%%       Address :: inet:ip_address() | inet:hostname(),
+%%       {unhandled, {call, term()}}}'
+%%   </dt>
+%%   <dd>
+%%     <p>the session received an invalid `gen_server' call</p>
+%%   </dd>
+%%   <dt>
+%%     `{ipmi,
+%%       Session :: session(),
+%%       Address :: inet:ip_address() | inet:hostname(),
+%%       {unhandled, {cast, term()}}}'
+%%   </dt>
+%%   <dd>
+%%     <p>the session received an invalid `gen_server' cast</p>
+%%   </dd>
+%%   <dt>
+%%     `{ipmi,
+%%       Session :: session(),
+%%       Address :: inet:ip_address() | inet:hostname(),
+%%       {unhandled, {info, term()}}}'
+%%   </dt>
+%%   <dd>
+%%     <p>the session received an invalid message</p>
+%%   </dd>
+%%   <dt>
+%%     `{ipmi,
+%%       Session :: session(),
+%%       Address :: inet:ip_address() | inet:hostname(),
+%%       {unhandled, {ipmi, {ok | error, term()}}}}'
+%%   </dt>
+%%   <dd>
+%%     <p>the session received an IPMI response but no handler was found for it</p>
+%%   </dd>
+%%   <dt>
+%%     `{ipmi,
+%%       Session :: session(),
+%%       Address :: inet:ip_address() | inet:hostname(),
+%%       SELEntry :: sel_entry()}'
+%%   </dt>
+%%   <dd>
+%%     <p>
+%%       a SEL event forwarded through the automatic SEL polling mechanism
+%%     </p>
+%%   </dd>
+%% </dl>
 %% @see open/2
 %% @see close/1
 %% @end
@@ -600,8 +688,7 @@ get_sel(Session, Clear) ->
 %% @doc
 %% Will start a dedicated server that polls the system event log using a
 %% specific session every 500ms. When polling is enabled the SEL will
-%% periodically be read and all events will be forwarded to the subscribed event
-%% handlers registered with {@link add_handler/2} or {@link add_sup_handler/3}.
+%% periodically be read and all events will be forwarded to the session owner.
 %%
 %% The automatic polling can be stopped by shutting down or exiting the returned
 %% process. The process will exit automatically when its corresponding session
@@ -885,136 +972,13 @@ sdr_to_fru(Sdr, SdrRepository, FruInventory) ->
 
 %%------------------------------------------------------------------------------
 %% @doc
-%% Registers/adds a handler for session related events. The handler module must
-%% implement the {@link gen_event} behaviour. For more information on the
-%% arguments `Handler' and `Args' refer to {@link gen_event:add_handler/3}.
-%% The event handling module should be prepared to receive the following events
-%% on the `handle_event/2' callback:
-%% <dl>
-%%   <dt>
-%%     `{ipmi,
-%%       Session :: session(),
-%%       Address :: inet:ip_address() | inet:hostname(),
-%%       established}'
-%%   </dt>
-%%   <dd>
-%%     <p>the session was successfully established and activated</p>
-%%   </dd>
-%%   <dt>
-%%     `{ipmi,
-%%       Session :: session(),
-%%       Address :: inet:ip_address() | inet:hostname(),
-%%       {closed, Reason :: term()}}'
-%%   </dt>
-%%   <dd>
-%%     <p>the session was closed with the provided reason</p>
-%%   </dd>
-%%   <dt>
-%%     `{ipmi,
-%%       Session :: session(),
-%%       Address :: inet:ip_address() | inet:hostname(),
-%%       {decode_error, Reason :: term()}}'
-%%   </dt>
-%%   <dd>
-%%     <p>a received packet could not be decoded</p>
-%%   </dd>
-%%   <dt>
-%%     `{ipmi,
-%%       Session :: session(),
-%%       Address :: inet:ip_address() | inet:hostname(),
-%%       {timeout, RqSeqNr :: 0..63}}'
-%%   </dt>
-%%   <dd>
-%%     <p>the corresponding request timed out</p>
-%%   </dd>
-%%   <dt>
-%%     `{ipmi,
-%%       Session :: session(),
-%%       Address :: inet:ip_address() | inet:hostname(),
-%%       {unhandled, {call, term()}}}'
-%%   </dt>
-%%   <dd>
-%%     <p>the session received an invalid `gen_server' call</p>
-%%   </dd>
-%%   <dt>
-%%     `{ipmi,
-%%       Session :: session(),
-%%       Address :: inet:ip_address() | inet:hostname(),
-%%       {unhandled, {cast, term()}}}'
-%%   </dt>
-%%   <dd>
-%%     <p>the session received an invalid `gen_server' cast</p>
-%%   </dd>
-%%   <dt>
-%%     `{ipmi,
-%%       Session :: session(),
-%%       Address :: inet:ip_address() | inet:hostname(),
-%%       {unhandled, {info, term()}}}'
-%%   </dt>
-%%   <dd>
-%%     <p>the session received an invalid message</p>
-%%   </dd>
-%%   <dt>
-%%     `{ipmi,
-%%       Session :: session(),
-%%       Address :: inet:ip_address() | inet:hostname(),
-%%       {unhandled, {ipmi, {ok | error, term()}}}}'
-%%   </dt>
-%%   <dd>
-%%     <p>the session received an IPMI response but no handler was found for it</p>
-%%   </dd>
-%%   <dt>
-%%     `{ipmi,
-%%       Session :: session(),
-%%       Address :: inet:ip_address() | inet:hostname(),
-%%       SELEntry :: sel_entry()}'
-%%   </dt>
-%%   <dd>
-%%     <p>
-%%       a SEL event forwarded through the automatic SEL polling mechanism
-%%     </p>
-%%   </dd>
-%% </dl>
+%% Returns statistical information about the currently opened sessions.
 %% @end
 %%------------------------------------------------------------------------------
--spec add_handler(module() | {module(), term()}, term()) -> ok | {error, term()}.
-add_handler(Handler, Args) ->
-    eipmi_events:add_handler(Handler, Args).
-
-%%------------------------------------------------------------------------------
-%% @doc
-%% Basically the same than {@link add_handler/2} but with supervised
-%% subscription as described by {@link gen_event:add_sup_handler/3}.
-%% @end
-%%------------------------------------------------------------------------------
--spec add_sup_handler(module() | {module(), term()}, term()) -> ok | {error, term()}.
-add_sup_handler(Handler, Args) ->
-    eipmi_events:add_sup_handler(Handler, Args).
-
-%%------------------------------------------------------------------------------
-%% @doc
-%% Unregisters/removes a handler for session related events previously added
-%% using {@link add_handler/2} or {@link add_sup_handler/2}. For more
-%% information refer to on the arguments {@link gen_event:delete_handler/3}.
-%% @end
-%%------------------------------------------------------------------------------
--spec delete_handler(module() | {module(), term()}, term()) -> term().
-delete_handler(Handler, Args) ->
-    eipmi_events:delete_handler(Handler, Args).
-
-%%------------------------------------------------------------------------------
-%% @doc
-%% Returns statistical information about the currently opened sessions and the
-%% registered event handlers.
-%% @end
-%%------------------------------------------------------------------------------
--spec stats() ->
-                   [{sessions, [session()]} |
-                    {handlers, [module() | {module(), term()}]}].
+-spec stats() -> [{sessions, [session()]}].
 stats() ->
     Cs = supervisor:which_children(?MODULE),
-    [{sessions, [S || {S = {session, _, _}, P, _, _} <- Cs, is_pid(P)]},
-     {handlers, eipmi_events:list_handlers()}].
+    [{sessions, [S || {S = {session, _, _}, P, _, _} <- Cs, is_pid(P)]}].
 
 %%------------------------------------------------------------------------------
 %% @doc
@@ -1047,8 +1011,7 @@ start(_StartType, _StartArgs) ->
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-stop(_State) ->
-    ok.
+stop(_State) -> ok.
 
 %%%=============================================================================
 %%% supervisor callbacks
@@ -1057,11 +1020,7 @@ stop(_State) ->
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-init([]) ->
-    {ok, {{one_for_one, 0, 1},
-          [{eipmi_events,
-            {eipmi_events, start_link, []},
-            permanent, 2000, worker, dynamic}]}}.
+init([]) -> {ok, {{one_for_one, 0, 1}, []}}.
 
 %%%=============================================================================
 %%% internal functions
@@ -1071,8 +1030,8 @@ init([]) ->
 %% @private
 %%------------------------------------------------------------------------------
 start_session(Target, IPAddress, Options) ->
-    Session = {session, Target, erlang:make_ref()},
-    Start = {eipmi_session, start_link, [Session, IPAddress, Options]},
+    Session = {session, Target, self()},
+    Start = {eipmi_session, start_link, [Session, IPAddress, self(), Options]},
     Spec = {Session, Start, temporary, 2000, worker, [eipmi_session]},
     case supervisor:start_child(?MODULE, Spec) of
         Error = {error, _} ->
@@ -1084,9 +1043,9 @@ start_session(Target, IPAddress, Options) ->
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-start_poll(Pid, Session, IP, Options) ->
+start_poll(Pid, Session = {session, _, Owner}, IP, Options) ->
     Id = {poll, erlang:make_ref()},
-    Start = {eipmi_poll, start_link, [Pid, Session, IP, Options]},
+    Start = {eipmi_poll, start_link, [Pid, Session, Owner, IP, Options]},
     Spec = {Id, Start, temporary, brutal_kill, worker, [eipmi_poll]},
     supervisor:start_child(?MODULE, Spec).
 

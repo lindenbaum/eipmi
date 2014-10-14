@@ -55,7 +55,7 @@
 -behaviour(gen_server).
 
 %% API
--export([start_link/3,
+-export([start_link/4,
          rpc/3,
          rpc/4,
          stop/2]).
@@ -139,10 +139,11 @@
 %%------------------------------------------------------------------------------
 -spec start_link(eipmi:session(),
                  inet:ip_address() | inet:hostname(),
+                 pid(),
                  [property()]) ->
                         {ok, pid()} | {error, term()}.
-start_link(Session, IPAddress, Options) ->
-    gen_server:start_link(?MODULE, [Session, IPAddress, Options], []).
+start_link(Session, IPAddress, Owner, Options) ->
+    gen_server:start_link(?MODULE, [Session, IPAddress, Owner, Options], []).
 
 %%------------------------------------------------------------------------------
 %% @doc
@@ -191,6 +192,7 @@ stop(Pid, Reason) -> gen_server:cast(Pid, {stop, Reason}).
 %%%=============================================================================
 
 -record(state, {
+          owner          :: {pid(), reference()},
           keep_alive     :: non_neg_integer(),
           last_send      :: non_neg_integer(),
           requests = []  :: [{0..63, reference(), term()}],
@@ -202,11 +204,16 @@ stop(Pid, Reason) -> gen_server:cast(Pid, {stop, Reason}).
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-init([S, Addr, Options]) ->
+init([Session, Addr, Owner, Options]) ->
     process_flag(trap_exit, true),
+    Ref = erlang:monitor(process, Owner),
     Opts = eipmi_util:merge_vals(Options, ?DEFAULTS),
     {ok, Sock} = gen_udp:open(0, [binary, {active, false}]),
-    State = #state{session = S, address = Addr, socket = Sock, properties = Opts},
+    State = #state{owner = {Owner, Ref},
+                   session = Session,
+                   address = Addr,
+                   socket = Sock,
+                   properties = Opts},
     try
         {ok, State1} = get_authentication_capabilities(State),
         {ok, State2} = get_session_challenge(State1),
@@ -258,6 +265,8 @@ handle_info({timeout, RqSeqNr}, State) ->
     end;
 handle_info(keep_alive, State) ->
     {noreply, keep_alive(to_millis(os:timestamp()), State)};
+handle_info({'DOWN', R, process, P, Reason}, State = #state{owner = {P, R}}) ->
+    {stop, {shutdown, {owner_exited, Reason}}, State};
 handle_info(Info, State) ->
     {noreply, fire({unhandled, {info, Info}}, State)}.
 
@@ -542,7 +551,7 @@ reply_(Message, From, State) ->
 %% @private
 %%------------------------------------------------------------------------------
 fire(Event, State = #state{session = Session, address = Address}) ->
-    eipmi_events:fire(Session, Address, Event),
+    element(1, State#state.owner) ! {ipmi, Session, Address, Event},
     State.
 
 %%------------------------------------------------------------------------------

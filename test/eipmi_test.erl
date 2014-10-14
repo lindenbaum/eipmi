@@ -20,7 +20,7 @@
 
 -include("eipmi.hrl").
 
--define(IP, "10.100.111.21").
+-define(IP, "192.168.101.1").
 %%-define(GET_HOSTNAME, inet:gethostname()).
 -define(GET_HOSTNAME, skip).
 
@@ -41,7 +41,7 @@ open_close({ok, "tirana"}) ->
     start(),
     {ok, Session} = eipmi:open(?IP),
     Mon = monitor_session(Session),
-    receive after 2000 -> ok end,
+    receive {ipmi, Session, ?IP, established} -> ok end,
     ?assertEqual(ok, eipmi:close(Session)),
     ?assertEqual(shutdown, receive {'DOWN', Mon, _, _, Reason} -> Reason end),
     stop();
@@ -130,48 +130,6 @@ auto_read_sel({ok, "tirana"}) ->
     ?assertEqual(shutdown, receive {'DOWN', Mon, _, _, Reason} -> Reason end),
     stop();
 auto_read_sel(_) ->
-    ok.
-
-send_message_test() -> send_message_test(?GET_HOSTNAME).
-send_message_test({ok, "tirana"}) ->
-    start(),
-    {ok, Session} = eipmi:open(?IP),
-    error_logger:info_msg(
-      "write 1 returned ~p~n",
-      [eipmi:send_message(
-         Session, 16#82, 0, 0, ?IPMI_NETFN_APPLICATION_REQUEST, ?SEND_MESSAGE,
-         [{channel, 7},
-          {request,
-           [{net_fn,  16#30},
-            {cmd,     16#02},
-            {rs_addr, 16#14},
-            {rs_lun,  16#00},
-            {data,    <<0, 0, 16#80, 0>>}]}])]),
-    error_logger:info_msg(
-      "write 2 returned ~p~n",
-      [eipmi:send_message(
-         Session, 16#82, 0, 0, ?IPMI_NETFN_APPLICATION_REQUEST, ?SEND_MESSAGE,
-         [{channel, 7},
-          {request,
-           [{net_fn,  16#30},
-            {cmd,     16#02},
-            {rs_addr, 16#14},
-            {rs_lun,  16#00},
-            {data,    <<0, 0, 16#81, 16#96>>}]}])]),
-    error_logger:info_msg(
-      "read returned ~p~n",
-      [eipmi:send_message(
-         Session, 16#82, 0, 0, ?IPMI_NETFN_APPLICATION_REQUEST, ?SEND_MESSAGE,
-         [{channel, 7},
-          {request,
-           [{net_fn,  16#30},
-            {cmd,     16#01},
-            {rs_addr, 16#14},
-            {rs_lun,  16#00},
-            {data,    <<0, 0, 16#82>>}]}])]),
-    ?assertEqual(ok, eipmi:close(Session)),
-    stop();
-send_message_test(_) ->
     ok.
 
 %%%=============================================================================
