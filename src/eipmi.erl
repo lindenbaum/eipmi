@@ -87,7 +87,7 @@
 
 -type target() :: {inet:ip_address() | inet:hostname(), inet:port_number()}.
 
--type session() :: {session, target(), pid()}.
+-type session() :: {session, target(), {pid(), reference()}}.
 
 -type req_net_fn()  :: 0..62. %% 0x00-0x3e
 -type resp_net_fn() :: 1..63. %% 0x01-0xef
@@ -1033,7 +1033,7 @@ init([]) -> {ok, {{one_for_one, 0, 1}, []}}.
 %% @private
 %%------------------------------------------------------------------------------
 start_session(Target, IPAddress, Options) ->
-    Session = {session, Target, self()},
+    Session = {session, Target, {self(), make_ref()}},
     Start = {eipmi_session, start_link, [Session, IPAddress, self(), Options]},
     Spec = {Session, Start, temporary, 2000, worker, [eipmi_session]},
     case supervisor:start_child(?MODULE, Spec) of
@@ -1046,7 +1046,7 @@ start_session(Target, IPAddress, Options) ->
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-start_poll(Pid, Session = {session, _, Owner}, IP, Options) ->
+start_poll(Pid, Session = {session, _, {Owner, _}}, IP, Options) ->
     Id = {poll, erlang:make_ref()},
     Start = {eipmi_poll, start_link, [Pid, Session, Owner, IP, Options]},
     Spec = {Id, Start, temporary, brutal_kill, worker, [eipmi_poll]},
