@@ -65,10 +65,6 @@ merge_vals_test() ->
     ?assertEqual(2, proplists:get_value(b, Merged3)),
     ?assertEqual(4, proplists:get_value(c, Merged3)).
 
-eipmi_catch_test() ->
-    ?assertEqual({error, b}, ?EIPMI_CATCH(a = b)),
-    ?assertEqual({error, b}, ?EIPMI_CATCH(a = {error, b})).
-
 from_bcd_plus_test() ->
     Bin = <<16#0:4, 16#1:4, 16#2:4, 16#3:4, 16#4:4, 16#5:4, 16#6:4, 16#7:4,
             16#8:4, 16#9:4, 16#a:4, 16#b:4, 16#c:4, 16#d:4, 16#e:4, 16#f:4>>,
