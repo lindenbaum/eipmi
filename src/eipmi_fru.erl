@@ -429,7 +429,7 @@ decode_picmg_record(Data) ->
 %%------------------------------------------------------------------------------
 decode_amc_p2p_connectivity_record(
   <<?PICMG_FRU_VERSION:8, GUIDCount:8, Rest/binary>>) ->
-    decode_amc_p2p_connectivity_record([], GUIDCount * 16, Rest).
+    decode_amc_p2p_connectivity_record([], GUIDCount, Rest).
 decode_amc_p2p_connectivity_record(Acc, 0, <<Rest/binary>>) ->
     decode_amc_p2p_connectivity_record(Acc, Rest);
 decode_amc_p2p_connectivity_record(Acc, C, <<GUID:16/binary, Rest/binary>>) ->
