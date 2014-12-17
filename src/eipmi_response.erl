@@ -38,19 +38,25 @@
 %% property list with the decoded values.
 %% @end
 %%------------------------------------------------------------------------------
--spec decode(eipmi:response(), binary()) -> proplists:proplist().
-decode({?IPMI_NETFN_SENSOR_EVENT_RESPONSE, Cmd}, Data) ->
-    decode_sensor_event(Cmd, Data);
-decode({?IPMI_NETFN_APPLICATION_RESPONSE, Cmd}, Data) ->
+-spec decode(eipmi:response(), binary()) ->
+                    {ok, proplists:proplist()} | {error, term()}.
+decode({NetFn, Cmd}, Data) ->
+    try decode(NetFn, Cmd, Data)
+    catch
+        C:E -> {error, {C, E}}
+    end.
+decode(?IPMI_NETFN_SENSOR_EVENT_RESPONSE, Cmd, Data) ->
+    {ok, decode_sensor_event(Cmd, Data)};
+decode(?IPMI_NETFN_APPLICATION_RESPONSE, Cmd, Data) ->
     decode_application(Cmd, Data);
-decode({?IPMI_NETFN_STORAGE_RESPONSE, Cmd}, Data) ->
-    decode_storage(Cmd, Data);
-decode({?IPMI_NETFN_TRANSPORT_RESPONSE, Cmd}, Data) ->
-    decode_transport(Cmd, Data);
-decode({?IPMI_NETFN_PICMG_RESPONSE, Cmd}, Data) ->
-    decode_picmg(Cmd, Data);
-decode({NetFn, Cmd}, Data) when NetFn >= 16#2f ->
-    decode_oem(NetFn, Cmd, Data).
+decode(?IPMI_NETFN_STORAGE_RESPONSE, Cmd, Data) ->
+    {ok, decode_storage(Cmd, Data)};
+decode(?IPMI_NETFN_TRANSPORT_RESPONSE, Cmd, Data) ->
+    {ok, decode_transport(Cmd, Data)};
+decode(?IPMI_NETFN_PICMG_RESPONSE, Cmd, Data) ->
+    {ok, decode_picmg(Cmd, Data)};
+decode(NetFn, Cmd, Data) when NetFn >= 16#2f ->
+    {ok, decode_oem(NetFn, Cmd, Data)}.
 
 %%------------------------------------------------------------------------------
 %% @doc
@@ -116,25 +122,25 @@ decode_application(?GET_DEVICE_ID,
                      Support:8, Manufacterer:24/little,
                      Product:16/little, _/binary>>) ->
     [Iv1 | IvRest] = lists:reverse(eipmi_util:from_bcd_plus(IPMIVersion)),
-    [{device_id, Id},
-     {device_revision, Revision},
-     {operation, case Operation of 0 -> normal; 1 -> progress end},
-     {firmware_version, eipmi_util:format("~B.~B", [Major, Minor])},
-     {ipmi_version, [Iv1 | [$. | IvRest]]},
-     {device_support, get_device_support(Support)},
-     {manufacturer_id, Manufacterer},
-     {product_id, Product}];
+    {ok, [{device_id, Id},
+          {device_revision, Revision},
+          {operation, case Operation of 0 -> normal; 1 -> progress end},
+          {firmware_version, eipmi_util:format("~B.~B", [Major, Minor])},
+          {ipmi_version, [Iv1 | [$. | IvRest]]},
+          {device_support, get_device_support(Support)},
+          {manufacturer_id, Manufacterer},
+          {product_id, Product}]};
 decode_application(?COLD_RESET, _) ->
-    [];
+    {ok, []};
 decode_application(?WARM_RESET, _) ->
-    [];
+    {ok, []};
 decode_application(?GET_SELF_TEST_RESULTS, <<Result:8, Detail:8>>) ->
-    [{result, get_self_test_result(Result, Detail)}];
+    {ok, [{result, get_self_test_result(Result, Detail)}]};
 decode_application(?GET_ACPI_POWER_STATE, <<_:1, System:7, _:1, Device:7>>) ->
-    [{system, get_system_power_state(System)},
-     {device, get_device_power_state(Device)}];
+    {ok, [{system, get_system_power_state(System)},
+          {device, get_device_power_state(Device)}]};
 decode_application(?GET_DEVICE_GUID, <<GUID/binary>>) ->
-    [{guid, eipmi_util:binary_to_string(GUID)}];
+    {ok, [{guid, eipmi_util:binary_to_string(GUID)}]};
 decode_application(?SEND_MESSAGE, <<Binary/binary>>) ->
     case eipmi_decoder:response(Binary) of
         {ok, #rmcp_ipmi{properties = Ps, cmd = Cmd, data = Data}} ->
@@ -142,35 +148,35 @@ decode_application(?SEND_MESSAGE, <<Binary/binary>>) ->
                 normal ->
                     decode(Cmd, Data);
                 Error ->
-                    [{error, {slave_error, Error}}]
+                    {error, {slave_error, Error}}
             end;
         Error ->
-            [Error]
+            Error
     end;
 decode_application(?GET_SYSTEM_GUID, <<GUID/binary>>) ->
-    [{guid, eipmi_util:binary_to_string(GUID)}];
+    {ok, [{guid, eipmi_util:binary_to_string(GUID)}]};
 decode_application(?GET_CHANNEL_AUTHENTICATION_CAPABILITIES,
                    <<Channel:8, 0:1, ?EIPMI_RESERVED:1, A:6,
                      ?EIPMI_RESERVED:3, P:1, U:1, L:3,
                      ?EIPMI_RESERVED:40>>) ->
-    [{channel, Channel},
-     {auth_types, get_auth_types(A)},
-     {per_message_authentication_enabled, not eipmi_util:get_bool(P)},
-     {user_level_authentication_enabled, not eipmi_util:get_bool(U)},
-     {login_status, get_login_status(L)}];
+    {ok, [{channel, Channel},
+          {auth_types, get_auth_types(A)},
+          {per_message_authentication_enabled, not eipmi_util:get_bool(P)},
+          {user_level_authentication_enabled, not eipmi_util:get_bool(U)},
+          {login_status, get_login_status(L)}]};
 decode_application(?GET_SESSION_CHALLENGE, <<I:32/little, C/binary>>) ->
-    [{session_id, I}, {challenge, C}];
+    {ok, [{session_id, I}, {challenge, C}]};
 decode_application(?ACTIVATE_SESSION,
                    <<?EIPMI_RESERVED:4, A:4, I:32/little, S:32/little,
                      ?EIPMI_RESERVED:4, P:4>>) ->
-    [{session_id, I},
-     {inbound_seq_nr, S},
-     {auth_type, eipmi_auth:decode_type(A)},
-     {privilege, decode_privilege(P)}];
+    {ok, [{session_id, I},
+          {inbound_seq_nr, S},
+          {auth_type, eipmi_auth:decode_type(A)},
+          {privilege, decode_privilege(P)}]};
 decode_application(?SET_SESSION_PRIVILEGE_LEVEL, <<?EIPMI_RESERVED:4, P:4>>) ->
-    [{privilege, decode_privilege(P)}];
+    {ok, [{privilege, decode_privilege(P)}]};
 decode_application(?CLOSE_SESSION, _) ->
-    [].
+    {ok, []}.
 
 %%------------------------------------------------------------------------------
 %% @private

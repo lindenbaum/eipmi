@@ -39,7 +39,10 @@
                     {ok, #rmcp_ack{} | #rmcp_asf{} | #rmcp_ipmi{}} |
                     {error, term()}.
 packet(<<?RMCP_VERSION:8, ?EIPMI_RESERVED:8, SeqNr:8, Rest/binary>>) ->
-    class(SeqNr, Rest);
+    try class(SeqNr, Rest)
+    catch
+        C:E -> {error, {C, E}}
+    end;
 packet(_Binary) ->
     {error, not_rmcp_packet}.
 

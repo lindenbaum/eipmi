@@ -222,8 +222,7 @@ init([Session, Addr, Owner, Options]) ->
         ok = inet:setopts(Sock, [{active, true}]),
         {ok, State4}
     catch
-        _:{badmatch, Reason} -> {stop, {shutdown, Reason}};
-        _:Reason             -> {stop, {shutdown, Reason}}
+        C:E -> {stop, {shutdown, {C, E}}}
     end.
 
 %%------------------------------------------------------------------------------
@@ -250,18 +249,14 @@ handle_info({udp_closed, Socket}, State = #state{socket = Socket}) ->
 handle_info({udp, Socket, _, _, Bin}, State = #state{socket = Socket}) ->
     try {noreply, handle_rmcp(eipmi_decoder:packet(Bin), State)}
     catch
-        throw:Reason         -> {stop, {shutdown, Reason}, State};
-        _:{badmatch, Reason} -> {stop, {shutdown, Reason}, State};
-        _:Reason             -> {stop, {shutdown, Reason}, State}
+        C:E -> {stop, {C, E}, State}
     end;
 handle_info({timeout, RqSeqNr}, State) ->
     NewState1 = fire({timeout, RqSeqNr}, State),
     {Requests, NewState2} = unregister_request(RqSeqNr, NewState1),
     try {noreply, lists:foldl(reply({error, timeout}), NewState2, Requests)}
     catch
-        throw:Reason         -> {stop, {shutdown, Reason}, NewState2};
-        _:{badmatch, Reason} -> {stop, {shutdown, Reason}, NewState2};
-        _:Reason             -> {stop, {shutdown, Reason}, NewState2}
+        C:E -> {stop, {C, E}, NewState2}
     end;
 handle_info(keep_alive, State) ->
     {noreply, keep_alive(to_millis(os:timestamp()), State)};
@@ -377,7 +372,7 @@ handle_ipmi_(Message, {Requests, State}) ->
 get_response(Packet = #rmcp_ipmi{properties = Ps}) ->
     get_response(proplists:get_value(completion, Ps), Packet).
 get_response(normal, #rmcp_ipmi{cmd = Cmd, data = Data}) ->
-    {ok, eipmi_response:decode(Cmd, Data)};
+    eipmi_response:decode(Cmd, Data);
 get_response(Completion, _Packet) ->
     {error, {bmc_error, Completion}}.
 

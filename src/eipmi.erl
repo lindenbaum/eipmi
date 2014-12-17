@@ -541,12 +541,7 @@ get_device_guid(Session) ->
 send_message(Session, TargetAddr, TargetLun, Channel, NetFn, Cmd, Properties) ->
     Data = [{net_fn, NetFn}, {cmd, Cmd}, {rs_addr, TargetAddr}, {rs_lun, TargetLun}],
     Args = [{channel, Channel}, {request, Data ++ Properties}],
-    case raw(Session, ?IPMI_NETFN_APPLICATION_REQUEST, ?SEND_MESSAGE, Args) of
-        {ok, [Error = {error, _} | _]} ->
-            Error;
-        Other ->
-            Other
-    end.
+    raw(Session, ?IPMI_NETFN_APPLICATION_REQUEST, ?SEND_MESSAGE, Args).
 
 %%------------------------------------------------------------------------------
 %% @doc
