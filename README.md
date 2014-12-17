@@ -220,9 +220,15 @@ error_logger:info_msg("New privilege level is ~p.~n", [NewPrivilege]),
 History
 -------
 
-### Master
+### Version 1.2.2
 
-* Development, currently no difference to version 1.2.0.
+* Fix decoding of `AMC P2P Connectivity Record`s
+* Make session more robust against decode errors
+
+### Version 1.2.1
+
+* Switch to non-deprecated crypto API
+* Allow non-standard sensor IDs to be decoded
 
 ### Version 1.2.0
 
