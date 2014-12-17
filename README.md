@@ -215,6 +215,11 @@ History
 * Switch asynchronous notifications from `gen_event` to Erlang messages
 * Introduce the concept of session owners
 
+### Version 1.2.2
+
+* Fix decoding of `AMC P2P Connectivity Record`s
+* Make session more robust against decode errors
+
 ### Version 1.2.1
 
 * Allow non-standard sensor ids (plain string without type)
