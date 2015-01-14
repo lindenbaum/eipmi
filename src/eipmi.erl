@@ -588,7 +588,17 @@ read_fru(Session, FruId) ->
 %%------------------------------------------------------------------------------
 -spec read_frus(session(), [0..254]) -> {ok, [fru_info()]} | {error, term()}.
 read_frus(Session, FruIds) ->
-    collect([read_fru(Session, FruId) || FruId <- FruIds]).
+    lists:foldr(
+      fun(FruId, {ok, FruInfos}) ->
+              case read_fru(Session, FruId) of
+                  {ok, FruInfo} ->
+                      {ok, [FruInfo | FruInfos]};
+                  Error ->
+                      Error
+              end;
+         (_, Error) ->
+              Error
+      end, {ok, []}, FruIds).
 
 %%------------------------------------------------------------------------------
 %% @doc
@@ -1124,23 +1134,6 @@ get_element_by_properties(Props, List) ->
 %% @private
 %%------------------------------------------------------------------------------
 filter_by_key(Key, List) -> [Element || Element = {K, _} <- List, K =:= Key].
-
-%%------------------------------------------------------------------------------
-%% @private
-%%------------------------------------------------------------------------------
-collect(Results) ->
-    lists:foldl(
-      fun({error, Error}, {ok, _}) ->
-              {error, [Error]};
-         ({error, Error}, {error, Errors}) ->
-              {error, [Error | Errors]};
-         ({ok, _}, Error = {error, _}) ->
-              Error;
-         ({ok, Ok}, {ok, Oks}) ->
-              {ok, [Ok | Oks]}
-      end,
-      {ok, []},
-      Results).
 
 %%------------------------------------------------------------------------------
 %% @private
