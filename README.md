@@ -215,6 +215,10 @@ History
 * Switch asynchronous notifications from `gen_event` to Erlang messages
 * Introduce the concept of session owners
 
+### Version 1.2.3
+
+* Unify error returns of `eipmi:read_fru/2` and `eipmi:read_frus/2`
+
 ### Version 1.2.2
 
 * Fix decoding of `AMC P2P Connectivity Record`s
