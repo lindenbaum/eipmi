@@ -220,6 +220,10 @@ error_logger:info_msg("New privilege level is ~p.~n", [NewPrivilege]),
 History
 -------
 
+### Version 1.2.3
+
+* Unify error returns of `eipmi:read_fru/2` and `eipmi:read_frus/2`
+
 ### Version 1.2.2
 
 * Fix decoding of `AMC P2P Connectivity Record`s
