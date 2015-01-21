@@ -16,7 +16,9 @@
 %%% @doc
 %%% A server that periodically polls information for a specific IPMI target.
 %%% The server monitors its corresponding {@link eipmi_session} process and
-%%% exits as soon as the session gets down.
+%%% exits as soon as the session gets down. The server itself will report
+%%% unavailability of the target when the SEL can't be read for longer than 30
+%%% seconds.
 %%%
 %%% Currently only polling of the target's System Event Log (SEL) is supported.
 %%% All entries retrieved from the SEL will be forwarded as asynchronous events
@@ -72,10 +74,11 @@ start_link(SessionPid, Session, IPAddress, Options) ->
 %%%=============================================================================
 
 -record(state, {
-          pid        :: pid(),
-          session    :: eipmi:session(),
-          address    :: inet:ip_address() | inet:hostname(),
-          properties :: [eipmi:option()]}).
+          pid         :: pid(),
+          last_sucess :: erlang:timestamp(),
+          session     :: eipmi:session(),
+          address     :: inet:ip_address() | inet:hostname(),
+          properties  :: [eipmi:option()]}).
 
 %%------------------------------------------------------------------------------
 %% @private
@@ -83,8 +86,10 @@ start_link(SessionPid, Session, IPAddress, Options) ->
 init([Pid, S, Addr, Options]) ->
     erlang:monitor(process, Pid),
     Opts = eipmi_util:merge_vals(Options, ?DEFAULTS),
-    State = #state{pid = Pid, session = S, address = Addr, properties = Opts},
-    {ok, start_timers(State)}.
+    {ok, start_timers(on_success(#state{pid = Pid,
+                                        session = S,
+                                        address = Addr,
+                                        properties = Opts}))}.
 
 %%------------------------------------------------------------------------------
 %% @private
@@ -129,12 +134,17 @@ code_change(_OldVsn, State, _Extra) ->
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-read_sel(State = #state{pid = Pid, properties = Ps}) ->
+read_sel(State = #state{pid = Pid, properties = Ps, last_sucess = T1}) ->
     case catch eipmi_sel:read(Pid, proplists:get_value(clear_sel, Ps)) of
         Entries when is_list(Entries) ->
-            lists:foldl(fun fire/2, State, Entries);
+            lists:foldl(fun fire/2, on_success(State), Entries);
         Reason ->
-            eipmi_session:stop(Pid, lost_connection),
+            case timer:now_diff(os:timestamp(), T1) of
+                Tdiff when Tdiff > 30 * 1000 * 1000 ->
+                    eipmi_session:stop(Pid, lost_connection);
+                _ ->
+                    ok
+            end,
             fire({sel_read_error, Reason}, State)
     end.
 
@@ -151,6 +161,11 @@ start_timers(State = #state{properties = Ps}) ->
 start_timer(Message, State = #state{properties = Ps}) ->
     erlang:send_after(proplists:get_value(Message, Ps), self(), Message),
     State.
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+on_success(State) -> State#state{last_sucess = os:timestamp()}.
 
 %%------------------------------------------------------------------------------
 %% @private
