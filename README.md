@@ -220,6 +220,10 @@ error_logger:info_msg("New privilege level is ~p.~n", [NewPrivilege]),
 History
 -------
 
+### Version 1.2.5
+
+* Allow FRU fields with broken type/length field
+
 ### Version 1.2.4
 
 * Allow periodic SEL polling to fail for `30` seconds
