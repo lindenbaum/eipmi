@@ -215,6 +215,10 @@ History
 * Switch asynchronous notifications from `gen_event` to Erlang messages
 * Introduce the concept of session owners
 
+### Version 1.2.5
+
+* Allow FRU fields with broken type/length field
+
 ### Version 1.2.4
 
 * Allow periodic SEL polling to fail for `30` seconds
