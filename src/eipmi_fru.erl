@@ -633,7 +633,22 @@ decode_field(Name, Lang, <<3:2, Len:6, Data:Len/binary, Rest/binary>>)
   when Lang =:= ?ENGLISH orelse Lang =:= ?OLD_ENGLISH ->
     {[{Name, eipmi_util:binary_to_string(Data)}], Rest};
 decode_field(Name, _Lang, <<3:2, _Len:6, Data/utf16-little, Rest/binary>>) ->
+    {[{Name, Data}], Rest};
+%% This clause supports broken custom fields that deliver bullshit in their
+%% length field. But note, at least the END-OF-FIELDS indicator must be present.
+decode_field(Name, _Lang, <<_Broken:8, Complete/binary>>) ->
+    {Data, Rest} = until_eofields(Complete),
     {[{Name, Data}], Rest}.
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+until_eofields(Data) ->
+    until_eofields(Data, <<>>).
+until_eofields(Rest = <<?EOFIELDS:8, _/binary>>, Acc) ->
+    {Acc, Rest};
+until_eofields(<<Byte:8, Rest/binary>>, Acc) ->
+    until_eofields(Rest, <<Acc/binary, Byte:8>>).
 
 %%------------------------------------------------------------------------------
 %% @private
