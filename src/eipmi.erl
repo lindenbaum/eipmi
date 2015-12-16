@@ -643,15 +643,15 @@ get_sdr(Session, RecordId) ->
 %% @end
 %%------------------------------------------------------------------------------
 -spec get_sdr(0..254, eipmi_sensor:type(), sdr_repository()) ->
-                     {ok, sdr()} | {error, term()}.
+                     {ok, [sdr()]} | {error, term()}.
 get_sdr(FruId, SensorType, SdrRepository) ->
     case id_to_fru(FruId, SdrRepository) of
         {ok, {fru_device_locator, LocatorProps}} ->
-            get_element_by_properties(
-              maybe_keyfind(entity_id, 1, LocatorProps)
-              ++ maybe_keyfind(entity_instance, 1, LocatorProps)
-              ++ [{sensor_type, SensorType}],
-              SdrRepository);
+            {ok, get_elements_by_properties(
+                   maybe_keyfind(entity_id, 1, LocatorProps)
+                   ++ maybe_keyfind(entity_instance, 1, LocatorProps)
+                   ++ [{sensor_type, SensorType}],
+                   SdrRepository)};
         Error ->
             Error
     end.
@@ -1192,13 +1192,20 @@ get_fru_ids(SdrRepository) ->
 get_element_by_properties([], _List) ->
     {error, unresolvable};
 get_element_by_properties(Props, List) ->
-    Pred = fun(Ps) -> lists:all(fun(P) -> lists:member(P, Ps) end, Props) end,
-    case [Element || Element = {_, Ps} <- List, Pred(Ps)] of
-        [] ->
-            {error, {not_found, Props}};
-        [Element | _] ->
-            {ok, Element}
+    case get_elements_by_properties(Props, List) of
+        []            -> {error, {not_found, Props}};
+        [Element | _] -> {ok, Element};
+        Error         -> Error
     end.
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+get_elements_by_properties([], _List) ->
+    [];
+get_elements_by_properties(Props, List) ->
+    Pred = fun(Ps) -> lists:all(fun(P) -> lists:member(P, Ps) end, Props) end,
+    [Element || Element = {_, Ps} <- List, Pred(Ps)].
 
 %%------------------------------------------------------------------------------
 %% @private
