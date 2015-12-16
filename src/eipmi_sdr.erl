@@ -1,4 +1,3 @@
-
 %%%=============================================================================
 %%% Copyright (c) 2012 Lindenbaum GmbH
 %%%
@@ -201,7 +200,8 @@ get_sensor_reading(SessionPid, SensorNumber, SdrRepository) ->
 
 %%------------------------------------------------------------------------------
 %% @doc
-%% Return the current reading of a specific sensor referred to by its number.
+%% Return the current reading of a specific sensor referred to by its sensor
+%% data record.
 %% @end
 %%------------------------------------------------------------------------------
 -spec get_sensor_reading(pid(), {full | compact, [property()]}) -> [reading()].

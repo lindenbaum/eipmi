@@ -49,6 +49,9 @@
          read_frus/2,
          read_fru_inventory/2,
          get_sdr/2,
+         get_sdr/3,
+         read_sdr/2,
+         read_sdr/3,
          get_sdr_repository/1,
          get_sdr_repository/2,
          get_sdr_repository_info/1,
@@ -74,6 +77,7 @@
          sel_to_fru/3,
          sdr_to_fru/2,
          sdr_to_fru/3,
+         id_to_fru/2,
          info/0,
          start/0]).
 
@@ -122,6 +126,7 @@
 -type fru_inventory() :: [fru_info()].
 -type sdr_info() :: repository_info().
 -type sdr() :: eipmi_sdr:entry().
+-type sdr_reading() :: [eipmi_sdr:reading()].
 -type sdr_repository() :: [sdr()].
 -type sel_info() :: repository_info().
 -type sel_entry() :: eipmi_sel:entry().
@@ -210,6 +215,7 @@
               fru_inventory/0,
               sdr_info/0,
               sdr/0,
+              sdr_reading/0,
               sdr_repository/0,
               sel_info/0,
               sel_entry/0,
@@ -620,11 +626,60 @@ read_fru_inventory(Session, SdrRepository) ->
 %% reservation for SDR reading with non-zero offsets gets cancelled. This is not
 %% a severe error. It is most likely that the SDR can be read successfully when
 %% retried.
+%%
+%% If the SDR repository has already been read, consider using get_sdr/3 which
+%% does not involve session-related calls.
 %% @end
 %%------------------------------------------------------------------------------
 -spec get_sdr(session(), non_neg_integer()) -> {ok, sdr()} | {error, term()}.
 get_sdr(Session, RecordId) ->
     F = fun(Pid) -> eipmi_sdr:get(Pid, RecordId) end,
+    to_ok_tuple(with_session(Session, F)).
+
+%%------------------------------------------------------------------------------
+%% @doc
+%% Return the sensor record with the given type corresponding to a specific FRU
+%% id from the Sensor Data Record (SDR) Repository, if any.
+%% @end
+%%------------------------------------------------------------------------------
+-spec get_sdr(0..254, eipmi_sensor:type(), sdr_repository()) ->
+                     {ok, sdr()} | {error, term()}.
+get_sdr(FruId, SensorType, SdrRepository) ->
+    case id_to_fru(FruId, SdrRepository) of
+        {ok, {fru_device_locator, LocatorProps}} ->
+            get_element_by_properties(
+              maybe_keyfind(entity_id, 1, LocatorProps)
+              ++ maybe_keyfind(entity_instance, 1, LocatorProps)
+              ++ [{sensor_type, SensorType}],
+              SdrRepository);
+        Error ->
+            Error
+    end.
+
+%%------------------------------------------------------------------------------
+%% @doc
+%% Get the current sensor reading for a specific Sensor Data Record (SDR). Note
+%% that only sensors of type `full' and `compact' can be read.
+%% @end
+%%------------------------------------------------------------------------------
+-spec read_sdr(session(), sdr()) -> {ok, sdr_reading()} | {error, term()}.
+read_sdr(Session, Sdr) ->
+    F = fun(Pid) -> eipmi_sdr:get_sensor_reading(Pid, Sdr) end,
+    to_ok_tuple(with_session(Session, F)).
+
+%%------------------------------------------------------------------------------
+%% @doc
+%% Get the current sensor reading for a Sensor Data Record (SDR) referred to by
+%% its number. The restrictions mentioned in {@link read_sdr/2} do also apply to
+%% this function.
+%% @end
+%%------------------------------------------------------------------------------
+-spec read_sdr(session(), non_neg_integer(), sdr_repository()) ->
+                      {ok, sdr_reading()} | {error, term()}.
+read_sdr(Session, SensorNumber, SdrRepository) ->
+    F = fun(Pid) ->
+                eipmi_sdr:get_sensor_reading(Pid, SensorNumber, SdrRepository)
+        end,
     to_ok_tuple(with_session(Session, F)).
 
 %%------------------------------------------------------------------------------
@@ -858,6 +913,9 @@ fru_control(Session, FruId, Action) ->
 %% session. This can be used to retrieve the record id of a 'FRU Device Locator
 %% Record' for a specific FRU. Having this idea makes it possible to read this
 %% record directly using {@link get_sdr/2}.
+%%
+%% If the SDR repository is already available, the device locator record can
+%% easier be retrieved using {@link id_to_fru/2}.
 %% @end
 %%------------------------------------------------------------------------------
 -spec get_device_locator_record_id(session(), 0..254) ->
@@ -974,6 +1032,18 @@ sdr_to_fru(Sdr, SdrRepository, FruInventory) ->
         Error ->
             Error
     end.
+
+%%------------------------------------------------------------------------------
+%% @doc
+%% Returns the FRU Device Locator Record associated with a specific FRU id from
+%% the Sensor Data Record (SDR) repository, if any.
+%% @end
+%%------------------------------------------------------------------------------
+-spec id_to_fru(0..254, sdr_repository()) -> {ok, sdr()} | {error, term()}.
+id_to_fru(FruId, SdrRepository) ->
+    get_element_by_properties(
+      [{fru_id, FruId}],
+      filter_by_key(fru_device_locator, SdrRepository)).
 
 %%------------------------------------------------------------------------------
 %% @doc
