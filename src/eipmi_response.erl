@@ -107,11 +107,11 @@ decode_sensor_event(?RESERVE_DEVICE_SDR_REPOSITORY, <<Reservation:16/little>>) -
     [{reservation_id, Reservation}];
 decode_sensor_event(?GET_SENSOR_READING,
                     <<Reading:1/binary, Events:1, Scanning:1, Available:1,
-                      ?EIPMI_RESERVED:5, S/binary>>) ->
+                      ?EIPMI_RESERVED:5, States/binary>>) ->
     [{events_enabled, eipmi_util:get_bool(Events)},
      {scanning_enabled, eipmi_util:get_bool(Scanning)}]
         ++ case Available of 0 -> [{raw_reading, Reading}]; _ -> [] end
-        ++ case Available of 0 -> get_state(S); _ -> [] end.
+        ++ case Available of 0 -> [{raw_states, States}]; _ -> [] end.
 
 %%------------------------------------------------------------------------------
 %% @private
@@ -359,21 +359,6 @@ decode_privilege(1) -> callback;
 decode_privilege(2) -> user;
 decode_privilege(3) -> operator;
 decode_privilege(4) -> administrator.
-
-%%------------------------------------------------------------------------------
-%% @private
-%%------------------------------------------------------------------------------
-get_state(<<A:8, _:1, B:7>>) ->
-    [{state, <<(reverse(<<A:8>>))/binary, (reverse(<<0:1, B:7>>))/bitstring>>}];
-get_state(<<A:8>>) ->
-    [{state, reverse(<<A:8>>)}].
-
-%%------------------------------------------------------------------------------
-%% @private
-%%------------------------------------------------------------------------------
-reverse(Bitstring) -> reverse(Bitstring, <<>>).
-reverse(<<>>, Acc) -> Acc;
-reverse(<<B:1, R/bitstring>>, Acc) -> reverse(R, <<B:1, Acc/bitstring>>).
 
 %%------------------------------------------------------------------------------
 %% @private

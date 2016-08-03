@@ -131,7 +131,8 @@
 
 -type reading() ::
         eipmi_sensor:value() |
-        {sensor_reading, {number(), eipmi_sensor:unit()}}.
+        {sensor_reading, {number(), eipmi_sensor:unit()}} |
+        {sensor_threshold, atom()}.
 
 -export_type([record_type/0, property/0, entry/0, reading/0]).
 
@@ -211,14 +212,10 @@ get_sensor_reading(SessionPid, {Type, Properties})
     SensorType = proplists:get_value(sensor_type, Properties),
     Args = [lists:keyfind(sensor_number, 1, Properties)],
     {ok, Result} = eipmi_session:rpc(SessionPid, ?GET_READING, Args),
-    State = proplists:get_value(state, Result),
+    States = proplists:get_value(raw_states, Result),
     Raw = proplists:get_value(raw_reading, Result),
     Reading = get_reading(sensor_reading, Raw, Properties),
-    get_sensor_reading_(ReadingType, SensorType, State) ++ Reading.
-get_sensor_reading_(R, T, <<S:6/bitstring, _:2>>) ->
-    [eipmi_sensor:get_value(R, T, O, 1, 16#ff, 16#ff) || O <- get_offsets(S)];
-get_sensor_reading_(R, T, S) ->
-    [eipmi_sensor:get_value(R, T, O, 1, 16#ff, 16#ff) || O <- get_offsets(S)].
+    get_states(ReadingType, SensorType, States) ++ Reading.
 
 %%------------------------------------------------------------------------------
 %% @doc
@@ -847,16 +844,45 @@ calc_reading(Unit, X, {L, M, B, BExp, ResultExp}) ->
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
+get_states(threshold, _, <<_:2, Threshold:6, _/binary>>) ->
+    [{sensor_threshold, get_threshold(Threshold)}];
+get_states(R, T, <<First:8/bitstring, _/binary>>) ->
+    lists:append(
+      [eipmi_sensor:get_value(R, T, O, 1, 16#ff, 16#ff)
+       || O <- get_offsets(First, 7, [])]);
+get_states(R, T, <<First:8/bitstring, 0:8, _/binary>>) ->
+    lists:append(
+      [eipmi_sensor:get_value(R, T, O, 1, 16#ff, 16#ff)
+       || O <- get_offsets(First, 7, [])]);
+get_states(R, T, <<First:8/bitstring, _:1, Second:7/bitstring, _/binary>>) ->
+    lists:append(
+      [eipmi_sensor:get_value(R, T, O, 1, 16#ff, 16#ff)
+       || O <- get_offsets(<<Second/bitstring, First/bitstring>>, 14, [])]);
+get_states(_, _, _) ->
+    [].
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
 needs_reservation(SdrInfo) ->
     lists:member(reserve, proplists:get_value(operations, SdrInfo)).
 
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-get_offsets(StateBitstring) -> get_offsets(StateBitstring, 0, []).
+get_threshold(N) when N >= 32 -> upper_non_recoverable;
+get_threshold(N) when N >= 16 -> upper_critical;
+get_threshold(N) when N >= 8  -> upper_non_critical;
+get_threshold(N) when N >= 4  -> lower_non_recoverable;
+get_threshold(N) when N >= 2  -> lower_critical;
+get_threshold(_)              -> lower_non_critical.
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
 get_offsets(<<>>, _, Acc) -> lists:reverse(Acc);
-get_offsets(<<0:1, R/bitstring>>, I, Acc) -> get_offsets(R, I + 1, Acc);
-get_offsets(<<1:1, R/bitstring>>, I, Acc) -> get_offsets(R, I + 1, [I | Acc]).
+get_offsets(<<0:1, R/bitstring>>, I, Acc) -> get_offsets(R, I - 1, Acc);
+get_offsets(<<1:1, R/bitstring>>, I, Acc) -> get_offsets(R, I - 1, [I | Acc]).
 
 %%------------------------------------------------------------------------------
 %% @private

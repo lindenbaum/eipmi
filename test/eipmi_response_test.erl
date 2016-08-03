@@ -46,7 +46,7 @@ decode_get_sensor_reading_test() ->
        {ok, [{events_enabled, true},
              {scanning_enabled, true},
              {raw_reading, <<16#01>>},
-             {state, <<2#0000111110000000:16>>}]},
+             {raw_states, <<2#1111000010000001:16>>}]},
        eipmi_response:decode(Resp, Bin)).
 
 decode_get_device_id_test() ->
