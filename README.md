@@ -213,7 +213,7 @@ History
 
 * No difference to latest tag
 
-### Version 1.3.0
+### Version 2.0.0
 
 * `eipmi` is now available on [hex.pm](https://hex.pm/packages/eipmi)
 * Make project compatible to rebar3/hex
