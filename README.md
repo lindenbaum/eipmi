@@ -209,11 +209,18 @@ error_logger:info_msg("New privilege level is ~p.~n", [NewPrivilege]),
 History
 -------
 
-### Master (1.3.0)
+### Master
 
+* No difference to latest tag
+
+### Version 1.3.0
+
+* `eipmi` is now available on [hex.pm](https://hex.pm/packages/eipmi)
+* Make project compatible to rebar3/hex
 * Rename `eipmi:stats/0` to `eipmi:info/0`
 * Switch asynchronous notifications from `gen_event` to Erlang messages
 * Introduce the concept of session owners
+* Extended support for reading sensors
 
 ### Version 1.2.5
 
