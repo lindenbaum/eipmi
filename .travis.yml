@@ -1,4 +1,7 @@
 language: erlang
+script:
+  - rebar get-deps compile -DDEBUG
+  - rebar skip_deps=true eunit -DDEBUG
 otp_release:
   - R16B03
   - R16B02
