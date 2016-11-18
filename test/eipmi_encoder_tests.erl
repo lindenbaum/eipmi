@@ -14,7 +14,7 @@
 %%% OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 %%%=============================================================================
 
--module(eipmi_encoder_test).
+-module(eipmi_encoder_tests).
 
 -include_lib("eunit/include/eunit.hrl").
 

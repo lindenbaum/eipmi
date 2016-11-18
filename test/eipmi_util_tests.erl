@@ -14,7 +14,7 @@
 %%% OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 %%%=============================================================================
 
--module(eipmi_util_test).
+-module(eipmi_util_tests).
 
 -include_lib("eunit/include/eunit.hrl").
 
