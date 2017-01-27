@@ -190,10 +190,12 @@ stop(Pid, Reason) -> gen_server:cast(Pid, {stop, Reason}).
 %%% gen_server Callbacks
 %%%=============================================================================
 
+-type rq() :: {eipmi:response(), 0..63}.
+
 -record(state, {
           keep_alive     :: non_neg_integer(),
           last_send      :: non_neg_integer(),
-          requests = []  :: [{0..63, reference(), term()}],
+          requests = []  :: [{rq(), reference(), term()}],
           session        :: eipmi:session(),
           address        :: inet:ip_address() | inet:hostname(),
           socket         :: inet:socket(),
@@ -244,9 +246,9 @@ handle_info({udp, Socket, _, _, Bin}, State = #state{socket = Socket}) ->
     catch
         C:E -> {stop, {C, E}, State}
     end;
-handle_info({timeout, RqSeqNr}, State) ->
-    NewState1 = fire({timeout, RqSeqNr}, State),
-    {Requests, NewState2} = unregister_request(RqSeqNr, NewState1),
+handle_info({timeout, Rq = {_, ReqSeqNr}}, State) ->
+    NewState1 = fire({timeout, ReqSeqNr}, State),
+    {Requests, NewState2} = unregister_request(Rq, NewState1),
     try {noreply, lists:foldl(reply({error, timeout}), NewState2, Requests)}
     catch
         C:E -> {stop, {C, E}, NewState2}
@@ -351,9 +353,9 @@ handle_rmcp({error, Reason}, State) ->
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-handle_ipmi(Packet = #rmcp_ipmi{properties = Properties}, State) ->
-    RqSeqNr = proplists:get_value(rq_seq_nr, Properties),
-    handle_ipmi_(get_response(Packet), unregister_request(RqSeqNr, State)).
+handle_ipmi(Packet = #rmcp_ipmi{cmd = Response, properties = Ps}, State) ->
+    Rq = {Response, proplists:get_value(rq_seq_nr, Ps)},
+    handle_ipmi_(get_response(Packet), unregister_request(Rq, State)).
 handle_ipmi_(Message, {Requests, State}) ->
     lists:foldl(reply(Message), State, Requests).
 
@@ -370,24 +372,26 @@ get_response(Completion, _Packet) ->
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-register_request(RqSeqNr, Receiver, State = #state{requests = Rs}) ->
+register_request(Rq, Receiver, State = #state{requests = Rs}) ->
     Timeout = get_state_val(timeout, State),
-    Ref = erlang:send_after(Timeout, self(), {timeout, RqSeqNr}),
-    State#state{requests = [{RqSeqNr, Ref, Receiver} | Rs]}.
+    Ref = erlang:send_after(Timeout, self(), {timeout, Rq}),
+    State#state{requests = [{Rq, Ref, Receiver} | Rs]}.
 
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-unregister_request(RqSeqNr, State = #state{requests = Rs}) ->
-    {Request, NewRs} = lists:partition(fun({S, _, _}) -> RqSeqNr =:= S end, Rs),
-    {Request, State#state{requests = NewRs}}.
+unregister_request(Rq, State = #state{requests = Rs}) ->
+    {Requests, NewRs} = lists:partition(fun({R, _, _}) -> Rq =:= R end, Rs),
+    {Requests, State#state{requests = NewRs}}.
 
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-process_request({Request, Data, Receiver}, State) ->
-    {RqSeqNr, NewState} = send_request(Request, Data, State),
-    register_request(RqSeqNr, Receiver, incr_inbound_seq_nr(NewState)).
+process_request({{NetFn, Cmd}, Data, Receiver}, State) ->
+    {RqSeqNr, NewState} = send_request({NetFn, Cmd}, Data, State),
+    NextState = incr_inbound_seq_nr(NewState),
+    %% Response NetFn is request NetFn + 1
+    register_request({{NetFn + 1, Cmd}, RqSeqNr}, Receiver, NextState).
 
 %%------------------------------------------------------------------------------
 %% @private

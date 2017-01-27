@@ -222,6 +222,7 @@ History
 
 ### Version 1.2.6
 
+* Enhance/harden response dispatching
 * Enhance robustness of SEL polling
 
 ### Version 1.2.5
