@@ -220,6 +220,10 @@ error_logger:info_msg("New privilege level is ~p.~n", [NewPrivilege]),
 History
 -------
 
+### Version 1.2.7
+
+* Fix SDR timestamp handling
+
 ### Version 1.2.6
 
 * Enhance/harden response dispatching

@@ -863,5 +863,11 @@ get_offsets(<<1:1, R/bitstring>>, I, Acc) -> get_offsets(R, I + 1, [I | Acc]).
 %%------------------------------------------------------------------------------
 get_recent_action_timestamp(SdrInfo) ->
     erlang:max(
-      proplists:get_value(most_recent_addition, SdrInfo, 0),
-      proplists:get_value(most_recent_erase, SdrInfo, 0)).
+      to_timestamp(proplists:get_value(most_recent_addition, SdrInfo, 0)),
+      to_timestamp(proplists:get_value(most_recent_erase, SdrInfo, 0))).
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+to_timestamp(16#ffffffff) -> -1;
+to_timestamp(Val)         -> Val.
