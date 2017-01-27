@@ -94,7 +94,7 @@ A received packet could not be decoded.
 {ipmi,
  Session :: eipmi:session(),
  Address :: inet:ip_address() | inet:hostname(),
- {timeout, RqSeqNr :: 0..63}}
+ {timeout, {eipmi:request(), RqSeqNr :: 0..63}}}
 ```
 The corresponding request timed out.
 ```erlang
@@ -201,6 +201,7 @@ History
 
 ### Master
 
+* Enhance/harden response dispatching
 * Enhance robustness of SEL polling
 
 ### Version 2.0.0
@@ -214,6 +215,7 @@ History
 
 ### Version 1.2.6
 
+* Enhance/harden response dispatching
 * Enhance robustness of SEL polling
 
 ### Version 1.2.5
