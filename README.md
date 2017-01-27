@@ -201,6 +201,7 @@ History
 
 ### Master
 
+* Fix SDR timestamp handling
 * Enhance/harden response dispatching
 * Enhance robustness of SEL polling
 
@@ -212,6 +213,10 @@ History
 * Switch asynchronous notifications from `gen_event` to Erlang messages
 * Introduce the concept of session owners
 * Extended support for reading sensors
+
+### Version 1.2.7
+
+* Fix SDR timestamp handling
 
 ### Version 1.2.6
 
