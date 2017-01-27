@@ -138,16 +138,6 @@ polling is enabled).
 An established session will be kept alive by the session state machine until
 either `eipmi:close/1` gets called or the owner process exits.
 
-### Building
-
-If you are using [rebar](http://github.com/basho/rebar) to build your project
-and want to use EIPMI just drop the following line into the `deps` section of
-your `rebar.config`:
-
-```erlang
-{eipmi, "1.2.1", {git, "https://github.com/lindenbaum/eipmi.git", {tag, "1.2.1"}}}
-```
-
 ### Usage
 
 The `eipmi` module contains the whole functionality this project currently has
@@ -211,7 +201,7 @@ History
 
 ### Master
 
-* No difference to latest tag
+* Enhance robustness of SEL polling
 
 ### Version 2.0.0
 
@@ -221,6 +211,10 @@ History
 * Switch asynchronous notifications from `gen_event` to Erlang messages
 * Introduce the concept of session owners
 * Extended support for reading sensors
+
+### Version 1.2.6
+
+* Enhance robustness of SEL polling
 
 ### Version 1.2.5
 
