@@ -67,12 +67,17 @@
 -spec read(pid(), boolean()) -> [entry()].
 read(SessionPid, true) ->
     {ok, SelInfo} = eipmi_session:rpc(SessionPid, ?GET_INFO, []),
-    Entries = do_read(SessionPid, proplists:get_value(entries, SelInfo)),
-    Operations = proplists:get_value(operations, SelInfo),
-    ?EIPMI_CATCH(do_clear(SessionPid, lists:member(reserve, Operations))),
-    Entries;
+    case do_read(SessionPid, proplists:get_value(entries, SelInfo)) of
+        {noop, Entries} ->
+            Entries;
+        {clear, Entries} ->
+            Operations = proplists:get_value(operations, SelInfo),
+            NeedsReservation = lists:member(reserve, Operations),
+            ?EIPMI_CATCH(do_clear(SessionPid, NeedsReservation)),
+            Entries
+    end;
 read(SessionPid, false) ->
-    do_read(SessionPid, all).
+    element(2, do_read(SessionPid, all)).
 
 %%------------------------------------------------------------------------------
 %% @doc
@@ -81,8 +86,7 @@ read(SessionPid, false) ->
 %% @end
 %%------------------------------------------------------------------------------
 -spec clear(pid()) -> ok | {error, term()}.
-clear(SessionPid) ->
-    do_clear(SessionPid).
+clear(SessionPid) -> do_clear(SessionPid).
 
 %%%=============================================================================
 %%% Internal functions
@@ -92,19 +96,33 @@ clear(SessionPid) ->
 %% @private
 %%------------------------------------------------------------------------------
 do_read(_SessionPid, 0) ->
-    [];
+    {noop, []};
 do_read(SessionPid, _NumEntries) ->
-    do_read(SessionPid, 16#0000, []).
-do_read(_SessionPid, 16#ffff, Acc) ->
-    lists:reverse(Acc);
-do_read(SessionPid, Id, Acc) ->
+    do_read(SessionPid, 16#0000, {clear, []}).
+do_read(_SessionPid, 16#ffff, {Return, Acc}) ->
+    {Return, lists:reverse(Acc)};
+do_read(SessionPid, Id, {clear, Acc}) ->
     case eipmi_session:rpc(SessionPid, ?READ, [{record_id, Id}]) of
         {ok, Entry} ->
             NextId = proplists:get_value(next_record_id, Entry),
-            Sel = decode(proplists:get_value(data, Entry)),
-            do_read(SessionPid, NextId, [Sel | Acc]);
+            try decode(proplists:get_value(data, Entry)) of
+                Sel -> do_read(SessionPid, NextId, {clear, [Sel | Acc]})
+            catch
+                C:E ->
+                    error_logger:info_msg(
+                      "Failed to decode SEL entry with record_id ~w (~w)",
+                      [Id, {error, {C, E}}]),
+                    {noop, Acc}
+            end;
         {error, {bmc_error, _}} ->
-            Acc
+            %% in most cases this should be cannot return requested number
+            %% of data bytes, which is ok, when the attempt was to read all
+            %% entries
+            {noop, Acc};
+        Err = {error, _} ->
+            error_logger:info_msg(
+              "Failed to get SEL entry with record_id ~w (~w)", [Id, Err]),
+            {noop, Acc}
     end.
 
 %%------------------------------------------------------------------------------
