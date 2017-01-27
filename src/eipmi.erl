@@ -1194,15 +1194,12 @@ get_element_by_properties([], _List) ->
 get_element_by_properties(Props, List) ->
     case get_elements_by_properties(Props, List) of
         []            -> {error, {not_found, Props}};
-        [Element | _] -> {ok, Element};
-        Error         -> Error
+        [Element | _] -> {ok, Element}
     end.
 
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-get_elements_by_properties([], _List) ->
-    [];
 get_elements_by_properties(Props, List) ->
     Pred = fun(Ps) -> lists:all(fun(P) -> lists:member(P, Ps) end, Props) end,
     [Element || Element = {_, Ps} <- List, Pred(Ps)].
