@@ -137,18 +137,14 @@ code_change(_OldVsn, State, _Extra) ->
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-read_sel(State = #state{pid = Pid, properties = Ps, last_sucess = T1}) ->
+read_sel(State = #state{pid = Pid, properties = Ps}) ->
     case catch eipmi_sel:read(Pid, proplists:get_value(clear_sel, Ps)) of
-        Entries when is_list(Entries) ->
+        {ok, Entries} ->
             lists:foldl(fun fire/2, on_success(State), Entries);
-        Reason ->
-            case timer:now_diff(os:timestamp(), T1) of
-                Tdiff when Tdiff > 30 * 1000 * 1000 ->
-                    eipmi_session:stop(Pid, lost_connection);
-                _ ->
-                    ok
-            end,
-            fire({sel_read_error, Reason}, State)
+        {error, Reason} ->
+            on_failure(Reason, State);
+        Catch ->
+            on_failure(Catch, State)
     end.
 
 %%------------------------------------------------------------------------------
@@ -169,6 +165,18 @@ start_timer(Message, State = #state{properties = Ps}) ->
 %% @private
 %%------------------------------------------------------------------------------
 on_success(State) -> State#state{last_sucess = os:timestamp()}.
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+on_failure(Reason, State = #state{pid = Pid, last_sucess = T1}) ->
+    case timer:now_diff(os:timestamp(), T1) of
+        Tdiff when Tdiff > 30 * 1000 * 1000 ->
+            eipmi_session:stop(Pid, lost_connection);
+        _ ->
+            ok
+    end,
+    fire({sel_read_error, Reason}, State).
 
 %%------------------------------------------------------------------------------
 %% @private

@@ -1169,8 +1169,9 @@ do_ping_receive(IPAddress, Timeout, Socket) ->
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-to_ok_tuple(Error = {error, _}) -> Error;
-to_ok_tuple(Result) -> {ok, Result}.
+to_ok_tuple(Error = {error, _})      -> Error;
+to_ok_tuple(Result = {ok, _})        -> Result;
+to_ok_tuple(Result)                  -> {ok, Result}.
 
 %%------------------------------------------------------------------------------
 %% @private
