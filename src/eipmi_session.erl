@@ -195,8 +195,8 @@ stop(Pid, Reason) -> gen_server:cast(Pid, {stop, Reason}).
 
 -record(state, {
           owner          :: {pid(), reference()},
-          keep_alive     :: non_neg_integer(),
-          last_send      :: non_neg_integer(),
+          keep_alive     :: non_neg_integer() | undefined,
+          last_send      :: non_neg_integer() | undefined,
           requests = []  :: [{rq(), reference(), term()}],
           session        :: eipmi:session(),
           address        :: inet:ip_address() | inet:hostname(),

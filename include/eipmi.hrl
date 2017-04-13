@@ -367,15 +367,15 @@
 %%------------------------------------------------------------------------------
 -record(rmcp_asf, {
           header  :: #rmcp_header{},
-          payload :: #asf_ping{} | #asf_pong{}}).
+          payload :: #asf_ping{} | #asf_pong{} | undefined}).
 
 %%------------------------------------------------------------------------------
 %% An RMCP IPMI Message.
 %%------------------------------------------------------------------------------
 -record(rmcp_ipmi, {
-          header          :: #rmcp_header{},
+          header          :: #rmcp_header{} | undefined,
           properties = [] :: proplists:proplist(),
-          cmd             :: eipmi:request() | eipmi:response(),
+          cmd             :: eipmi:request() | eipmi:response() | undefined,
           data = <<>>     :: binary()}).
 
 %%%=============================================================================

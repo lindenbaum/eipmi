@@ -77,7 +77,7 @@ start_link(SessionPid, Session, OwnerPid, IPAddress, Options) ->
 -record(state, {
           pid         :: pid(),
           owner       :: pid(),
-          last_sucess :: erlang:timestamp(),
+          last_sucess :: erlang:timestamp() | undefined,
           session     :: eipmi:session(),
           address     :: inet:ip_address() | inet:hostname(),
           properties  :: [eipmi:option()]}).
