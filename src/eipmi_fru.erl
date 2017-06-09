@@ -616,7 +616,7 @@ decode_fields(_Name, _Lang, <<?EOFIELDS:8, _/binary>>, Acc) ->
     lists:reverse(Acc);
 decode_fields(Name, Lang, Data, Acc) ->
     {Field, Rest} = decode_field(Name, Lang, Data),
-    decode_fields(Name, Lang, Rest, [Field | Acc]).
+    decode_fields(Name, Lang, Rest, Field ++ Acc).
 
 %%------------------------------------------------------------------------------
 %% @private
