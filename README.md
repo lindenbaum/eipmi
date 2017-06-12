@@ -201,9 +201,14 @@ History
 
 ### Master
 
+No changes to lastest release.
+
+### Version 2.0.1
+
 * Fix SDR timestamp handling
 * Enhance/harden response dispatching
 * Enhance robustness of SEL polling
+* Minor bug fixes
 
 ### Version 2.0.0
 
