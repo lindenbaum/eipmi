@@ -34,9 +34,8 @@ Documentation
 
 The following sections will give a brief description of the EIPMI features as
 well as some usage examples for developers integrating the application into
-their project. Additional information can be found in the projects EDoc
-documentation located [here](http://lindenbaum.github.com/eipmi/). The EIPMI
-API functions are exported by the `eipmi` module.
+their project. Additional information can be found in the projects EDoc/source
+documentation. The EIPMI API functions are exported by the `eipmi` module.
 
 ### Sessions &amp; Authentication
 
