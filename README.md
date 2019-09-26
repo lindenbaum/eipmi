@@ -200,7 +200,7 @@ History
 
 ### Master
 
-No changes to lastest release.
+* Drop support for OTP releases older than 18.3
 
 ### Version 2.0.1
 
