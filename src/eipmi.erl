@@ -1,5 +1,5 @@
 %%%=============================================================================
-%%% Copyright (c) 2012 Lindenbaum GmbH
+%%% Copyright (c) 2012-2019 Lindenbaum GmbH
 %%%
 %%% Permission to use, copy, modify, and/or distribute this software for any
 %%% purpose with or without fee is hereby granted, provided that the above
@@ -78,8 +78,7 @@
          sdr_to_fru/2,
          sdr_to_fru/3,
          id_to_fru/2,
-         info/0,
-         start/0]).
+         info/0]).
 
 %% Application callbacks
 -export([start/2, stop/1]).
@@ -1057,24 +1056,6 @@ info() ->
     io:format("~w IPMI sessions:~n", [length(Sessions)]),
     [io:format(" * ~w~n", [Session]) || Session <- Sessions],
     Sessions.
-
-%%------------------------------------------------------------------------------
-%% @doc
-%% Starts the `eipmi' applications along with all its depdendent applications.
-%% This function is not intended for normal application startup in an erlang
-%% release. It exists only for the purpose of instantly creating an `eipmi'
-%% playground from the erlang shell.
-%% @end
-%%------------------------------------------------------------------------------
--spec start() -> ok | {error, [term()]}.
-start() ->
-    AppFile = code:where_is_file("eipmi.app"),
-    {ok, [{application, ?MODULE, Properties}]} = file:consult(AppFile),
-    Applications = proplists:get_value(applications, Properties) ++ [?MODULE],
-    Rs = [R || {error, R} <- [application:start(A) || A <- Applications]],
-    start(lists:filter(fun({already_started, _}) -> false; (_) -> true end, Rs)).
-start([]) -> ok;
-start(Errors) -> {error, Errors}.
 
 %%%=============================================================================
 %%% Application callbacks

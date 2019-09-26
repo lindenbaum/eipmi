@@ -1,5 +1,5 @@
 %%%=============================================================================
-%%% Copyright (c) 2012 Lindenbaum GmbH
+%%% Copyright (c) 2012-2019 Lindenbaum GmbH
 %%%
 %%% Permission to use, copy, modify, and/or distribute this software for any
 %%% purpose with or without fee is hereby granted, provided that the above
@@ -30,29 +30,29 @@
 
 ping_test() -> ping(?GET_HOSTNAME).
 ping({ok, "tirana"}) ->
-    start(),
+    application:ensure_all_started(eipmi),
     ?assertEqual(pong, eipmi:ping(?IP)),
-    stop();
+    application:stop(eipmi);
 ping(_) ->
     ok.
 
 open_close_test() -> open_close(?GET_HOSTNAME).
 open_close({ok, "tirana"}) ->
-    start(),
+    application:ensure_all_started(eipmi),
     {ok, Session} = eipmi:open(?IP),
     Mon = monitor_session(Session),
     receive {ipmi, Session, ?IP, established} -> ok end,
     ?assertEqual([Session], eipmi:info()),
     ?assertEqual(ok, eipmi:close(Session)),
     ?assertEqual(shutdown, receive {'DOWN', Mon, _, _, Reason} -> Reason end),
-    stop();
+    application:stop(eipmi);
 open_close(_) ->
     ok.
 
 parallel_request_test() -> parallel_request(?GET_HOSTNAME).
 parallel_request({ok, "tirana"}) ->
     process_flag(trap_exit, true),
-    start(),
+    application:ensure_all_started(eipmi),
     {ok, Session} = eipmi:open(?IP),
     Mon = monitor_session(Session),
     Action = fun() -> {ok, _} = eipmi:get_sel_info(Session) end,
@@ -62,40 +62,40 @@ parallel_request({ok, "tirana"}) ->
     ?assert(lists:all(fun(E) -> E =:= normal end, Results)),
     ?assertEqual(ok, eipmi:close(Session)),
     ?assertEqual(shutdown, receive {'DOWN', Mon, _, _, Reason} -> Reason end),
-    stop();
+    application:stop(eipmi);
 parallel_request(_) ->
     ok.
 
 read_fru_test() -> read_fru(?GET_HOSTNAME).
 read_fru({ok, "tirana"}) ->
-    start(),
+    application:ensure_all_started(eipmi),
     {ok, Session} = eipmi:open(?IP),
     Mon = monitor_session(Session),
     {ok, Fru} = eipmi:read_fru(Session, 253),
     io:format(standard_error, "~s~n", [eipmi_fru:to_list(Fru)]),
     ?assertEqual(ok, eipmi:close(Session)),
     ?assertEqual(shutdown, receive {'DOWN', Mon, _, _, Reason} -> Reason end),
-    stop();
+    application:stop(eipmi);
 read_fru(_) ->
     ok.
 
 get_sdr_repository_test() -> get_sdr_repository(?GET_HOSTNAME).
 get_sdr_repository({ok, "tirana"}) ->
-    start(),
+    application:ensure_all_started(eipmi),
     {ok, Session} = eipmi:open(?IP),
     Mon = monitor_session(Session),
     {ok, SDRRepository} = eipmi:get_sdr_repository(Session),
     io:format(standard_error, "~s~n", [eipmi_sdr:to_list(SDRRepository)]),
     ?assertEqual(ok, eipmi:close(Session)),
     ?assertEqual(shutdown, receive {'DOWN', Mon, _, _, Reason} -> Reason end),
-    stop();
+    application:stop(eipmi);
 get_sdr_repository(_) ->
     ok.
 
 read_fru_inventory_test_() ->
     {timeout, 30000, [fun() -> read_fru_inventory(?GET_HOSTNAME) end]}.
 read_fru_inventory({ok, "tirana"}) ->
-    start(),
+    application:ensure_all_started(eipmi),
     {ok, Session} = eipmi:open(?IP),
     Mon = monitor_session(Session),
     {ok, SDRRepository} = eipmi:get_sdr_repository(Session),
@@ -103,26 +103,26 @@ read_fru_inventory({ok, "tirana"}) ->
     io:format(standard_error, "~s~n", [eipmi_fru:to_list(FruInventory)]),
     ?assertEqual(ok, eipmi:close(Session)),
     ?assertEqual(shutdown, receive {'DOWN', Mon, _, _, Reason} -> Reason end),
-    stop();
+    application:stop(eipmi);
 read_fru_inventory(_) ->
     ok.
 
 read_sel_test() -> read_sel(?GET_HOSTNAME).
 read_sel({ok, "tirana"}) ->
-    start(),
+    application:ensure_all_started(eipmi),
     {ok, Session} = eipmi:open(?IP),
     Mon = monitor_session(Session),
     {ok, Sel} = eipmi:get_sel(Session, false),
     io:format(standard_error, "~n~p~n", [Sel]),
     ?assertEqual(ok, eipmi:close(Session)),
     ?assertEqual(shutdown, receive {'DOWN', Mon, _, _, Reason} -> Reason end),
-    stop();
+    application:stop(eipmi);
 read_sel(_) ->
     ok.
 
 auto_read_sel_test() -> auto_read_sel(?GET_HOSTNAME).
 auto_read_sel({ok, "tirana"}) ->
-    start(),
+    application:ensure_all_started(eipmi),
     {ok, Session} = eipmi:open(?IP),
     {ok, _} = eipmi:poll_sel(Session, 500, false),
     Mon = monitor_session(Session),
@@ -130,21 +130,13 @@ auto_read_sel({ok, "tirana"}) ->
     receive {ipmi, Session, ?IP, {system_event, _}} -> ok after 500 -> ok end,
     ?assertEqual(ok, eipmi:close(Session)),
     ?assertEqual(shutdown, receive {'DOWN', Mon, _, _, Reason} -> Reason end),
-    stop();
+    application:stop(eipmi);
 auto_read_sel(_) ->
     ok.
 
 %%%=============================================================================
 %%% Internal functions
 %%%=============================================================================
-
-start() ->
-    application:start(sasl),
-    application:start(crypto),
-    application:start(md2),
-    application:start(eipmi).
-
-stop() -> application:stop(eipmi).
 
 %% don't look
 monitor_session(Session) ->
