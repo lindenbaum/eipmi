@@ -18,7 +18,7 @@
   {description, "A native Erlang IMPI library."},
   {vsn, "2.1.0"},
   {registered, [eipmi]},
-  {applications, [kernel, stdlib, sasl, crypto, md2]},
+  {applications, [kernel, stdlib, sasl, crypto, snmp, md2]},
   {mod, {eipmi, []}},
   {env, []},
   {maintainers, ["Tobias Schlager", "Sven Heyll", "Timo Koepke"]},
