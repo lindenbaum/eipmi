@@ -1,5 +1,5 @@
 %%%=============================================================================
-%%% Copyright (c) 2012 Lindenbaum GmbH
+%%% Copyright (c) 2012-2019 Lindenbaum GmbH
 %%%
 %%% Permission to use, copy, modify, and/or distribute this software for any
 %%% purpose with or without fee is hereby granted, provided that the above
@@ -846,10 +846,6 @@ calc_reading(Unit, X, {L, M, B, BExp, ResultExp}) ->
 %%------------------------------------------------------------------------------
 get_states(threshold, _, <<_:2, Threshold:6, _/binary>>) ->
     [{sensor_threshold, get_threshold(Threshold)}];
-get_states(R, T, <<First:8/bitstring, _/binary>>) ->
-    lists:append(
-      [eipmi_sensor:get_value(R, T, O, 1, 16#ff, 16#ff)
-       || O <- get_offsets(First, 7, [])]);
 get_states(R, T, <<First:8/bitstring, 0:8, _/binary>>) ->
     lists:append(
       [eipmi_sensor:get_value(R, T, O, 1, 16#ff, 16#ff)
@@ -858,6 +854,10 @@ get_states(R, T, <<First:8/bitstring, _:1, Second:7/bitstring, _/binary>>) ->
     lists:append(
       [eipmi_sensor:get_value(R, T, O, 1, 16#ff, 16#ff)
        || O <- get_offsets(<<Second/bitstring, First/bitstring>>, 14, [])]);
+get_states(R, T, <<First:8/bitstring, _/binary>>) ->
+    lists:append(
+      [eipmi_sensor:get_value(R, T, O, 1, 16#ff, 16#ff)
+       || O <- get_offsets(First, 7, [])]);
 get_states(_, _, _) ->
     [].
 
