@@ -165,7 +165,7 @@ encode_get_lan_configuration_parameters_test() ->
     Req = {?IPMI_NETFN_TRANSPORT_REQUEST, ?GET_LAN_CONFIGURATION_PARAMETERS},
     Properties = [{parameter, 3}],
     ?assertEqual(
-       <<16#8e, 16#03, 16#00, 16#00>>,
+       <<16#0e, 16#03, 16#00, 16#00>>,
        eipmi_request:encode(Req, Properties)).
 
 encode_get_sdr_repository_info_test() ->

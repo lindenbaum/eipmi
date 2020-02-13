@@ -47,7 +47,7 @@
                      enterprise_specific |
                      link_down | link_up} |
                     {enterprise, [non_neg_integer()]} |
-                    {cookie, pos_integer()} |
+                    {seq_nr, non_neg_integer()} |
                     {data, binary()} |
                     {event_severity, trap_severity()} |
                     {event_source, trap_source()} |
@@ -242,7 +242,7 @@ trap_misc(#trappdu{enterprise = E, time_stamp = T}) ->
 trap_enterprise_specific(
   <<?EIPMI_RESERVED:8, SensorType:8, EventType:8,
     Assertion:1, ?EIPMI_RESERVED:3, _Offset:4>>,
-  <<GUID:16/binary, Cookie:16, Time:32, UtcOffset:16, TrapSource:8,
+  <<GUID:16/binary, SeqNr:16, Time:32, UtcOffset:16, TrapSource:8,
     EventSource:8, Severity:8, Device:8, Number:8, Entity:8, Instance:8,
     Data:3/binary, DataRest:5/binary, _LangCode:8, Manufacturer:32,
     SystemId:16, _OEMCustomFields/binary>>,
@@ -254,7 +254,7 @@ trap_enterprise_specific(
         [
          [{type, enterprise_specific}],
          trap_smbios_guid(GUID),
-         unspecified_if_0(cookie, Cookie),
+         unspecified_if_0(seq_nr, SeqNr),
          unspecified_if_0(local_time, Time),
          unspecified_if_0(utc_offset, UtcOffset),
          trap_source(trap_source, TrapSource),
