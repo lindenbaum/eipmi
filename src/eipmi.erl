@@ -60,8 +60,9 @@
          poll_sel/3,
          clear_sel/1,
          get_sel_info/1,
-         get_ip_udp_rmcp_statistics/2,
+         set_lan_configuration_parameters/3,
          get_lan_configuration_parameters/3,
+         get_ip_udp_rmcp_statistics/2,
          get_picmg_properties/1,
          get_address_info/1,
          get_address_info/2,
@@ -209,7 +210,7 @@
          {default_gateway_mac_address, {byte(), byte(), byte(), byte(), byte(), byte()}} |
          {backup_gateway, inet:ip4_address()} |
          {backup_gateway_mac_address, {byte(), byte(), byte(), byte(), byte(), byte()}} |
-         {community, binary()} |
+         {community, string()} |
          {num_destinations, 0..15} |
          {acknowledge, boolean()} |
          {timeout, byte()} |
@@ -845,16 +846,21 @@ get_sel_info(Session) ->
 
 %%------------------------------------------------------------------------------
 %% @doc
-%% Will issue a 'Get IP/UDP/RMCP Statistics' request using the provided session.
-%% The statistics can optionally be cleared.
+%% Will issue a 'Set LAN Configuration Parameters' request using the provided
+%% session. The needed `Properties' depend on the actual Parameter that should
+%% get set. Refer to the {@link eipmi_request} module to see which properties
+%% can be used.
 %% @end
 %%------------------------------------------------------------------------------
--spec get_ip_udp_rmcp_statistics(session(), boolean()) ->
-                                        {ok, network_statistics()} |
-                                        {error, term()}.
-get_ip_udp_rmcp_statistics(Session, Clear) ->
-    A = [{clear_statistics, Clear}],
-    raw(Session, ?IPMI_NETFN_TRANSPORT_REQUEST, ?GET_IP_UDP_RMCP_STATISTICS, A).
+-spec set_lan_configuration_parameters(session(),
+                                       0..19,
+                                       lan_configurations()) ->
+          ok | {error, term()}.
+set_lan_configuration_parameters(Session, Parameter, Properties) ->
+    raw(Session,
+        ?IPMI_NETFN_TRANSPORT_REQUEST,
+        ?SET_LAN_CONFIGURATION_PARAMETERS,
+        [{parameter, Parameter} | Properties]).
 
 %%------------------------------------------------------------------------------
 %% @doc
@@ -885,6 +891,19 @@ get_lan_configuration_parameters(Session, Parameter, SetSelector) ->
         Error ->
             Error
     end.
+
+%%------------------------------------------------------------------------------
+%% @doc
+%% Will issue a 'Get IP/UDP/RMCP Statistics' request using the provided session.
+%% The statistics can optionally be cleared.
+%% @end
+%%------------------------------------------------------------------------------
+-spec get_ip_udp_rmcp_statistics(session(), boolean()) ->
+                                        {ok, network_statistics()} |
+                                        {error, term()}.
+get_ip_udp_rmcp_statistics(Session, Clear) ->
+    A = [{clear_statistics, Clear}],
+    raw(Session, ?IPMI_NETFN_TRANSPORT_REQUEST, ?GET_IP_UDP_RMCP_STATISTICS, A).
 
 %%------------------------------------------------------------------------------
 %% @doc

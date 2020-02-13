@@ -171,7 +171,7 @@ decode_lan_configuration_parameters(15,
                                     <<M1, M2, M3, M4, M5, M6, _/binary>>) ->
     [{backup_gateway_mac_address, {M1, M2, M3, M4, M5, M6}}];
 decode_lan_configuration_parameters(16, _, Binary) ->
-    [{community, Binary}];
+    [{community, string:strip(binary_to_list(Binary), right, $\0)}];
 decode_lan_configuration_parameters(17,
                                     _,
                                     <<?EIPMI_RESERVED:4, Num:4, _/binary>>) ->
@@ -337,6 +337,8 @@ decode_transport(?GET_IP_UDP_RMCP_STATISTICS,
      {udp_proxy_packets_received, UDPRxProxy},
      {udp_proxy_packets_dropped, UDPDr},
      {rmcp_packets_received, RMCPRx}];
+decode_transport(?SET_LAN_CONFIGURATION_PARAMETERS, _) ->
+    [];
 decode_transport(?GET_LAN_CONFIGURATION_PARAMETERS, <<Rev:8, Data/binary>>) ->
     io:format("Got rev ~w data ~p~n", [Rev, Data]),
     [{data, Data}].
