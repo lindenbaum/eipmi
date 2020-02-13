@@ -32,7 +32,8 @@
          get_bool/1,
          binary_to_string/1,
          join_nl/1,
-         decode_event_data/4]).
+         decode_event_data/4,
+         warn/2]).
 
 %%%=============================================================================
 %%% API
@@ -242,6 +243,18 @@ decode_event_data(Reading, Type, Assertion, Data) when is_atom(Reading) ->
     decode_generic(Reading, Type, Assertion, pad_event_data(Data));
 decode_event_data(Reading, Type, Assertion, Data) when is_integer(Reading) ->
     decode_oem(Reading, Type, Assertion, pad_event_data(Data)).
+
+%%------------------------------------------------------------------------------
+%% @doc
+%% A logger-aware wrapper to log warnings.
+%% @end
+%%------------------------------------------------------------------------------
+-spec warn(string(), [term()]) -> ok.
+-ifdef(OTP_RELEASE).
+warn(Fmt, Args) -> logger:warning(Fmt, Args).
+-else.
+warn(Fmt, Args) -> error_logger:warning_msg(Fmt, Args).
+-endif.
 
 %%%=============================================================================
 %%% Internal functions

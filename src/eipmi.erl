@@ -78,6 +78,7 @@
          sdr_to_fru/2,
          sdr_to_fru/3,
          id_to_fru/2,
+         sessions/0,
          info/0]).
 
 %% Application callbacks
@@ -88,7 +89,7 @@
 
 -include("eipmi.hrl").
 
--type target() :: {inet:ip_address() | inet:hostname(), inet:port_number()}.
+-type target() :: {inet:ip4_address(), inet:port_number()}.
 
 -type session() :: {session, target(), {pid(), reference()}}.
 
@@ -129,6 +130,7 @@
 -type sdr_repository() :: [sdr()].
 -type sel_info() :: repository_info().
 -type sel_entry() :: eipmi_sel:entry().
+-type trap() :: eipmi_trap:trap().
 
 -type device_support() ::
         chassis | bridge | event_generator | event_receiver | fru_inventory |
@@ -218,6 +220,7 @@
               sdr_repository/0,
               sel_info/0,
               sel_entry/0,
+              trap/0,
               device_info/0,
               self_test/0,
               power_state/0,
@@ -240,7 +243,7 @@
 %% @see ping/2
 %% @end
 %%------------------------------------------------------------------------------
--spec ping(inet:ip_address() | inet:hostname()) -> pang | pong.
+-spec ping(inet:ip4_address() | inet:hostname()) -> pang | pong.
 ping(IPAddress) ->
     ping(IPAddress, 5000).
 
@@ -250,7 +253,7 @@ ping(IPAddress) ->
 %% timeout value in milliseconds.
 %% @end
 %%------------------------------------------------------------------------------
--spec ping(inet:ip_address() | inet:hostname(), timeout()) -> pang | pong.
+-spec ping(inet:ip4_address() | inet:hostname(), timeout()) -> pang | pong.
 ping(IPAddress, Timeout) when is_integer(Timeout) andalso Timeout > 0 ->
     {ok, Socket} = gen_udp:open(0, [binary, {active, false}]),
     try do_ping(IPAddress, Timeout, Socket) of
@@ -282,7 +285,7 @@ ping(IPAddress, Timeout) when is_integer(Timeout) andalso Timeout > 0 ->
 %%   <dt>
 %%     `{ipmi,
 %%       Session :: session(),
-%%       Address :: inet:ip_address() | inet:hostname(),
+%%       Address :: inet:ip4_address(),
 %%       established}'
 %%   </dt>
 %%   <dd>
@@ -291,7 +294,7 @@ ping(IPAddress, Timeout) when is_integer(Timeout) andalso Timeout > 0 ->
 %%   <dt>
 %%     `{ipmi,
 %%       Session :: session(),
-%%       Address :: inet:ip_address() | inet:hostname(),
+%%       Address :: inet:ip4_address(),
 %%       {closed, Reason :: term()}}'
 %%   </dt>
 %%   <dd>
@@ -300,7 +303,7 @@ ping(IPAddress, Timeout) when is_integer(Timeout) andalso Timeout > 0 ->
 %%   <dt>
 %%     `{ipmi,
 %%       Session :: session(),
-%%       Address :: inet:ip_address() | inet:hostname(),
+%%       Address :: inet:ip4_address(),
 %%       {decode_error, Reason :: term()}}'
 %%   </dt>
 %%   <dd>
@@ -309,7 +312,7 @@ ping(IPAddress, Timeout) when is_integer(Timeout) andalso Timeout > 0 ->
 %%   <dt>
 %%     `{ipmi,
 %%       Session :: session(),
-%%       Address :: inet:ip_address() | inet:hostname(),
+%%       Address :: inet:ip4_address(),
 %%       {timeout, RqSeqNr :: 0..63}}'
 %%   </dt>
 %%   <dd>
@@ -318,7 +321,7 @@ ping(IPAddress, Timeout) when is_integer(Timeout) andalso Timeout > 0 ->
 %%   <dt>
 %%     `{ipmi,
 %%       Session :: session(),
-%%       Address :: inet:ip_address() | inet:hostname(),
+%%       Address :: inet:ip4_address(),
 %%       {unhandled, {call, term()}}}'
 %%   </dt>
 %%   <dd>
@@ -327,7 +330,7 @@ ping(IPAddress, Timeout) when is_integer(Timeout) andalso Timeout > 0 ->
 %%   <dt>
 %%     `{ipmi,
 %%       Session :: session(),
-%%       Address :: inet:ip_address() | inet:hostname(),
+%%       Address :: inet:ip4_address(),
 %%       {unhandled, {cast, term()}}}'
 %%   </dt>
 %%   <dd>
@@ -336,7 +339,7 @@ ping(IPAddress, Timeout) when is_integer(Timeout) andalso Timeout > 0 ->
 %%   <dt>
 %%     `{ipmi,
 %%       Session :: session(),
-%%       Address :: inet:ip_address() | inet:hostname(),
+%%       Address :: inet:ip4_address(),
 %%       {unhandled, {info, term()}}}'
 %%   </dt>
 %%   <dd>
@@ -345,16 +348,7 @@ ping(IPAddress, Timeout) when is_integer(Timeout) andalso Timeout > 0 ->
 %%   <dt>
 %%     `{ipmi,
 %%       Session :: session(),
-%%       Address :: inet:ip_address() | inet:hostname(),
-%%       {unhandled, {ipmi, {ok | error, term()}}}}'
-%%   </dt>
-%%   <dd>
-%%     <p>the session received an IPMI response but no handler was found for it</p>
-%%   </dd>
-%%   <dt>
-%%     `{ipmi,
-%%       Session :: session(),
-%%       Address :: inet:ip_address() | inet:hostname(),
+%%       Address :: inet:ip4_address(),
 %%       SELEntry :: sel_entry()}'
 %%   </dt>
 %%   <dd>
@@ -362,15 +356,37 @@ ping(IPAddress, Timeout) when is_integer(Timeout) andalso Timeout > 0 ->
 %%       a SEL event forwarded through the automatic SEL polling mechanism
 %%     </p>
 %%   </dd>
+%%   <dt>
+%%     `{ipmi,
+%%       Session :: session(),
+%%       Address :: inet:ip4_address(),
+%%       {sel_read_error, Reason :: term()}}'
+%%   </dt>
+%%   <dd>
+%%     <p>
+%%       an error occured when polling the System Event Log
+%%     </p>
+%%   </dd>
+%%   <dt>
+%%     `{ipmi,
+%%       Session :: session(),
+%%       Address :: inet:ip4_address(),
+%%       Trap :: trap()}'
+%%   </dt>
+%%   <dd>
+%%     <p>
+%%       an IPMI PET event forwarded by the trap handling mechanism
+%%     </p>
+%%   </dd>
 %% </dl>
 %% @see open/2
 %% @see close/1
 %% @end
 %%------------------------------------------------------------------------------
--spec open(inet:ip_address() | inet:hostname()) ->
+-spec open(inet:ip4_address() | inet:hostname()) ->
                   {ok, eipmi:session()} | {error, term()}.
-open(IPAddress) ->
-    open(IPAddress, []).
+open(Host) ->
+    open(Host, []).
 
 %%------------------------------------------------------------------------------
 %% @doc
@@ -435,11 +451,12 @@ open(IPAddress) ->
 %% </dl>
 %% @end
 %%------------------------------------------------------------------------------
--spec open(inet:ip_address() | inet:hostname(), [option()]) ->
+-spec open(inet:ip4_address() | inet:hostname(), [option()]) ->
                   {ok, eipmi:session()} | {error, term()}.
-open(IPAddress, Options) ->
-    Target = {IPAddress, proplists:get_value(port, Options, ?RMCP_PORT_NUMBER)},
-    start_session(Target, IPAddress, Options).
+open(Host, Options) ->
+    {ok, IPAddress} = inet:getaddr(Host, inet),
+    Port = proplists:get_value(port, Options, ?RMCP_PORT_NUMBER),
+    start_session({IPAddress, Port}, Options).
 
 %%------------------------------------------------------------------------------
 %% @doc
@@ -768,12 +785,12 @@ poll_sel(Session) ->
 %%------------------------------------------------------------------------------
 -spec poll_sel(session(), non_neg_integer(), boolean()) ->
                       {ok, pid()} | {error, term()}.
-poll_sel(Session = {session, {IP, _}, _}, Interval, Clear) when Interval > 0 ->
+poll_sel(Session = {session, _, _}, Interval, Clear) when Interval > 0 ->
     Children = supervisor:which_children(?MODULE),
-    poll_sel(get_session(Session, Children), Session, IP, Interval, Clear).
-poll_sel({ok, Pid}, Session, IP, Interval, Clear) ->
-    start_poll(Pid, Session, IP, [{read_sel, Interval}, {clear_sel, Clear}]);
-poll_sel(Error, _Session, _IP, _Interval, _Clear) ->
+    poll_sel(get_session(Session, Children), Session, Interval, Clear).
+poll_sel({ok, Pid}, Session, Interval, Clear) ->
+    start_poll(Pid, Session, [{read_sel, Interval}, {clear_sel, Clear}]);
+poll_sel(Error, _Session, _Interval, _Clear) ->
     Error.
 
 %%------------------------------------------------------------------------------
@@ -1046,16 +1063,25 @@ id_to_fru(FruId, SdrRepository) ->
 
 %%------------------------------------------------------------------------------
 %% @doc
-%% Returns statistical information about the currently opened sessions.
+%% Returns the handles of all currently opened sessions.
 %% @end
 %%------------------------------------------------------------------------------
--spec info() -> [session()].
-info() ->
+-spec sessions() -> [session()].
+sessions() ->
     Cs = supervisor:which_children(?MODULE),
-    Sessions = [S || {S = {session, _, _}, P, _, _} <- Cs, is_pid(P)],
+    [S || {S = {session, _, _}, P, _, _} <- Cs, is_pid(P)].
+
+%%------------------------------------------------------------------------------
+%% @doc
+%% Prints information about the currently opened sessions.
+%% @end
+%%------------------------------------------------------------------------------
+-spec info() -> ok.
+info() ->
+    Sessions = sessions(),
     io:format("~w IPMI sessions:~n", [length(Sessions)]),
     [io:format(" * ~w~n", [Session]) || Session <- Sessions],
-    Sessions.
+    ok.
 
 %%%=============================================================================
 %%% Application callbacks
@@ -1079,7 +1105,9 @@ stop(_State) -> ok.
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-init([]) -> {ok, {{one_for_one, 0, 1}, []}}.
+init([]) ->
+    TrapPorts = application:get_env(?MODULE, trap_ports, []),
+    {ok, {{one_for_one, 0, 1}, [trap_spec(Port) || Port <- TrapPorts]}}.
 
 %%%=============================================================================
 %%% internal functions
@@ -1088,9 +1116,16 @@ init([]) -> {ok, {{one_for_one, 0, 1}, []}}.
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-start_session(Target, IPAddress, Options) ->
+trap_spec(Port) ->
+    Start = {eipmi_trap, start_link, [Port]},
+    {{trap, Port}, Start, permanent, brutal_kill, work, [eipmi_trap]}.
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+start_session(Target, Options) ->
     Session = {session, Target, {self(), make_ref()}},
-    Start = {eipmi_session, start_link, [Session, IPAddress, self(), Options]},
+    Start = {eipmi_session, start_link, [Session, Options]},
     Spec = {Session, Start, temporary, 2000, worker, [eipmi_session]},
     case supervisor:start_child(?MODULE, Spec) of
         Error = {error, _} ->
@@ -1102,9 +1137,9 @@ start_session(Target, IPAddress, Options) ->
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-start_poll(Pid, Session = {session, _, {Owner, _}}, IP, Options) ->
+start_poll(SessionPid, Session = {session, _, _}, Options) ->
     Id = {poll, erlang:make_ref()},
-    Start = {eipmi_poll, start_link, [Pid, Session, Owner, IP, Options]},
+    Start = {eipmi_poll, start_link, [SessionPid, Session, Options]},
     Spec = {Id, Start, temporary, brutal_kill, worker, [eipmi_poll]},
     supervisor:start_child(?MODULE, Spec).
 

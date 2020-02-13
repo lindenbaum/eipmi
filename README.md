@@ -71,56 +71,56 @@ handled accordingly. Be prepared to receive the messages of the following form:
 ```erlang
 {ipmi,
  Session :: eipmi:session(),
- Address :: inet:ip_address() | inet:hostname(),
+ Address :: inet:ip4_address() | inet:hostname(),
  established}
 ```
 The session was successfully established and activated.
 ```erlang
 {ipmi,
  Session :: eipmi:session(),
- Address :: inet:ip_address() | inet:hostname(),
+ Address :: inet:ip4_address(),
  {closed, Reason :: term()}}
 ```
 The session was closed with the provided reason.
 ```erlang
 {ipmi,
  Session :: eipmi:session(),
- Address :: inet:ip_address() | inet:hostname(),
+ Address :: inet:ip4_address(),
  {decode_error, Reason :: term()}}
 ```
 A received packet could not be decoded.
 ```erlang
 {ipmi,
  Session :: eipmi:session(),
- Address :: inet:ip_address() | inet:hostname(),
+ Address :: inet:ip4_address(),
  {timeout, {eipmi:request(), RqSeqNr :: 0..63}}}
 ```
 The corresponding request timed out.
 ```erlang
 {ipmi,
  Session :: eipmi:session(),
- Address :: inet:ip_address() | inet:hostname(),
+ Address :: inet:ip4_address(),
  {unhandled, {call, Request :: term()}}}
 ```
 The session received an invalid `gen_server` call.
 ```erlang
 {ipmi,
  Session :: eipmi:session(),
- Address :: inet:ip_address() | inet:hostname(),
+ Address :: inet:ip4_address(),
  {unhandled, {cast, Request :: term()}}}
 ```
 The session received an invalid `gen_server` cast.
 ```erlang
 {ipmi,
  Session :: eipmi:session(),
- Address :: inet:ip_address() | inet:hostname(),
+ Address :: inet:ip4_address(),
  {unhandled, {info, Info :: term()}}}
 ```
 The session received an invalid message.
 ```erlang
 {ipmi,
  Session :: eipmi:session(),
- Address :: inet:ip_address() | inet:hostname(),
+ Address :: inet:ip4_address(),
  SELEntry :: eipmi:sel_entry()}
 ```
 A forwarded entry from the System Event Log (only when automatic SEL polling is
@@ -128,11 +128,19 @@ enabled).
 ```erlang
 {ipmi,
  Session :: eipmi:session(),
- Address :: inet:ip_address() | inet:hostname(),
+ Address :: inet:ip4_address(),
  {sel_read_error, Reason :: term()}}
 ```
 An error occured when polling the System Event Log (only when automatic SEL
 polling is enabled).
+```erlang
+{ipmi,
+ Session :: eipmi:session(),
+ Address :: inet:ip4_address(),
+ Trap :: eipmi:trap()}
+```
+A forwarded entry from the System Event Log (only when automatic SEL polling is
+enabled).
 
 An established session will be kept alive by the session state machine until
 either `eipmi:close/1` gets called or the owner process exits.
@@ -201,6 +209,7 @@ History
 ### Master
 
 * Drop support for OTP releases older than 18.3
+* Add support for receiving/decoding/dispatching IPMI PET event messages
 
 ### Version 2.0.1
 

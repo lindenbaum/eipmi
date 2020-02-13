@@ -114,7 +114,7 @@ do_read(SessionPid, Id, {clear, Acc}) ->
                 Sel -> do_read(SessionPid, NextId, {clear, [Sel | Acc]})
             catch
                 C:E ->
-                    error_logger:info_msg(
+                    eipmi_util:warn(
                       "Failed to decode SEL entry with record_id ~w (~w)",
                       [Id, {error, {C, E}}]),
                     {{error, {C, E}}, Acc}

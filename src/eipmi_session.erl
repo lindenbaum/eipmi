@@ -55,7 +55,7 @@
 -behaviour(gen_server).
 
 %% API
--export([start_link/4,
+-export([start_link/2,
          rpc/3,
          rpc/4,
          stop/2]).
@@ -137,13 +137,9 @@
 %% be queued and sent as soon as the session is established.
 %% @end
 %%------------------------------------------------------------------------------
--spec start_link(eipmi:session(),
-                 inet:ip_address() | inet:hostname(),
-                 pid(),
-                 [property()]) ->
-                        {ok, pid()} | {error, term()}.
-start_link(Session, IPAddress, Owner, Options) ->
-    gen_server:start_link(?MODULE, [Session, IPAddress, Owner, Options], []).
+-spec start_link(eipmi:session(), [property()]) -> {ok, pid()} | {error, term()}.
+start_link(Session, Options) ->
+    gen_server:start_link(?MODULE, [Session, Options], []).
 
 %%------------------------------------------------------------------------------
 %% @doc
@@ -206,7 +202,7 @@ stop(Pid, Reason) -> gen_server:cast(Pid, {stop, Reason}).
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-init([Session, Addr, Owner, Options]) ->
+init([Session = {session, {Addr, _}, {Owner, _}}, Options]) ->
     process_flag(trap_exit, true),
     Ref = erlang:monitor(process, Owner),
     Opts = eipmi_util:merge_vals(Options, ?DEFAULTS),

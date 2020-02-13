@@ -30,7 +30,7 @@
 -behaviour(gen_server).
 
 %% API
--export([start_link/5]).
+-export([start_link/3]).
 
 %% gen_server callbacks
 -export([init/1,
@@ -60,15 +60,10 @@
 %% Start a polling server for the given session process.
 %% @end
 %%------------------------------------------------------------------------------
--spec start_link(pid(),
-                 eipmi:session(),
-                 pid(),
-                 inet:ip_address() | inet:hostname(),
-                 [eipmi:option()]) ->
-                        {ok, pid()} | {error, term()}.
-start_link(SessionPid, Session, OwnerPid, IPAddress, Options) ->
-    Args = [SessionPid, Session, OwnerPid, IPAddress, Options],
-    gen_server:start_link(?MODULE, Args, []).
+-spec start_link(pid(), eipmi:session(), [eipmi:option()]) ->
+          {ok, pid()} | {error, term()}.
+start_link(SessionPid, Session, Options) ->
+    gen_server:start_link(?MODULE, [SessionPid, Session, Options], []).
 
 %%%=============================================================================
 %%% gen_server Callbacks
@@ -79,13 +74,13 @@ start_link(SessionPid, Session, OwnerPid, IPAddress, Options) ->
           owner       :: pid(),
           last_sucess :: erlang:timestamp() | undefined,
           session     :: eipmi:session(),
-          address     :: inet:ip_address() | inet:hostname(),
+          address     :: inet:ip4_address(),
           properties  :: [eipmi:option()]}).
 
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-init([Pid, Session, Owner, Addr, Options]) ->
+init([Pid, Session = {session, {Addr, _}, {Owner, _}}, Options]) ->
     erlang:monitor(process, Pid),
     Opts = eipmi_util:merge_vals(Options, ?DEFAULTS),
     {ok, start_timers(on_success(#state{pid = Pid,
