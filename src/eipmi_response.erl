@@ -24,7 +24,8 @@
 
 -export([decode/2,
          get_device_support/1,
-         get_picmg_site_type/1]).
+         get_picmg_site_type/1,
+         decode_lan_configuration_parameters/3]).
 
 -include("eipmi.hrl").
 
@@ -93,6 +94,118 @@ get_picmg_site_type(16#09) -> [{site_type, rear_transition_module}];
 get_picmg_site_type(16#0a) -> [{site_type, mch}];
 get_picmg_site_type(16#0b) -> [{site_type, power_module}];
 get_picmg_site_type(_) -> [].
+
+%%------------------------------------------------------------------------------
+%% @doc
+%% Decode the given binary according to IPMI 2.0 Table 23.
+%% @end
+%%------------------------------------------------------------------------------
+-spec decode_lan_configuration_parameters(pos_integer(),
+                                          non_neg_integer(),
+                                          binary()) ->
+          eipmi:lan_configurations().
+decode_lan_configuration_parameters(0,
+                                    _,
+                                    <<?EIPMI_RESERVED:6, S:2, _/binary>>) ->
+    case S of
+        0 -> [{set_in_progress, set_complete}];
+        1 -> [{set_in_progress, set_in_progress}];
+        2 -> [{set_in_progress, commit_write}];
+        _ -> []
+    end;
+decode_lan_configuration_parameters(1,
+                                    _,
+                                    <<?EIPMI_RESERVED:2, A:6, _/binary>>) ->
+    [{auth_types, get_auth_types(A)}];
+decode_lan_configuration_parameters(2,
+                                    _,
+                                    <<?EIPMI_RESERVED:2, A:6,
+                                      ?EIPMI_RESERVED:2, B:6,
+                                      ?EIPMI_RESERVED:2, C:6,
+                                      ?EIPMI_RESERVED:2, D:6,
+                                      ?EIPMI_RESERVED:2, E:6,
+                                      _/binary>>) ->
+    [{callback_level_auth_types, get_auth_types(A)},
+     {user_level_auth_types, get_auth_types(B)},
+     {operator_level_auth_types, get_auth_types(C)},
+     {administrator_level_auth_types, get_auth_types(D)},
+     {oem_level_auth_types, get_auth_types(E)}];
+decode_lan_configuration_parameters(3, _, <<I1, I2, I3, I4, _/binary>>) ->
+    [{ip_address, {I1, I2, I3, I4}}];
+decode_lan_configuration_parameters(4,
+                                    _,
+                                    <<?EIPMI_RESERVED:4, S:4, _/binary>>) ->
+    case S of
+        1 -> [{ip_assignment, static}];
+        2 -> [{ip_assignment, dhcp}];
+        3 -> [{ip_assignment, bios_or_system}];
+        4 -> [{ip_assignment, other}];
+        _ -> []
+    end;
+decode_lan_configuration_parameters(5,
+                                    _,
+                                    <<M1, M2, M3, M4, M5, M6, _/binary>>) ->
+    [{mac_address, {M1, M2, M3, M4, M5, M6}}];
+decode_lan_configuration_parameters(6, _, <<I1, I2, I3, I4, _/binary>>) ->
+    [{subnet_mask, {I1, I2, I3, I4}}];
+decode_lan_configuration_parameters(7,
+                                    _,
+                                    <<Ttl, _, Prec:4, Tos:3,
+                                      ?EIPMI_RESERVED:1,
+                                      _/binary>>) ->
+    [{ttl, Ttl}, {precendence, Prec}, {type_of_service, Tos}];
+decode_lan_configuration_parameters(8, _, <<P:16/little, _/binary>>) ->
+    [{primary_port, P}];
+decode_lan_configuration_parameters(9, _, <<P:16/little, _/binary>>) ->
+    [{secondary_port, P}];
+decode_lan_configuration_parameters(12, _, <<I1, I2, I3, I4, _/binary>>) ->
+    [{default_gateway, {I1, I2, I3, I4}}];
+decode_lan_configuration_parameters(13,
+                                    _,
+                                    <<M1, M2, M3, M4, M5, M6, _/binary>>) ->
+    [{default_gateway_mac_address, {M1, M2, M3, M4, M5, M6}}];
+decode_lan_configuration_parameters(14, _, <<I1, I2, I3, I4, _/binary>>) ->
+    [{backup_gateway, {I1, I2, I3, I4}}];
+decode_lan_configuration_parameters(15,
+                                    _,
+                                    <<M1, M2, M3, M4, M5, M6, _/binary>>) ->
+    [{backup_gateway_mac_address, {M1, M2, M3, M4, M5, M6}}];
+decode_lan_configuration_parameters(16, _, Binary) ->
+    [{community, Binary}];
+decode_lan_configuration_parameters(17,
+                                    _,
+                                    <<?EIPMI_RESERVED:4, Num:4, _/binary>>) ->
+    [{num_destinations, Num}];
+decode_lan_configuration_parameters(18,
+                                    _,
+                                    <<?EIPMI_RESERVED:4, Sel:4,
+                                      Ack:1, ?EIPMI_RESERVED:4, Type:3,
+                                      Timeout:8,
+                                      ?EIPMI_RESERVED:5, Retries:3,
+                                      _/binary>>) ->
+    [{set, Sel},
+     {acknowledge, eipmi_util:get_bool(Ack)},
+     {timeout, Timeout},
+     {retries, Retries}
+     | case Type of
+           0 -> [{destination_type, trap}];
+           6 -> [{destination_type, oem1}];
+           7 -> [{destination_type, oem2}];
+           _ -> []
+       end];
+decode_lan_configuration_parameters(19,
+                                    _,
+                                    <<?EIPMI_RESERVED:4, Sel:4,
+                                      0:4, ?EIPMI_RESERVED:4,
+                                      ?EIPMI_RESERVED:7, Gw:1,
+                                      I1, I2, I3, I4,
+                                      M1, M2, M3, M4, M5, M6, _/binary>>) ->
+    [{set, Sel},
+     {gateway, case Gw of 0 -> default; 1 -> backup end},
+     {ip_address, {I1, I2, I3, I4}},
+     {mac_address, {M1, M2, M3, M4, M5, M6}}];
+decode_lan_configuration_parameters(_, _, _) ->
+    [].
 
 %%%=============================================================================
 %%% internal functions
@@ -224,7 +337,8 @@ decode_transport(?GET_IP_UDP_RMCP_STATISTICS,
      {udp_proxy_packets_received, UDPRxProxy},
      {udp_proxy_packets_dropped, UDPDr},
      {rmcp_packets_received, RMCPRx}];
-decode_transport(?GET_LAN_CONFIGURATION_PARAMETERS, <<_Rev:8, Data/binary>>) ->
+decode_transport(?GET_LAN_CONFIGURATION_PARAMETERS, <<Rev:8, Data/binary>>) ->
+    io:format("Got rev ~w data ~p~n", [Rev, Data]),
     [{data, Data}].
 
 %%------------------------------------------------------------------------------
@@ -337,11 +451,12 @@ get_device_power_state(_) -> unknown.
 %% @private
 %%------------------------------------------------------------------------------
 get_auth_types(AuthTypes) ->
-    A = case AuthTypes band 2#10000 of 2#10000 -> [pwd]; _ -> [] end,
-    B = case AuthTypes band 2#100 of 2#100 -> [md5]; _ -> [] end,
-    C = case AuthTypes band 2#10 of 2#10 -> [md2]; _ -> [] end,
-    D = case AuthTypes band 2#1 of 2#1 -> [none]; _ -> [] end,
-    A ++ B ++ C ++ D.
+    A = case AuthTypes band 2#100000 of 2#100000 -> [oem]; _ -> [] end,
+    B = case AuthTypes band 2#10000 of 2#10000 -> [pwd]; _ -> [] end,
+    C = case AuthTypes band 2#100 of 2#100 -> [md5]; _ -> [] end,
+    D = case AuthTypes band 2#10 of 2#10 -> [md2]; _ -> [] end,
+    E = case AuthTypes band 2#1 of 2#1 -> [none]; _ -> [] end,
+    A ++ B ++ C ++ D ++ E.
 
 %%------------------------------------------------------------------------------
 %% @private

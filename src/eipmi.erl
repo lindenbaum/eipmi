@@ -61,6 +61,7 @@
          clear_sel/1,
          get_sel_info/1,
          get_ip_udp_rmcp_statistics/2,
+         get_lan_configuration_parameters/3,
          get_picmg_properties/1,
          get_address_info/1,
          get_address_info/2,
@@ -185,6 +186,36 @@
          {udp_proxy_packets_dropped, non_neg_integer()} |
          {rmcp_packets_received, non_neg_integer()}].
 
+-type lan_configurations() ::
+        [{set, 0..15} |
+         {parameter, 0..19} |
+         {set_in_progress, set_complete | set_in_progress | commit_write} |
+         {auth_types, [eipmi_auth:type() | oem]} |
+         {callback_level_auth_types, [eipmi_auth:type() | oem]} |
+         {user_level_auth_types, [eipmi_auth:type() | oem]} |
+         {operator_level_auth_types, [eipmi_auth:type() | oem]} |
+         {administrator_level_auth_types, [eipmi_auth:type() | oem]} |
+         {oem_level_auth_types, [eipmi_auth:type() | oem]} |
+         {ip_assignment, bios_or_system | dhcp | static | other} |
+         {subnet_mask, inet:ip4_address()} |
+         {ttl, byte()} |
+         {precendence, 0..15} |
+         {type_of_service, 0..7} |
+         {primary_port, inet:port_number()} |
+         {secondary_port, inet:port_number()} |
+         {ip_address, inet:ip4_address()} |
+         {mac_address, {byte(), byte(), byte(), byte(), byte(), byte()}} |
+         {default_gateway, inet:ip4_address()} |
+         {default_gateway_mac_address, {byte(), byte(), byte(), byte(), byte(), byte()}} |
+         {backup_gateway, inet:ip4_address()} |
+         {backup_gateway_mac_address, {byte(), byte(), byte(), byte(), byte(), byte()}} |
+         {community, binary()} |
+         {num_destinations, 0..15} |
+         {acknowledge, boolean()} |
+         {timeout, byte()} |
+         {retries, 0..3} |
+         {gateway, default|backup}].
+
 -type picmg_properties() ::
         [{picmg_extension, string()} |
          {max_fru_id, 0..254} |
@@ -225,6 +256,7 @@
               self_test/0,
               power_state/0,
               network_statistics/0,
+              lan_configurations/0,
               picmg_properties/0,
               picmg_site_type/0,
               picmg_address_info/0,
@@ -823,6 +855,36 @@ get_sel_info(Session) ->
 get_ip_udp_rmcp_statistics(Session, Clear) ->
     A = [{clear_statistics, Clear}],
     raw(Session, ?IPMI_NETFN_TRANSPORT_REQUEST, ?GET_IP_UDP_RMCP_STATISTICS, A).
+
+%%------------------------------------------------------------------------------
+%% @doc
+%% Will issue a 'Get LAN Configuration Parameters' request using the provided
+%% session. The `SetSelector' should be set to `0' if the queried parameter does
+%% not support selection.
+%% @end
+%%------------------------------------------------------------------------------
+-spec get_lan_configuration_parameters(session(), 0..19, 0..15) ->
+          {ok, lan_configurations()} | {error, term()}.
+get_lan_configuration_parameters(Session, Parameter, SetSelector) ->
+    case
+        raw(Session,
+            ?IPMI_NETFN_TRANSPORT_REQUEST,
+            ?GET_LAN_CONFIGURATION_PARAMETERS,
+            [{parameter, Parameter}, {set, SetSelector}])
+    of
+        {ok, RawResult} ->
+            RawData = proplists:get_value(data, RawResult, <<>>),
+            case
+                eipmi_response:decode_lan_configuration_parameters(Parameter,
+                                                                   SetSelector,
+                                                                   RawData)
+            of
+                []     -> {error, unsupported};
+                Result -> {ok, Result}
+            end;
+        Error ->
+            Error
+    end.
 
 %%------------------------------------------------------------------------------
 %% @doc

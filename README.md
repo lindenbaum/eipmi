@@ -210,6 +210,7 @@ History
 
 * Drop support for OTP releases older than 18.3
 * Add support for receiving/decoding/dispatching IPMI PET event messages
+* Support for the *Get LAN Configuration Parameters* command
 
 ### Version 2.0.1
 

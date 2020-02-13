@@ -158,7 +158,7 @@ encode_transport(?GET_LAN_CONFIGURATION_PARAMETERS, Properties) ->
     P = proplists:get_value(parameter, Properties),
     S = proplists:get_value(set, Properties, 0),
     B = proplists:get_value(block, Properties, 0),
-    <<1:1, 0:3, ?IPMI_REQUESTED_CHANNEL:4, P:8, S:8 , B:8>>.
+    <<0:1, 0:3, ?IPMI_REQUESTED_CHANNEL:4, P:8, S:8 , B:8>>.
 
 %%------------------------------------------------------------------------------
 %% @private
