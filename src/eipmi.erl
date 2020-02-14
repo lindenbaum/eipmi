@@ -1199,7 +1199,7 @@ init([]) ->
 %%------------------------------------------------------------------------------
 trap_spec(Port) ->
     Start = {eipmi_trap, start_link, [Port]},
-    {{trap, Port}, Start, permanent, brutal_kill, work, [eipmi_trap]}.
+    {{trap, Port}, Start, permanent, brutal_kill, worker, [eipmi_trap]}.
 
 %%------------------------------------------------------------------------------
 %% @private
