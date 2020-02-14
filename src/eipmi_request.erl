@@ -71,7 +71,7 @@ encode_sensor_event(?GET_SENSOR_READING, Properties) ->
     <<N:8>>;
 encode_sensor_event(?PET_ACKNOWLEDGE, Properties) ->
     SeqNr = proplists:get_value(seq_nr, Properties, 0),
-    LocalTime = proplists:get_value(local_time, Properties),
+    LocalTime = proplists:get_value(local_time, Properties, 0),
     EventSource = proplists:get_value(event_source_raw, Properties),
     SensorDevice = proplists:get_value(sensor_device, Properties, 16#ff),
     SensorNumber = proplists:get_value(sensor_number, Properties, 16#00),

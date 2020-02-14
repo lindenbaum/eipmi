@@ -1188,7 +1188,7 @@ stop(_State) -> ok.
 %%------------------------------------------------------------------------------
 init([]) ->
     TrapPorts = application:get_env(?MODULE, trap_ports, []),
-    {ok, {{one_for_one, 0, 1}, [trap_spec(Port) || Port <- TrapPorts]}}.
+    {ok, {{one_for_one, 5, 1000}, [trap_spec(Port) || Port <- TrapPorts]}}.
 
 %%%=============================================================================
 %%% internal functions

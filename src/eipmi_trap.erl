@@ -205,7 +205,7 @@ forward(AgentIP, Trap) ->
 acknowledge(Session, {trap, TrapProperties}) ->
     case proplists:get_value(type, TrapProperties) of
         enterprise_specific ->
-            case proplists:get_value(seq_nr, TrapProperties) of
+            case proplists:get_value(seq_nr, TrapProperties, 0) of
                 X when X > 0 ->
                     _ = eipmi:raw(Session,
                                   ?IPMI_NETFN_SENSOR_EVENT_REQUEST,
