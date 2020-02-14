@@ -166,42 +166,42 @@ encode_transport(?GET_IP_UDP_RMCP_STATISTICS, Properties) ->
 encode_transport(?SET_LAN_CONFIGURATION_PARAMETERS, Properties) ->
     P = proplists:get_value(parameter, Properties),
     D = case P of
-            3 ->
+            ?IPMI_LAN_CONFIGURATION_PARAMETER_IP_ADDRESS ->
                 V = proplists:get_value(ip_address, Properties),
                 list_to_binary(tuple_to_list(V));
-            4 ->
+            ?IPMI_LAN_CONFIGURATION_PARAMETER_IP_ADDRESS_SOURCE ->
                 case proplists:get_value(ip_assignment, Properties) of
                     static         -> <<0:4, 1:4>>;
                     dhcp           -> <<0:4, 2:4>>;
                     bios_or_system -> <<0:4, 3:4>>;
                     other          -> <<0:4, 4:4>>
                 end;
-            5 ->
+            ?IPMI_LAN_CONFIGURATION_PARAMETER_MAC_ADDRESS ->
                 V = proplists:get_value(mac_address, Properties),
                 list_to_binary(tuple_to_list(V));
-            6 ->
+            ?IPMI_LAN_CONFIGURATION_PARAMETER_SUBNET_MASK ->
                 V = proplists:get_value(subnet_mask, Properties),
                 list_to_binary(tuple_to_list(V));
-            12 ->
+            ?IPMI_LAN_CONFIGURATION_PARAMETER_DEFAULT_GATEWAY ->
                 V = proplists:get_value(default_gateway, Properties),
                 list_to_binary(tuple_to_list(V));
-            13 ->
+            ?IPMI_LAN_CONFIGURATION_PARAMETER_DEFAULT_GATEWAY_MAC_ADDRESS ->
                 V = proplists:get_value(default_gateway_mac_address, Properties),
                 list_to_binary(tuple_to_list(V));
-            14 ->
+            ?IPMI_LAN_CONFIGURATION_PARAMETER_BACKUP_GATEWAY ->
                 V = proplists:get_value(backup_gateway, Properties),
                 list_to_binary(tuple_to_list(V));
-            15 ->
+            ?IPMI_LAN_CONFIGURATION_PARAMETER_BACKUP_GATEWAY_MAC_ADDRESS ->
                 V = proplists:get_value(backup_gateway_gateway_mac_address, Properties),
                 list_to_binary(tuple_to_list(V));
-            16 ->
+            ?IPMI_LAN_CONFIGURATION_PARAMETER_COMMUNITY_STRING ->
                 C = proplists:get_value(community, Properties),
                 Len = length(C),
                 case Len >= 18 of
                     true  -> list_to_binary(string:substr(C, 1, 18));
                     false -> list_to_binary(C ++ lists:duplicate(18 - Len, 0))
                 end;
-            18 ->
+            ?IPMI_LAN_CONFIGURATION_PARAMETER_DESTINATION_TYPE ->
                 S = proplists:get_value(set, Properties, 0),
                 T = case proplists:get_value(destination_type, Properties, trap) of
                         trap -> 0;
@@ -215,7 +215,7 @@ encode_transport(?SET_LAN_CONFIGURATION_PARAMETERS, Properties) ->
                 To = proplists:get_value(timeout, Properties, 0),
                 R = proplists:get_value(retries, Properties, 0),
                 <<0:4, S:4, A:1, 0:4, T:3, To:8, 0:5, R:3>>;
-            19 ->
+            ?IPMI_LAN_CONFIGURATION_PARAMETER_DESTINATION_ADDRESSES ->
                 S = proplists:get_value(set, Properties, 0),
                 G = case proplists:get_value(gateway, Properties, default) of
                         default -> 0;

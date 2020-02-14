@@ -220,9 +220,9 @@ decode_get_ip_udp_rmcp_statistics_test() ->
 
 decode_get_lan_configuration_parameters_test() ->
     Resp = {?IPMI_NETFN_TRANSPORT_RESPONSE, ?GET_LAN_CONFIGURATION_PARAMETERS},
-    Bin = <<16#00, $d, $a, $t, $a>>,
+    Bin = <<16#11, $d, $a, $t, $a>>,
     ?assertEqual(
-       {ok, [{data, <<$d, $a, $t, $a>>}]},
+       {ok, [{revision, 17}, {data, <<$d, $a, $t, $a>>}]},
        eipmi_response:decode(Resp, Bin)).
 
 decode_get_sdr_repository_info_test() ->
