@@ -68,7 +68,16 @@ encode_sensor_event(?RESERVE_DEVICE_SDR_REPOSITORY, _Properties) ->
     <<>>;
 encode_sensor_event(?GET_SENSOR_READING, Properties) ->
     N = proplists:get_value(sensor_number, Properties),
-    <<N:8>>.
+    <<N:8>>;
+encode_sensor_event(?PET_ACKNOWLEDGE, Properties) ->
+    SeqNr = proplists:get_value(seq_nr, Properties, 0),
+    LocalTime = proplists:get_value(local_time, Properties),
+    EventSource = proplists:get_value(event_source_raw, Properties),
+    SensorDevice = proplists:get_value(sensor_device, Properties, 16#ff),
+    SensorNumber = proplists:get_value(sensor_number, Properties, 16#00),
+    <<Data:3/binary, _/binary>> = proplists:get_value(data, Properties),
+    <<SeqNr:16/little, LocalTime:32/little, EventSource, SensorDevice,
+      SensorNumber, Data/binary>>.
 
 %%------------------------------------------------------------------------------
 %% @private

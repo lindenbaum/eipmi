@@ -140,15 +140,20 @@
 -define(IPMI_NETFN_PICMG_RESPONSE, 16#2d).
 
 %%------------------------------------------------------------------------------
-%% The default reponder address sent in all IPMI requests, currently this is
+%% The default responder address sent in all IPMI requests, currently this is
 %% directly the BMC.
 %%------------------------------------------------------------------------------
 -define(IPMI_RESPONDER_ADDR, 16#20).
 
 %%------------------------------------------------------------------------------
-%% The default reponder logical unit (the BMC's event receiver function).
+%% The default responder logical unit (the BMC's event receiver function).
 %%------------------------------------------------------------------------------
 -define(IPMI_RESPONDER_LUN, 2#00).
+
+%%------------------------------------------------------------------------------
+%% The default requestor address.
+%%------------------------------------------------------------------------------
+-define(IPMI_REQUESTOR_ADDR, 16#81).
 
 %%------------------------------------------------------------------------------
 %% The default requestor logical unit.

@@ -16,7 +16,9 @@
 %%% @doc
 %%% A server that listens for IPMI Platform Event Trap (PET) messages forwarding
 %%% these to the owner of all currently active and matching IPMI sessions.
-%%% Matching is performed on the provided agent IP address.
+%%% Matching is performed on the provided agent IP address. The first matching
+%%% session is used to acknowledge the trap if it's sequence number is
+%%% specified (not null).
 %%% @end
 %%%=============================================================================
 
@@ -51,6 +53,7 @@
                     {data, binary()} |
                     {event_severity, trap_severity()} |
                     {event_source, trap_source()} |
+                    {event_source_raw, non_neg_integer()} |
                     {guid, binary()} |
                     {if_index, non_neg_integer()} |
                     {local_time, non_neg_integer()} |
@@ -157,7 +160,10 @@ handle_info({udp_closed, Socket}, State = #state{socket = Socket}) ->
 handle_info({udp, Socket, SrcIP, _, Bin}, State = #state{socket = Socket}) ->
     case decode(Bin) of
         {ok, {AgentIP, Trap}} ->
-            lists:foreach(fire(AgentIP, Trap), eipmi:sessions());
+            case lists:filter(forward(AgentIP, Trap), eipmi:sessions()) of
+                [Session | _] -> acknowledge(Session, Trap);
+                _             -> ok
+            end;
         {error, Reason} ->
             eipmi_util:warn("Bad IPMI PET from ~w: ~w", [SrcIP, Reason])
     end,
@@ -181,11 +187,34 @@ code_change(_OldVsn, State, _Extra) -> {ok, State}.
 
 %%------------------------------------------------------------------------------
 %% @private
+%% Forward the trap to a matching sessions' owner.
 %%------------------------------------------------------------------------------
-fire(AgentIP, Trap) ->
+forward(AgentIP, Trap) ->
     fun(Session = {session, {IP, _}, {Owner, _}}) when AgentIP =:= IP ->
-            Owner ! {ipmi, Session, AgentIP, Trap};
+            Owner ! {ipmi, Session, AgentIP, Trap},
+            true;
        (_Session) ->
+            false
+    end.
+
+%%------------------------------------------------------------------------------
+%% @private
+%% Acknowledge enterprise specific traps with a specified sequence number
+%% (cookie).
+%%------------------------------------------------------------------------------
+acknowledge(Session, {trap, TrapProperties}) ->
+    case proplists:get_value(type, TrapProperties) of
+        enterprise_specific ->
+            case proplists:get_value(seq_nr, TrapProperties) of
+                X when X > 0 ->
+                    _ = eipmi:raw(Session,
+                                  ?IPMI_NETFN_SENSOR_EVENT_REQUEST,
+                                  ?PET_ACKNOWLEDGE,
+                                  [{retransmits, 0} | TrapProperties]);
+                _ ->
+                    ok
+            end;
+        _ ->
             ok
     end.
 
@@ -252,7 +281,7 @@ trap_enterprise_specific(
      {trap,
       lists:append(
         [
-         [{type, enterprise_specific}],
+         [{type, enterprise_specific}, {event_source_raw, EventSource}],
          trap_smbios_guid(GUID),
          unspecified_if_0(seq_nr, SeqNr),
          unspecified_if_0(local_time, Time),

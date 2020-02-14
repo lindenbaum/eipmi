@@ -66,7 +66,7 @@ The API of EIPMI has been designed to be as similar as possible to existing
 erlang protocol implementations (e.g. `gen_udp`). Therefore, the session owner
 (the process calling `open/1,2`) will get asynchronous messages for its
 sessions. The messages are sent using ordinary Erlang messaging and should be
-handled accordingly. Be prepared to receive the messages of the following form:
+handled accordingly. Be prepared to receive messages of the following form:
 
 ```erlang
 {ipmi,
@@ -139,11 +139,33 @@ polling is enabled).
  Address :: inet:ip4_address(),
  Trap :: eipmi:trap()}
 ```
-A forwarded entry from the System Event Log (only when automatic SEL polling is
+An IPMI platform event trap forwarded by the trap handling mechanism (only if
 enabled).
 
 An established session will be kept alive by the session state machine until
 either `eipmi:close/1` gets called or the owner process exits.
+
+### Platform Event Traps
+
+EIPMI is capable of receiving and forwarding platform event traps. In order to
+receive trap events you will need to have trap handling enabled __and__ have at
+least one IPMI session open to the respective target device. The events will
+then be delivered to all owners of currently open sessions to this device.
+
+Traps will automatically be acknowledged using the *PET Acknowledge* command if
+their sequence number (cookie) is set/specified. To enable trap handling you
+will need to set at least one port number for the `trap_ports` property in the
+EIPMI application environment, e.g. in your `sys.config` add the following
+
+```erlang
+...
+{eipmi, [{trap_ports, [162]}]},
+...
+```
+
+Please be aware that depending on the chosen port (to be standard compliant you
+will need to use port 162) your VM will need the permission to open internet
+privileged ports.
 
 ### Usage
 

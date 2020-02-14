@@ -224,7 +224,9 @@ decode_sensor_event(?GET_SENSOR_READING,
     [{events_enabled, eipmi_util:get_bool(Events)},
      {scanning_enabled, eipmi_util:get_bool(Scanning)}]
         ++ case Available of 0 -> [{raw_reading, Reading}]; _ -> [] end
-        ++ case Available of 0 -> [{raw_states, States}]; _ -> [] end.
+        ++ case Available of 0 -> [{raw_states, States}]; _ -> [] end;
+decode_sensor_event(?PET_ACKNOWLEDGE, _) ->
+    [].
 
 %%------------------------------------------------------------------------------
 %% @private
