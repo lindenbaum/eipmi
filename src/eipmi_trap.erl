@@ -167,7 +167,7 @@ handle_info({udp, Socket, SrcIP, _, Bin}, State = #state{socket = Socket}) ->
         {error, Reason} ->
             eipmi_util:warn("Bad IPMI PET from ~w: ~w", [SrcIP, Reason])
     end,
-    {stop, socket_closed, State};
+    {noreply, State};
 handle_info(_Info, State) ->
     {noreply, State}.
 
