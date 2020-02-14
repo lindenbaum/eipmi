@@ -234,6 +234,7 @@ History
 * Add support for receiving/decoding/dispatching IPMI PET event messages
 * Support for the *Get LAN Configuration Parameters* command
 * Support for the *Set LAN Configuration Parameters* command
+* Add `eipmi:sessions/0` and remove return value from `eipmi:info/0`
 
 ### Version 2.0.1
 
