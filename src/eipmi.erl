@@ -79,6 +79,7 @@
          sel_to_fru/3,
          sdr_to_fru/2,
          sdr_to_fru/3,
+         props_to_fru/2,
          id_to_fru/2,
          sessions/0,
          info/0]).
@@ -1107,10 +1108,7 @@ sel_to_fru(SelEntry, SdrRepository, FruInventory) ->
 %%------------------------------------------------------------------------------
 -spec sdr_to_fru(sdr(), sdr_repository()) -> {ok, sdr()} | {error, term()}.
 sdr_to_fru({_, SensorProps}, SdrRepository) ->
-    get_element_by_properties(
-      maybe_keyfind(entity_id, 1, SensorProps)
-      ++ maybe_keyfind(entity_instance, 1, SensorProps),
-      filter_by_key(fru_device_locator, SdrRepository)).
+    props_to_fru(SensorProps, SdrRepository).
 
 %%------------------------------------------------------------------------------
 %% @doc
@@ -1129,6 +1127,20 @@ sdr_to_fru(Sdr, SdrRepository, FruInventory) ->
         Error ->
             Error
     end.
+
+%%------------------------------------------------------------------------------
+%% @doc
+%% Returns the FRU Device Locator Record associated with the given entity
+%% coordinate properties from the Sensor Data Record (SDR) repository, if any.
+%% @end
+%%------------------------------------------------------------------------------
+-spec props_to_fru([eipmi_sdr:property()], sdr_repository()) ->
+          {ok, sdr()} | {error, term()}.
+props_to_fru(Props, SdrRepository) ->
+    get_element_by_properties(
+      maybe_keyfind(entity_id, 1, Props)
+      ++ maybe_keyfind(entity_instance, 1, Props),
+      filter_by_key(fru_device_locator, SdrRepository)).
 
 %%------------------------------------------------------------------------------
 %% @doc
