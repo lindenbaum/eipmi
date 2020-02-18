@@ -228,10 +228,11 @@ error_logger:info_msg("New privilege level is ~p.~n", [NewPrivilege]),
 History
 -------
 
-### Master
+### Version 3.0.0
 
 * Drop support for OTP releases older than 18.3
-* Add support for receiving/decoding/dispatching IPMI PET event messages
+* Add support for receiving/decoding/dispatching *IPMI Platform Event* and
+  *SNMP* (RFC 1157) *Trap* messages
 * Support for the *Get LAN Configuration Parameters* command
 * Support for the *Set LAN Configuration Parameters* command
 * Add `eipmi:sessions/0` and remove return value from `eipmi:info/0`
