@@ -38,6 +38,8 @@
          terminate/2,
          code_change/3]).
 
+-include_lib("snmp/include/snmp_types.hrl").
+
 -type trap() :: {trap, [property()]}.
 -type trap_severity() :: monitor | information | ok | non_critical | critical |
                          non_recoverable.
@@ -46,6 +48,8 @@
                        third_party_add_in | osv | nic | system_management_card.
 -type property() :: {type,
                      cold_start | warm_start |
+                     authentication_failure |
+                     egp_neighbor_loss |
                      enterprise_specific |
                      link_down | link_up} |
                     {enterprise, [non_neg_integer()]} |
@@ -68,7 +72,8 @@
                     {trap_source, trap_source()} |
                     {utc_offset, non_neg_integer()} |
                     eipmi_sensor:entity() |
-                    eipmi_sensor:value().
+                    eipmi_sensor:value() |
+                    #varbind{}.
 
 -export_type([trap/0,
               trap_severity/0,
@@ -76,8 +81,6 @@
               property/0]).
 
 -include("eipmi.hrl").
-
--include_lib("snmp/include/snmp_types.hrl").
 
 %%%=============================================================================
 %%% API
@@ -158,14 +161,18 @@ handle_cast(_Request, State) -> {noreply, State}.
 handle_info({udp_closed, Socket}, State = #state{socket = Socket}) ->
     {stop, socket_closed, State};
 handle_info({udp, Socket, SrcIP, _, Bin}, State = #state{socket = Socket}) ->
-    case decode(Bin) of
+    try decode(Bin) of
         {ok, {AgentIP, Trap}} ->
             case lists:filter(forward(AgentIP, Trap), eipmi:sessions()) of
                 [Session | _] -> acknowledge(Session, Trap);
                 _             -> ok
             end;
         {error, Reason} ->
-            eipmi_util:warn("Bad IPMI PET from ~w: ~w", [SrcIP, Reason])
+            eipmi_util:warn("Unsupported trap from ~w: ~w", [SrcIP, Reason])
+    catch
+        C:E ->
+            Reason = {decode_error, {C, E}},
+            eipmi_util:warn("Bad trap from ~w: ~w", [SrcIP, Reason])
     end,
     {noreply, State};
 handle_info(_Info, State) ->
@@ -228,34 +235,36 @@ agent_addr(List) when is_list(List)     -> list_to_tuple(List).
 
 %%------------------------------------------------------------------------------
 %% @private
+%% RFC 1157
 %%------------------------------------------------------------------------------
 trap_pdu(Trap = #trappdu{generic_trap = 0}) ->
     {ok, {trap, [{type, cold_start} | trap_misc(Trap)]}};
 trap_pdu(Trap = #trappdu{generic_trap = 1}) ->
     {ok, {trap, [{type, warm_start} | trap_misc(Trap)]}};
-trap_pdu(Trap = #trappdu{generic_trap = 2,
-                         varbinds = [#varbind{variabletype = 'INTEGER',
-                                              oid = OId,
-                                              value = If} | _]}) ->
-    Misc = trap_misc(Trap),
-    {ok, {trap, [{type, link_down}, {oid, OId}, {if_index, If} | Misc]}};
-trap_pdu(Trap = #trappdu{generic_trap = 3,
-                         varbinds = [#varbind{variabletype = 'INTEGER',
-                                              oid = OId,
-                                              value = If} | _]}) ->
-    Misc = trap_misc(Trap),
-    {ok, {trap, [{type, link_up}, {oid, OId}, {if_index, If} | Misc]}};
-trap_pdu(Trap = #trappdu{generic_trap = 6, specific_trap = ST, varbinds = Vs}) ->
-    case
-        [V || V = #varbind{oid = [1, 3, 6, 1, 4, 1, 3183, 1, 1, 1],
-                           variabletype = 'OCTET STRING'} <- Vs]
-    of
-        [#varbind{value = String} | _] ->
-            Fields = list_to_binary(String),
-            trap_enterprise_specific(<<ST:32>>, Fields, trap_misc(Trap));
-        _ ->
-            {error, {unsupported, Trap}}
-    end;
+trap_pdu(Trap = #trappdu{generic_trap = 2, varbinds = Vs}) ->
+    Ps = [{if_index, If} || #varbind{variabletype = 'INTEGER',
+                                     oid = [1,3,6,1,2,1,2,2,1,8|_],
+                                     value = If} <- Vs],
+    {ok, {trap, [{type, link_down} | trap_misc(Trap)] ++ Ps}};
+trap_pdu(Trap = #trappdu{generic_trap = 3, varbinds = Vs}) ->
+    Ps = [{if_index, If} || #varbind{variabletype = 'INTEGER',
+                                     oid = [1,3,6,1,2,1,2,2,1,8|_],
+                                     value = If} <- Vs],
+    {ok, {trap, [{type, link_up} | trap_misc(Trap)] ++ Ps}};
+trap_pdu(Trap = #trappdu{generic_trap = 4}) ->
+    {ok, {trap, [{type, authentication_failure} | trap_misc(Trap)]}};
+trap_pdu(Trap = #trappdu{generic_trap = 5, varbinds = Vs}) ->
+    Ps = [{neighbor_addr, list_to_tuple(IP)}
+          || #varbind{variabletype = 'IpAddress',
+                      oid = [1,3,6,1,2,1,8,5,1,2|_],
+                      value = IP} <- Vs],
+    {ok, {trap, [{type, egp_neighbor_loss} | trap_misc(Trap)] ++ Ps}};
+trap_pdu(Trap = #trappdu{generic_trap = 6,
+                         enterprise = Enterprise,
+                         specific_trap = SpecificTrap,
+                         varbinds = Vs}) ->
+    Ps = [trap_enterprise_specific(Enterprise, SpecificTrap, V) || V <- Vs],
+    {ok, {trap, [{type, enterprise_specific} | trap_misc(Trap)] ++ lists:append(Ps)}};
 trap_pdu(Trap = #trappdu{}) ->
     {error, {unsupported, Trap}}.
 
@@ -268,39 +277,66 @@ trap_misc(#trappdu{enterprise = E, time_stamp = T}) ->
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-trap_enterprise_specific(
+trap_enterprise_specific([1,3,6,1,4,1,3183,1,1],
+                         SpecificTrap,
+                         #varbind{oid = [1,3,6,1,4,1,3183,1,1,1],
+                                  variabletype = 'OCTET STRING',
+                                  value = String}) ->
+    trap_ipmi_pet(<<SpecificTrap:32>>, list_to_binary(String));
+trap_enterprise_specific([1,3,6,1,4,1,27768,1,1,2],
+                         _SpecificTrap,
+                         #varbind{oid = [1,3,6,1,4,1,27768,1,1,2,1,1],
+                                  variabletype = 'IpAddress',
+                                  value = IP}) ->
+    [{main_ip, list_to_tuple(IP)}];
+trap_enterprise_specific([1,3,6,1,4,1,27768,1,1,2],
+                         _SpecificTrap,
+                         #varbind{oid = [1,3,6,1,4,1,27768,1,1,2,1,2],
+                                  variabletype = 'IpAddress',
+                                  value = IP}) ->
+    [{primary_ip, list_to_tuple(IP)}];
+trap_enterprise_specific([1,3,6,1,4,1,27768,1,1,2],
+                         _SpecificTrap,
+                         #varbind{oid = [1,3,6,1,4,1,27768,1,1,2,1,3],
+                                  variabletype = 'OCTET STRING',
+                                  value = Mac}) ->
+    [{mac_address, lists:foldr(fun(0, Acc)  -> Acc;
+                                  ($-, Acc) -> [$: | Acc];
+                                  (C, Acc)  -> [C | Acc]
+                               end, "", Mac)}];
+trap_enterprise_specific(_, _, Varbind) ->
+    [Varbind].
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+trap_ipmi_pet(
   <<?EIPMI_RESERVED:8, SensorType:8, EventType:8,
     Assertion:1, ?EIPMI_RESERVED:3, _Offset:4>>,
   <<GUID:16/binary, SeqNr:16, Time:32, UtcOffset:16, TrapSource:8,
     EventSource:8, Severity:8, Device:8, Number:8, Entity:8, Instance:8,
     Data:3/binary, DataRest:5/binary, _LangCode:8, Manufacturer:32,
-    SystemId:16, _OEMCustomFields/binary>>,
-  Acc) ->
+    SystemId:16, _OEMCustomFields/binary>>) ->
     {Reading, Type} = eipmi_sensor:get_type(EventType, SensorType),
-    {ok,
-     {trap,
-      lists:append(
-        [
-         [{type, enterprise_specific}, {event_source_raw, EventSource}],
-         trap_smbios_guid(GUID),
-         unspecified_if_0(seq_nr, SeqNr),
-         unspecified_if_0(local_time, Time),
-         unspecified_if_0(utc_offset, UtcOffset),
-         trap_source(trap_source, TrapSource),
-         trap_source(event_source, EventSource),
-         trap_severity(Severity),
-         unspecified_if_0(manufacturer_id, Manufacturer),
-         unspecified_if_0(system_id, SystemId),
-         unspecified_if_ff(sensor_device, Device),
-         unspecified_if_ff(unspecified_if_0(sensor_number, Number)),
-         unspecified_if_0(eipmi_sensor:get_entity(Entity, Instance)),
-         [{sensor_type, Type}, {reading_type, Reading}],
-         eipmi_util:decode_event_data(Reading, Type, Assertion, Data),
-         [{data, <<Data/binary, DataRest/binary>>}],
-         Acc
-        ])}};
-trap_enterprise_specific(_SpecificTrap, Fields, _Acc) ->
-    {error, {malformed_varbind, Fields}}.
+    lists:append(
+      [
+       [{event_source_raw, EventSource}],
+       trap_smbios_guid(GUID),
+       unspecified_if_0(seq_nr, SeqNr),
+       unspecified_if_0(local_time, Time),
+       unspecified_if_0(utc_offset, UtcOffset),
+       trap_source(trap_source, TrapSource),
+       trap_source(event_source, EventSource),
+       trap_severity(Severity),
+       unspecified_if_0(manufacturer_id, Manufacturer),
+       unspecified_if_0(system_id, SystemId),
+       unspecified_if_ff(sensor_device, Device),
+       unspecified_if_ff(unspecified_if_0(sensor_number, Number)),
+       unspecified_if_0(eipmi_sensor:get_entity(Entity, Instance)),
+       [{sensor_type, Type}, {reading_type, Reading}],
+       eipmi_util:decode_event_data(Reading, Type, Assertion, Data),
+       [{data, <<Data/binary, DataRest/binary>>}]
+      ]).
 
 %%------------------------------------------------------------------------------
 %% @private
@@ -367,3 +403,22 @@ unspecified_if_ff(L) when is_list(L) ->
 %%------------------------------------------------------------------------------
 unspecified_if_ff(_, 16#ff) -> [];
 unspecified_if_ff(T, Val)   -> [{T, Val}].
+
+%%%=============================================================================
+%%% TESTS
+%%%=============================================================================
+
+-ifdef(TEST).
+
+-include_lib("eunit/include/eunit.hrl").
+
+trap_enterprise_specific_test() ->
+    MacAddress = {varbind,[1,3,6,1,4,1,27768,1,1,2,1,3],
+                  'OCTET STRING',
+                  [48,48,45,52,48,45,52,50,45,48,98,45,50,99,45,51,48,0],
+                  3},
+    ?assertEqual(
+       [{mac_address, "00:40:42:0b:2c:30"}],
+       trap_enterprise_specific([1,3,6,1,4,1,27768,1,1,2], 1337, MacAddress)).
+
+-endif. %% TEST
