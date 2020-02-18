@@ -228,6 +228,10 @@ error_logger:info_msg("New privilege level is ~p.~n", [NewPrivilege]),
 History
 -------
 
+### Master
+
+No change to latest tag.
+
 ### Version 3.0.0
 
 * Drop support for OTP releases older than 18.3
