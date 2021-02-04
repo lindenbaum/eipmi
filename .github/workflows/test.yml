@@ -1,0 +1,20 @@
+on: push
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    name: OTP ${{matrix.otp_release}}
+    strategy:
+      matrix:
+        otp_release:
+          - 22.2
+          - 21.0
+          - 20.3
+          - 19.3
+          - 18.3
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-erlang@v1
+        with:
+          otp-version: ${{matrix.otp_release}}
+      - run: rebar3 as test do clean,compile,dialyzer,eunit
