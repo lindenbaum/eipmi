@@ -1,6 +1,3 @@
-[![Build Status](https://github.com/lindenbaum/eipmi/workflows/.github/workflows/test.yml/badge.svg?branch=master)](https://github.com/lindenbaum/eipmi/actions)
-[![Old Build Status (TRAVIS)](https://travis-ci.org/lindenbaum/eipmi.png?branch=master)](https://travis-ci.org/lindenbaum/eipmi)
-
 EIPMI
 =====
 

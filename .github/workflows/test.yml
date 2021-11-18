@@ -1,19 +1,20 @@
-on: push
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
 
 jobs:
-  test:
+  build:
     runs-on: ubuntu-latest
-    name: OTP ${{matrix.otp_release}}
-    strategy:
-      matrix:
-        otp_release:
-          - 22.2
-          - 21.3
-          - 20.3
-          - 19.3.6.8
+    container:
+      image: erlang:23
     steps:
-      - uses: actions/checkout@v2.0.0
-      - uses: gleam-lang/setup-erlang@v1.1.2
-        with:
-          otp-version: ${{matrix.otp_release}}
-      - run: rebar3 as test do clean,compile,dialyzer,eunit
+      - uses: actions/checkout@v2
+      - name: Compile
+        run: rebar3 compile
+      - name: Run dialyzer
+        run: rebar3 dialyzer
+      - name: Run tests
+        run: rebar3 as test eunit

@@ -1,0 +1,8 @@
+check:
+  stage: test
+  image: erlang:23
+  script:
+    - rebar3 do clean,compile,dialyzer
+    - rebar3 as test eunit
+  only:
+    - master
