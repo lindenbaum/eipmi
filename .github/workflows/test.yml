@@ -8,8 +8,11 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        otp: [21, 22, 23, 24]
     container:
-      image: erlang:23
+      image: erlang:${{ matrix.otp }}
     steps:
       - uses: actions/checkout@v2
       - name: Compile
