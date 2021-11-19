@@ -228,7 +228,7 @@ History
 
 ### Master
 
-No change to latest tag.
+* Drop support for OTP releases older than 21.
 
 ### Version 3.0.0
 
