@@ -253,6 +253,103 @@ decode_get_sdr_test() ->
              {data, <<$d, $a, $t, $a>>}]},
        eipmi_response:decode(Resp, Bin)).
 
+decode_get_chassis_caps_test() ->
+    Resp = {?IPMI_NETFN_CHASSIS_RESPONSE, ?GET_CHASSIS_CAPABILITIES},
+    Bin = <<15:8, 27:8, 132:8, 65:8, 213:8, 40:8>>,
+    ?assertEqual(
+       {ok, [{interlock, 1},
+             {lockout, 1},
+             {diagnostic, 1},
+             {intrusion, 1},
+             {fru_address, 27},
+             {sdr_address, 132},
+             {sel_address, 65},
+             {sm_address, 213},
+             {bridge_address, 40}]},
+       eipmi_response:decode(Resp, Bin)).
+
+decode_get_chassis_status_test() ->
+    Resp = {?IPMI_NETFN_CHASSIS_RESPONSE, ?GET_CHASSIS_STATUS},
+    Bin = <<127:8, 8:8, 0:8, 2#11110000>>,
+    ?assertEqual(
+       {ok, [{power_restore_policy, 3},
+             {power_control_fault, 1},
+             {power_fault, 1},
+             {interlock_status, 1},
+             {overload, 1},
+             {power_status, 1},
+             {last_power_reason, 8},
+             {identify_supported, 0},
+             {identify_status, 0},
+             {fan_fault, 0},
+             {drive_fault, 0},
+             {lockout_active, 0},
+             {intrusion_detection, 0},
+             {disable_standby_allowed, 1},
+             {disable_diagnostic_allowed, 1},
+             {disable_reset_allowed, 1},
+             {disable_power_off_allowed, 1},
+             {standby_disabled, 0},
+             {diagnostic_disabled, 0},
+             {reset_disabled, 0},
+             {power_off_disabled, 0}]},
+       eipmi_response:decode(Resp, Bin)).
+
+decode_chassis_poh_counter_test() ->
+    Resp = {?IPMI_NETFN_CHASSIS_RESPONSE, ?GET_POH_COUNTER},
+    Bin = <<5:8, 200:8, 0:8, 0:8, 0:8>>,
+    ?assertEqual(
+       {ok, [{counter, 200},
+             {minutes_per_count, 5}]},
+       eipmi_response:decode(Resp, Bin)).
+
+decode_chassis_restart_cause_test() ->
+    Resp = {?IPMI_NETFN_CHASSIS_RESPONSE, ?GET_SYSTEM_RESTART_CAUSE},
+    Bin = <<6:8, 13:8>>,
+    ?assertEqual(
+       {ok, [{restart_cause, always_on_restore_policy},
+             {channel, 13}]},
+       eipmi_response:decode(Resp, Bin)).
+
+decode_chassis_set_power_restore_policy_test() ->
+    Resp = {?IPMI_NETFN_CHASSIS_RESPONSE, ?SET_POWER_RESTORE_POLICY},
+    Bin = <<4:8>>,
+    ?assertEqual(
+       {ok, [{supports_always_up, 1},
+             {supports_last_state, 0},
+             {supports_always_off, 0}]},
+       eipmi_response:decode(Resp, Bin)).
+
+decode_chassis_control_test() ->
+    Resp = {?IPMI_NETFN_CHASSIS_RESPONSE, ?CHASSIS_CONTROL},
+    Bin = <<>>,
+    ?assertEqual({ok, []}, eipmi_response:decode(Resp, Bin)).
+
+decode_chassis_identify_test() ->
+    Resp = {?IPMI_NETFN_CHASSIS_RESPONSE, ?CHASSIS_IDENTIFY},
+    Bin = <<>>,
+    ?assertEqual({ok, []}, eipmi_response:decode(Resp, Bin)).
+
+decode_chassis_reset_test() ->
+    Resp = {?IPMI_NETFN_CHASSIS_RESPONSE, ?CHASSIS_RESET},
+    Bin = <<>>,
+    ?assertEqual({ok, []}, eipmi_response:decode(Resp, Bin)).
+
+decode_set_chassis_caps_test() ->
+    Resp = {?IPMI_NETFN_CHASSIS_RESPONSE, ?SET_CHASSIS_CAPABILITIES},
+    Bin = <<>>,
+    ?assertEqual({ok, []}, eipmi_response:decode(Resp, Bin)).
+
+decode_chassis_set_front_panel_enables_test() ->
+    Resp = {?IPMI_NETFN_CHASSIS_RESPONSE, ?SET_FRONT_PANEL_ENABLES},
+    Bin = <<>>,
+    ?assertEqual({ok, []}, eipmi_response:decode(Resp, Bin)).
+
+decode_chassis_set_power_cycle_interval_test() ->
+    Resp = {?IPMI_NETFN_CHASSIS_RESPONSE, ?SET_POWER_CYCLE_INTERVAL},
+    Bin = <<>>,
+    ?assertEqual({ok, []}, eipmi_response:decode(Resp, Bin)).
+
 decode_get_picmg_properties_test() ->
     Resp = {?IPMI_NETFN_PICMG_RESPONSE, ?GET_PICMG_PROPERTIES},
     Bin = <<16#00, 16#12, 16#05, 16#6>>,

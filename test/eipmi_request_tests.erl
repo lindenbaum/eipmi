@@ -186,6 +186,82 @@ encode_get_sdr_test() ->
        <<16#22, 16#11, 16#44, 16#33, 16#00, 16#05>>,
        eipmi_request:encode(Req, Properties)).
 
+encode_chassis_control_test() ->
+    Req = {?IPMI_NETFN_CHASSIS_REQUEST, ?CHASSIS_CONTROL},
+    Properties = [{command, hard_reset}],
+    ?assertEqual(<<0:4, 3:4>>, eipmi_request:encode(Req, Properties)).
+
+encode_chassis_identify_force_test() ->
+    Req = {?IPMI_NETFN_CHASSIS_REQUEST, ?CHASSIS_IDENTIFY},
+    Properties = [{force, true}],
+    ?assertEqual(<<0:8, 1:8>>, eipmi_request:encode(Req, Properties)).
+
+encode_chassis_identify_off_test() ->
+    Req = {?IPMI_NETFN_CHASSIS_REQUEST, ?CHASSIS_IDENTIFY},
+    Properties = [{interval, 0}],
+    ?assertEqual(<<0:8>>, eipmi_request:encode(Req, Properties)).
+
+encode_chassis_identify_on_test() ->
+    Req = {?IPMI_NETFN_CHASSIS_REQUEST, ?CHASSIS_IDENTIFY},
+    Properties = [{interval, 30}, {force, false}],
+    ?assertEqual(<<30:8, 0:8>>, eipmi_request:encode(Req, Properties)).
+
+encode_get_chassis_caps_test() ->
+    Req = {?IPMI_NETFN_CHASSIS_REQUEST, ?GET_CHASSIS_CAPABILITIES},
+    ?assertEqual(<<>>, eipmi_request:encode(Req, [])).
+
+encode_set_chassis_caps_test() ->
+    Req = {?IPMI_NETFN_CHASSIS_REQUEST, ?SET_CHASSIS_CAPABILITIES},
+    Properties = [{lockout, true},
+                  {intrusion, true},
+                  {fru_address, 16#57},
+                  {sdr_address, 16#62},
+                  {sel_address, 16#a8},
+                  {sm_address, 16#bc},
+                  {bridge_address, 16#c4}],
+    ?assertEqual(<<3:8, 16#57:8, 16#62:8, 16#a8:8, 16#bc:8, 16#c4:8>>, eipmi_request:encode(Req, Properties)).
+
+encode_set_chassis_caps_no_bridge_test() ->
+    Req = {?IPMI_NETFN_CHASSIS_REQUEST, ?SET_CHASSIS_CAPABILITIES},
+    Properties = [{lockout, true},
+                  {intrusion, true},
+                  {fru_address, 16#57},
+                  {sdr_address, 16#62},
+                  {sel_address, 16#a8},
+                  {sm_address, 16#bc}],
+    ?assertEqual(<<3:8, 16#57:8, 16#62:8, 16#a8:8, 16#bc:8>>, eipmi_request:encode(Req, Properties)).
+
+encode_get_chassis_status_test() ->
+    Req = {?IPMI_NETFN_CHASSIS_REQUEST, ?GET_CHASSIS_STATUS},
+    ?assertEqual(<<>>, eipmi_request:encode(Req, [])).
+
+encode_chassis_reset_test() ->
+    Req = {?IPMI_NETFN_CHASSIS_REQUEST, ?CHASSIS_RESET},
+    ?assertEqual(<<>>, eipmi_request:encode(Req, [])).
+
+encode_chassis_control_reset_test() ->
+    Req = {?IPMI_NETFN_CHASSIS_REQUEST, ?CHASSIS_CONTROL},
+    Properties = [{command, hard_reset}],
+    ?assertEqual(<<0:4, 3:4>>, eipmi_request:encode(Req, Properties)).
+
+encode_chassis_power_cycle_interval_test() ->
+    Req = {?IPMI_NETFN_CHASSIS_REQUEST, ?SET_POWER_CYCLE_INTERVAL},
+    Properties = [{interval, 60}],
+    ?assertEqual(<<60:8>>, eipmi_request:encode(Req, Properties)).
+
+encode_chassis_restore_policy_test() ->
+    Req = {?IPMI_NETFN_CHASSIS_REQUEST, ?SET_POWER_RESTORE_POLICY},
+    Properties = [{policy, always_up}],
+    ?assertEqual(<<2:8>>, eipmi_request:encode(Req, Properties)).
+
+encode_get_system_restart_cause_test() ->
+    Req = {?IPMI_NETFN_CHASSIS_REQUEST, ?GET_SYSTEM_RESTART_CAUSE},
+    ?assertEqual(<<>>, eipmi_request:encode(Req, [])).
+
+encode_get_poh_count_test() ->
+    Req = {?IPMI_NETFN_CHASSIS_REQUEST, ?GET_POH_COUNTER},
+    ?assertEqual(<<>>, eipmi_request:encode(Req, [])).
+
 encode_get_picmg_properties_test() ->
     Req = {?IPMI_NETFN_PICMG_REQUEST, ?GET_PICMG_PROPERTIES},
     ?assertEqual(<<16#00>>, eipmi_request:encode(Req, [])).
