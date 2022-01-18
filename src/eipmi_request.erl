@@ -243,7 +243,7 @@ encode_transport(?GET_LAN_CONFIGURATION_PARAMETERS, Properties) ->
 %%------------------------------------------------------------------------------
 encode_chassis(?CHASSIS_CONTROL, Properties) ->
     C = proplists:get_value(command, Properties),
-    <<0:4, C:4>>;
+    <<0:4, (chassis_command(C)):4>>;
 encode_chassis(?CHASSIS_IDENTIFY, Properties) ->
     F = proplists:get_value(force, Properties),
     T = proplists:get_value(interval, Properties),
@@ -260,23 +260,23 @@ encode_chassis(?CHASSIS_IDENTIFY, Properties) ->
             <<0:8, 0:7, 1:1>>
     end;
 encode_chassis(?SET_CHASSIS_CAPABILITIES, Properties) ->
-    Lockout = propsist:get_bool(lockout, Properties),
+    Lockout = proplists:get_bool(lockout, Properties),
     L = case Lockout of true -> 1; false -> 0 end,
-    Intrusion = propslist:get_bool(intrusion, Properties),
+    Intrusion = proplists:get_bool(intrusion, Properties),
     I = case Intrusion of true -> 1; false -> 0 end,
-    F = propslist:get_value(fru_address, Properties),
-    Sdr = propslist:get_value(sdr_address, Properties),
-    Sel = propslist:get_value(sel_address, Properties),
-    Sm = propslist:get_value(sm_address, Properties),
+    F = proplists:get_value(fru_address, Properties),
+    Sdr = proplists:get_value(sdr_address, Properties),
+    Sel = proplists:get_value(sel_address, Properties),
+    Sm = proplists:get_value(sm_address, Properties),
     Acc = <<0:6, L:1, I:1, F:8, Sdr:8, Sel:8, Sm:8>>,
-    case propslist:get_value(bridge_address, Properties) of
+    case proplists:get_value(bridge_address, Properties) of
         undefined ->
             Acc;
         B ->
             <<Acc/binary, B:8>>
     end;
 encode_chassis(?SET_POWER_RESTORE_POLICY, Properties) ->
-    P = case propslist:get_value(policy, Properties) of
+    P = case proplists:get_value(policy, Properties) of
             no_change -> 3;
             always_up -> 2;
             last_state -> 1;
@@ -367,6 +367,16 @@ set_activation_policy(List) ->
     Set.
 set_activation_policy(true, {Set, Bit}) -> {Set + (1 bsl Bit), Bit + 1};
 set_activation_policy(_, {Set, Bit}) -> {Set, Bit + 1}.
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+chassis_command(power_down) -> 0;
+chassis_command(power_up) -> 1;
+chassis_command(power_cycle) -> 2;
+chassis_command(hard_reset) -> 3;
+chassis_command(diagnostic_interrupt) -> 4;
+chassis_command(acpi_shutdown) -> 5.
 
 %%------------------------------------------------------------------------------
 %% @private

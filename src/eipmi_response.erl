@@ -449,7 +449,7 @@ decode_chassis(Cmd, _)
        Cmd =:= ?SET_CHASSIS_CAPABILITIES orelse
        Cmd =:= ?SET_FRONT_PANEL_ENABLES orelse
        Cmd =:= ?SET_POWER_CYCLE_INTERVAL ->
-    <<>>.
+    [].
 
 %%------------------------------------------------------------------------------
 %% @private
