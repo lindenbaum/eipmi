@@ -26,48 +26,62 @@ none_test() ->
     AuthType = none,
     Unencrypted = <<"abcd">>,
     Encrypted = <<>>,
-    ?assertEqual(Encrypted, eipmi_auth:encrypt(AuthType, Unencrypted)),
+    ?assertEqual(Encrypted, eipmi_auth:hash(AuthType, Unencrypted)),
     ?assert(validate(AuthType, Unencrypted, Encrypted)).
 
 md2_test() ->
     AuthType = md2,
     Unencrypted = <<"abcd">>,
-    Encrypted = eipmi_auth:encrypt(AuthType, Unencrypted),
+    Encrypted = eipmi_auth:hash(AuthType, Unencrypted),
     ?assert(validate(AuthType, Unencrypted, Encrypted)).
 
 md5_test() ->
     AuthType = md5,
     Unencrypted = <<"abcd">>,
-    Encrypted = eipmi_auth:encrypt(AuthType, Unencrypted),
+    Encrypted = eipmi_auth:hash(AuthType, Unencrypted),
     ?assert(validate(AuthType, Unencrypted, Encrypted)).
 
 string_pwd_test() ->
     AuthType = pwd,
     Unencrypted = "abcd",
     Encrypted = <<"abcd", 0:(12*8)>>,
-    ?assertEqual(Encrypted, eipmi_auth:encrypt(AuthType, Unencrypted)),
+    ?assertEqual(Encrypted, eipmi_auth:hash(AuthType, Unencrypted)),
     ?assert(validate(AuthType, Unencrypted, Encrypted)).
 
 short_pwd_test() ->
     AuthType = pwd,
     Unencrypted = <<"abcd">>,
     Encrypted = <<"abcd", 0:(12*8)>>,
-    ?assertEqual(Encrypted, eipmi_auth:encrypt(AuthType, Unencrypted)),
+    ?assertEqual(Encrypted, eipmi_auth:hash(AuthType, Unencrypted)),
     ?assert(validate(AuthType, Unencrypted, Encrypted)).
 
 exact_pwd_test() ->
     AuthType = pwd,
     Unencrypted = <<"abcdefghijklmnop">>,
     Encrypted = <<"abcdefghijklmnop">>,
-    ?assertEqual(Encrypted, eipmi_auth:encrypt(AuthType, Unencrypted)),
+    ?assertEqual(Encrypted, eipmi_auth:hash(AuthType, Unencrypted)),
     ?assert(validate(AuthType, Unencrypted, Encrypted)).
 
 long_pwd_test() ->
     AuthType = pwd,
     Unencrypted = <<"abcdefghijklmnopqrstuvwxyz">>,
     Encrypted = <<"abcdefghijklmnop">>,
-    ?assertEqual(Encrypted, eipmi_auth:encrypt(AuthType, Unencrypted)),
+    ?assertEqual(Encrypted, eipmi_auth:hash(AuthType, Unencrypted)),
     ?assert(validate(AuthType, Unencrypted, Encrypted)).
+
+none_encryption_test() ->
+    EncryptType = none,
+    Key = <<>>,
+    Unencrypted = <<"abc">>,
+    ?assertEqual(Unencrypted, eipmi_auth:encrypt(EncryptType, Key, Unencrypted)),
+    ?assertEqual(Unencrypted, eipmi_auth:decrypt(EncryptType, Key, Unencrypted)).
+
+aes_encryption_test() ->
+    EncryptType = aes_cbc,
+    Key = crypto:strong_rand_bytes(16),
+    Unencrypted = <<"abcdefghijklmnopqrstuvwxyz">>,
+    Encrypted = eipmi_auth:encrypt(EncryptType, Key, Unencrypted),
+    ?assertEqual(Unencrypted, eipmi_auth:decrypt(EncryptType, Key, Encrypted)).
 
 %%%=============================================================================
 %%% internal functions
@@ -76,4 +90,4 @@ long_pwd_test() ->
 validate(none, _, _) ->
     true;
 validate(AuthType, Unencrypted, Encrypted) ->
-    eipmi_auth:encrypt(AuthType, Unencrypted) =:= Encrypted.
+    eipmi_auth:hash(AuthType, Unencrypted) =:= Encrypted.
