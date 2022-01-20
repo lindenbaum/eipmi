@@ -23,13 +23,24 @@
 
 -export([encrypt/3,
          decrypt/3,
+         encode_integrity_type/1,
+         encode_payload_type/1,
+         encode_rakp_type/1,
          encode_type/1,
+         decode_integrity_type/1,
+         decode_payload_type/1,
+         decode_rakp_type/1,
          decode_type/1,
-         hash/2
+         hash/2,
+         hash/3
         ]).
 
 -type encrypt_type() :: none | aes_cbc.
--type type() :: none | md2 | md5 | pwd | rmcp_plus.
+-type integrity_type() :: none | hmac_sha1 | hmac_md5 | md5 | hmac_sha256.
+-type payload_type() :: ipmi | open_session_rq | open_session_rs |
+                        rakp1 | rakp2 | rakp3 | rakp4.
+-type rakp_type() :: none | hmac_sha1 | hmac_md5 | hmac_sha256.
+-type type() :: none | md2 | md5 | pwd.
 
 -export_type([type/0]).
 
@@ -54,6 +65,18 @@ hash(md5, Binary) ->
     crypto:hash(md5, Binary);
 hash(pwd, Password) ->
     eipmi_util:normalize(16, Password).
+
+-spec hash(integrity_type(), binary(), binary()) -> binary().
+hash(none, _Key, _Ignored) ->
+    <<>>;
+hash(hmac_sha1, Key, Binary) ->
+    crypto:mac(hmac, sha, Key, Binary);
+hash(hmac_md5, Key, Binary) ->
+    crypto:mac(hmac, md5, Key, Binary);
+hash(md5, Key, Binary) ->
+    crypto:hash(md5, <<Key/binary, Binary/binary, Key/binary>>);
+hash(hmac_sha256, Key, Binary) ->
+    crypto:mac(hmac, sha256, Key, Binary).
 
 %%-------------------------------------------------------------------------------
 %% @doc
@@ -88,6 +111,42 @@ decrypt(aes_cbc, Key, <<Iv:16/binary, Encrypted/binary>>) ->
 
 %%------------------------------------------------------------------------------
 %% @doc
+%% Encodes an integrity algorithm into its integer representation.
+%% @end
+%%------------------------------------------------------------------------------
+-spec encode_integrity_type(integrity_type()) -> 0..4.
+encode_integrity_type(none) -> 0;
+encode_integrity_type(hmac_sha1) -> 1;
+encode_integrity_type(hmac_md5) -> 2;
+encode_integrity_type(md5) -> 3;
+encode_integrity_type(hmac_sha256) -> 4.
+
+%%------------------------------------------------------------------------------
+%% @doc
+%% Encodes a payload type into its integer representation.
+%% @end
+%%------------------------------------------------------------------------------
+-spec encode_payload_type(payload_type()) -> 0 | 16..21.
+encode_payload_type(ipmi) -> 0;
+encode_payload_type(open_session_rq) -> 16#10;
+encode_payload_type(open_session_rs) -> 16#11;
+encode_payload_type(rakp1) -> 16#12;
+encode_payload_type(rakp2) -> 16#13;
+encode_payload_type(rakp3) -> 16#14;
+encode_payload_type(rakp4) -> 16#15.
+
+%%-------------------------------------------------------------------------------
+%% @doc
+%% Encodes a RAKP algorithm into its integer representation.
+%% @end
+%%-------------------------------------------------------------------------------
+encode_rakp_type(none) -> 0;
+encode_rakp_type(hmac_sha1) -> 1;
+encode_rakp_type(hmac_md5) -> 2;
+encode_rakp_type(hmac_sha256) -> 3.
+
+%%------------------------------------------------------------------------------
+%% @doc
 %% Encodes an authentication type into its integer representation.
 %% @end
 %%------------------------------------------------------------------------------
@@ -97,6 +156,42 @@ encode_type(md2) -> 1;
 encode_type(md5) -> 2;
 encode_type(pwd) -> 4;
 encode_type(rmcp_plus) -> 6.
+
+%%------------------------------------------------------------------------------
+%% @doc
+%% Decodes an integrity algorithm integer into human readable format.
+%% @end
+%%------------------------------------------------------------------------------
+-spec decode_integrity_type(integrity_type()) -> 0..4.
+decode_integrity_type(none) -> 0;
+decode_integrity_type(hmac_sha1) -> 1;
+decode_integrity_type(hmac_md5) -> 2;
+decode_integrity_type(md5) -> 3;
+decode_integrity_type(hmac_sha256) -> 4.
+
+%%------------------------------------------------------------------------------
+%% @doc
+%% Decodes a payload type integer into human readable format.
+%% @end
+%%------------------------------------------------------------------------------
+-spec decode_payload_type(0 | 16..21) -> payload_type().
+decode_payload_type(0) -> ipmi;
+decode_payload_type(16#10) -> open_session_rq;
+decode_payload_type(16#11) -> open_session_rs;
+decode_payload_type(16#12) -> rakp1;
+decode_payload_type(16#13) -> rakp2;
+decode_payload_type(16#14) -> rakp3;
+decode_payload_type(16#15) -> rakp4.
+
+%%-------------------------------------------------------------------------------
+%% @doc
+%% Decodes a RAKP algorithm integer into human readable format.
+%% @end
+%%-------------------------------------------------------------------------------
+decode_rakp_type(0) -> none;
+decode_rakp_type(1) -> hmac_sha1;
+decode_rakp_type(2) -> hmac_md5;
+decode_rakp_type(3) -> hmac_sha256.
 
 %%------------------------------------------------------------------------------
 %% @doc

@@ -69,6 +69,49 @@ long_pwd_test() ->
     ?assertEqual(Encrypted, eipmi_auth:hash(AuthType, Unencrypted)),
     ?assert(validate(AuthType, Unencrypted, Encrypted)).
 
+hmac_md5_test() ->
+    HashType = hmac_md5,
+    Key =
+        <<16#37, 16#8d, 16#60, 16#63, 16#fe, 16#16,
+          16#05, 16#2c, 16#cc, 16#40, 16#bf, 16#88,
+          16#92, 16#af, 16#28, 16#4a>>,
+    Clear = <<"abcdefghijklmnopqrstuvwxyz">>,
+    Hashed =
+        <<16#04, 16#c0, 16#46, 16#ef, 16#75, 16#a1,
+          16#ff, 16#11, 16#db, 16#4d, 16#f3, 16#b2,
+          16#39, 16#21, 16#20, 16#59>>,
+    ?assertEqual(Hashed, eipmi_auth:hash(HashType, Key, Clear)).
+
+hmac_sha1_test() ->
+    HashType = hmac_sha1,
+    Key =
+        <<16#37, 16#8d, 16#60, 16#63, 16#fe, 16#16,
+          16#05, 16#2c, 16#cc, 16#40, 16#bf, 16#88,
+          16#92, 16#af, 16#28, 16#4a>>,
+    Clear = <<"abcdefghijklmnopqrstuvwxyz">>,
+    Hashed =
+        <<16#82, 16#5b, 16#5b, 16#c1, 16#7b, 16#56,
+          16#f9, 16#d9, 16#27, 16#72, 16#76, 16#07,
+          16#3c, 16#c6, 16#64, 16#d4, 16#71, 16#d6,
+          16#78, 16#74>>,
+    ?assertEqual(Hashed, eipmi_auth:hash(HashType, Key, Clear)).
+
+hmac_sha256_test() ->
+    HashType = hmac_sha256,
+    Key =
+        <<16#37, 16#8d, 16#60, 16#63, 16#fe, 16#16,
+          16#05, 16#2c, 16#cc, 16#40, 16#bf, 16#88,
+          16#92, 16#af, 16#28, 16#4a>>,
+    Clear = <<"abcdefghijklmnopqrstuvwxyz">>,
+    Hashed =
+        <<16#33, 16#ca, 16#58, 16#57, 16#8a, 16#fc,
+          16#86, 16#e6, 16#6d, 16#24, 16#8d, 16#98,
+          16#0f, 16#6d, 16#8d, 16#06, 16#1c, 16#af,
+          16#b0, 16#dd, 16#5f, 16#e7, 16#3e, 16#a6,
+          16#ec, 16#cd, 16#72, 16#09, 16#d1, 16#d7,
+          16#3b, 16#24>>,
+    ?assertEqual(Hashed, eipmi_auth:hash(HashType, Key, Clear)).
+
 none_encryption_test() ->
     EncryptType = none,
     Key = <<>>,
