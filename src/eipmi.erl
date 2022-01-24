@@ -45,6 +45,17 @@
          send_message/7,
          get_system_guid/1,
          set_session_privilege_level/2,
+         chassis_control/2,
+         chassis_identify/2,
+         set_chassis_capabilities/5,
+         set_chassis_capabilities/6,
+         get_chassis_capabilities/1,
+         get_chassis_status/1,
+         disable_front_panel_buttons/5,
+         set_power_restore_policy/2,
+         set_power_cycle_interval/2,
+         get_system_restart_cause/1,
+         get_poh_counter/1,
          read_fru/2,
          read_frus/2,
          read_fru_inventory/2,
@@ -103,6 +114,16 @@
 -type response() :: {resp_net_fn(), Command :: 0..255}.
 
 -type privilege() :: callback | user | operator | administrator.
+
+-type chassis_command() :: power_down | power_up | power_cycle | hard_reset | diagnostic_interrupt | acpi_shutdown.
+
+-type power_policy() :: no_change | always_on | last_state | always_off.
+
+-type restart_cause() ::
+        unknown | control_command | reset_button | power_button |
+        watchdog_expired | oem | always_on_restore_policy |
+        last_state_restore_policy | pef_reset | pef_power_cycle | soft_reset |
+        clock_wakeup.
 
 -type option_name() ::
         initial_outbound_seq_nr | keep_alive_retransmits | password | port |
@@ -243,6 +264,9 @@
               request/0,
               response/0,
               privilege/0,
+              chassis_command/0,
+              power_policy/0,
+              restart_cause/0,
               option/0,
               option_name/0,
               fru_info/0,
@@ -622,6 +646,141 @@ set_session_privilege_level(Session, Privilege) ->
     Args = [{privilege, Privilege}],
     Command = ?SET_SESSION_PRIVILEGE_LEVEL,
     raw(Session, ?IPMI_NETFN_APPLICATION_REQUEST, Command, Args).
+
+%%------------------------------------------------------------------------------
+%% @doc
+%% Issues the given command to the chassis, affecting its power state.
+%% @end
+%%------------------------------------------------------------------------------
+-spec chassis_control(session(), chassis_command()) -> ok | {error, term()}.
+chassis_control(Session, Cmd) ->
+    Args = [{command, Cmd}],
+    Command = ?CHASSIS_CONTROL,
+    raw(Session, ?IPMI_NETFN_CHASSIS_REQUEST, Command, Args).
+
+%%------------------------------------------------------------------------------
+%% @doc
+%% Causes LEDs on the chassis to blink for `Interval` seconds. `true` may be
+%% given to cause the LED to blink indefinitely. Send an Interval of `0` to
+%% turn it off.
+%% @end
+%%------------------------------------------------------------------------------
+-spec chassis_identify(session(), byte() | true) -> ok | {error, term()}.
+chassis_identify(Session, true) ->
+    Args = [{force, true}],
+    Command = ?CHASSIS_IDENTIFY,
+    raw(Session, ?IPMI_NETFN_CHASSIS_REQUEST, Command, Args);
+chassis_identify(Session, Interval) ->
+    Args = [{interval, Interval}],
+    Command = ?CHASSIS_IDENTIFY,
+    raw(Session, ?IPMI_NETFN_CHASSIS_REQUEST, Command, Args).
+
+%%------------------------------------------------------------------------------
+%% @doc
+%% Sets the capabilities of the chassis recorded in non-volatile storage. This
+%% version sets `lockout` and `intrusion` to `false` and the Bridge address
+%% left unset. See {@link set_chassis_capabilities/6} for more info.
+%% @end
+%%------------------------------------------------------------------------------
+-spec set_chassis_capabilities(session(), byte(), byte(), byte(), byte()) -> ok | {error, term()}.
+set_chassis_capabilities(Session, FruAddr, SdrAddr, SelAddr, SmAddr) ->
+    set_chassis_capabilities(Session, FruAddr, SdrAddr, SelAddr, SmAddr, []).
+
+%%------------------------------------------------------------------------------
+%% @doc
+%% Sets the capabilities of the chassis recorded in non-volatile storage. In addition to the device addresses, `Extra` may have the following properties:
+%% - `lockout` - boolean() - chassis provides front-panel lockout. Default: false
+%% - `intrusion` - boolean() - chassis has intrusion detection sensor. Default: false
+%% - `bridge_address` - byte() - location of ICMB bridge function. If not
+%%   provided, assumed to be the BMC address (0x20).
+%% @end
+%%------------------------------------------------------------------------------
+-spec set_chassis_capabilities(session(), byte(), byte(), byte(), byte(), proplists:proplist()) -> ok | {error, term()}.
+set_chassis_capabilities(Session, FruAddr, SdrAddr, SelAddr, SmAddr, Extra) ->
+    Args = [{fru_address, FruAddr},
+            {sdr_address, SdrAddr},
+            {sel_address, SelAddr},
+            {sm_address, SmAddr} | Extra],
+    Command = ?SET_CHASSIS_CAPABILITIES,
+    raw(Session, ?IPMI_NETFN_CHASSIS_REQUEST, Command, Args).
+
+%%------------------------------------------------------------------------------
+%% @doc
+%% Returns the capabilities reported by the Chassis device as a proplist. In
+%% addition to those modifiable by {@link set_chassis_capabilities/6}, also
+%% reports whether it has apower interlock (`interlock`) and diagnostic
+%% interrupt (`diagnostic`).
+%% @end
+%%------------------------------------------------------------------------------
+-spec get_chassis_capabilities(session()) -> {ok, proplists:proplist()} | {error, term()}.
+get_chassis_capabilities(Session) ->
+    raw(Session, ?IPMI_NETFN_CHASSIS_REQUEST, ?GET_CHASSIS_CAPABILITIES, []).
+
+%%------------------------------------------------------------------------------
+%% @doc
+%% Returns high-level status of chassis and main power subsystem.
+%% @end
+%%------------------------------------------------------------------------------
+-spec get_chassis_status(session()) -> {ok, proplists:proplist()} | {error, term()}.
+get_chassis_status(Session) ->
+    raw(Session, ?IPMI_NETFN_CHASSIS_REQUEST, ?GET_CHASSIS_STATUS, []).
+
+%%-------------------------------------------------------------------------------
+%% @doc
+%% Issues a "Set Front Panel Enables" request by specifying `true` for each
+%% button to *disable*.
+%%-------------------------------------------------------------------------------
+-spec disable_front_panel_buttons(session(), boolean(), boolean(), boolean(), boolean()) -> ok | {error, term()}.
+disable_front_panel_buttons(Session, Standby, Diagnostic, Reset, Power) ->
+    Args = [{disable_standby, Standby},
+            {disable_diagnostic_interrupt, Diagnostic},
+            {disable_reset, Reset},
+            {disable_power, Power}],
+    Command = ?SET_FRONT_PANEL_ENABLES,
+    raw(Session, ?IPMI_NETFN_CHASSIS_REQUEST, Command, Args).
+
+%%-------------------------------------------------------------------------------
+%% @doc
+%% Sets the behavior of the power subsystem when AC power is restored.
+%% @end
+%%-------------------------------------------------------------------------------
+-spec set_power_restore_policy(session(), power_policy()) -> {ok, proplists:proplist()} | {error, term()}.
+set_power_restore_policy(Session, Policy) ->
+    Args = [{policy, Policy}],
+    Command = ?SET_POWER_RESTORE_POLICY,
+    raw(Session, ?IPMI_NETFN_CHASSIS_REQUEST, Command, Args).
+
+%%-------------------------------------------------------------------------------
+%% @doc
+%% Sets the amount of time the BMC will keep the device off during a power
+%% cycle event, in seconds.
+%% @end
+%%-------------------------------------------------------------------------------
+-spec set_power_cycle_interval(session(), byte()) -> ok | {error, term()}.
+set_power_cycle_interval(Session, Interval) ->
+    Args = [{interval, Interval}],
+    Command = ?SET_POWER_CYCLE_INTERVAL,
+    raw(Session, ?IPMI_NETFN_CHASSIS_REQUEST, Command, Args).
+
+%%-------------------------------------------------------------------------------
+%% @doc
+%% Returns information about what caused the system to restart. The return
+%% value contains `restart_cause` and `channel` properties.
+%% @end
+%%-------------------------------------------------------------------------------
+-spec get_system_restart_cause(session()) -> {ok, proplists:proplist()} | {error, term()}.
+get_system_restart_cause(Session) ->
+    raw(Session, ?IPMI_NETFN_CHASSIS_REQUEST, ?GET_SYSTEM_RESTART_CAUSE, []).
+
+%%-------------------------------------------------------------------------------
+%% @doc
+%% Gets the "Power-On Hours" counter. The return value contains `counter` and
+%% `minutes_per_count` properties.
+%% @end
+%%-------------------------------------------------------------------------------
+-spec get_poh_counter(session()) -> {ok, proplists:proplist()} | {error, term()}.
+get_poh_counter(Session) ->
+    raw(Session, ?IPMI_NETFN_CHASSIS_REQUEST, ?GET_POH_COUNTER, []).
 
 %%------------------------------------------------------------------------------
 %% @doc
