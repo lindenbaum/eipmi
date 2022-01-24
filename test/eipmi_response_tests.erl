@@ -315,7 +315,7 @@ decode_chassis_set_power_restore_policy_test() ->
     Resp = {?IPMI_NETFN_CHASSIS_RESPONSE, ?SET_POWER_RESTORE_POLICY},
     Bin = <<4:8>>,
     ?assertEqual(
-       {ok, [{supports_always_up, 1},
+       {ok, [{supports_always_on, 1},
              {supports_last_state, 0},
              {supports_always_off, 0}]},
        eipmi_response:decode(Resp, Bin)).

@@ -278,7 +278,7 @@ encode_chassis(?SET_CHASSIS_CAPABILITIES, Properties) ->
 encode_chassis(?SET_POWER_RESTORE_POLICY, Properties) ->
     P = case proplists:get_value(policy, Properties) of
             no_change -> 3;
-            always_up -> 2;
+            always_on -> 2;
             last_state -> 1;
             always_off -> 0
         end,

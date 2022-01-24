@@ -439,7 +439,7 @@ decode_chassis(?GET_SYSTEM_RESTART_CAUSE, <<?EIPMI_RESERVED:4, Cause:4,
      {channel, Channel}];
 decode_chassis(?SET_POWER_RESTORE_POLICY, <<?EIPMI_RESERVED:5, PowerUp:1,
                                             LastState:1, PowerOff:1>>) ->
-    [{supports_always_up, PowerUp},
+    [{supports_always_on, PowerUp},
      {supports_last_state, LastState},
      {supports_always_off, PowerOff}];
 decode_chassis(Cmd, _)

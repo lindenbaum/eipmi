@@ -251,7 +251,7 @@ encode_chassis_power_cycle_interval_test() ->
 
 encode_chassis_restore_policy_test() ->
     Req = {?IPMI_NETFN_CHASSIS_REQUEST, ?SET_POWER_RESTORE_POLICY},
-    Properties = [{policy, always_up}],
+    Properties = [{policy, always_on}],
     ?assertEqual(<<2:8>>, eipmi_request:encode(Req, Properties)).
 
 encode_get_system_restart_cause_test() ->
