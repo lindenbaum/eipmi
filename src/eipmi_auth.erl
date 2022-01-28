@@ -15,7 +15,8 @@
 %%%
 %%% @doc
 %%% A module providing the supported authentication algorithms for IPMI packets.
-%%% Currently supported algorithms are MD2, MD5 and straight password.
+%%% Currently supported algorithms are MD2, MD5, straight password, and those
+%%% specified in RMCP+.
 %%% @end
 %%%=============================================================================
 
@@ -69,14 +70,15 @@ hash(pwd, Password) ->
 -spec hash(integrity_type(), binary(), binary()) -> binary().
 hash(none, _Key, _Ignored) ->
     <<>>;
-hash(hmac_sha1, Key, Binary) ->
-    crypto:mac(hmac, sha, Key, Binary);
-hash(hmac_md5, Key, Binary) ->
-    crypto:mac(hmac, md5, Key, Binary);
 hash(md5, Key, Binary) ->
     crypto:hash(md5, <<Key/binary, Binary/binary, Key/binary>>);
-hash(hmac_sha256, Key, Binary) ->
-    crypto:mac(hmac, sha256, Key, Binary).
+hash(HashType, Key, Binary) ->
+    Algo = hash_algo(HashType),
+    crypto:mac(hmac, Algo, Key, Binary).
+
+hash_algo(hmac_md5) -> md5;
+hash_algo(hmac_sha1) -> sha;
+hash_algo(hmac_sha256) -> sha256.
 
 %%-------------------------------------------------------------------------------
 %% @doc
@@ -140,6 +142,7 @@ encode_payload_type(rakp4) -> 16#15.
 %% Encodes a RAKP algorithm into its integer representation.
 %% @end
 %%-------------------------------------------------------------------------------
+-spec encode_rakp_type(rakp_type()) -> 0..3.
 encode_rakp_type(none) -> 0;
 encode_rakp_type(hmac_sha1) -> 1;
 encode_rakp_type(hmac_md5) -> 2;
@@ -150,7 +153,7 @@ encode_rakp_type(hmac_sha256) -> 3.
 %% Encodes an authentication type into its integer representation.
 %% @end
 %%------------------------------------------------------------------------------
--spec encode_type(type()) -> 0..6.
+-spec encode_type(type() | rmcp_plus) -> 0..4 | 6.
 encode_type(none) -> 0;
 encode_type(md2) -> 1;
 encode_type(md5) -> 2;
@@ -188,6 +191,7 @@ decode_payload_type(16#15) -> rakp4.
 %% Decodes a RAKP algorithm integer into human readable format.
 %% @end
 %%-------------------------------------------------------------------------------
+-spec decode_rakp_type(0..3) -> rakp_type().
 decode_rakp_type(0) -> none;
 decode_rakp_type(1) -> hmac_sha1;
 decode_rakp_type(2) -> hmac_md5;
@@ -198,7 +202,7 @@ decode_rakp_type(3) -> hmac_sha256.
 %% Decodes an authentication type integer into human readable format.
 %% @end
 %%------------------------------------------------------------------------------
--spec decode_type(0..6) -> type().
+-spec decode_type(0..4 | 6) -> type() | rmcp_plus.
 decode_type(0) -> none;
 decode_type(1) -> md2;
 decode_type(2) -> md5;
