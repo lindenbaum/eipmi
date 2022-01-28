@@ -66,10 +66,42 @@ ping(Header = #rmcp_header{class = ?RMCP_ASF}, #asf_ping{iana = I, tag = T}) ->
                   binary().
 ipmi(Header = #rmcp_header{class = ?RMCP_IPMI}, Properties, Req, Data) ->
     HeaderBin = header(Header, ?RMCP_NORMAL),
-    SessionBin = session(Properties, Data),
-    RequestBin = request(Properties, Req, Data),
-    Length = size(RequestBin),
-    <<HeaderBin/binary, SessionBin/binary, Length:8, RequestBin/binary>>.
+    case proplists:get_value(auth_type, Properties) of
+        rmcp_plus ->
+            E = proplists:get_value(encrypt_type, Properties),
+            H = proplists:get_value(hash_type, Properties),
+            SIK = proplists:get_value(session_key, Properties),
+            K2 = eipmi_auth:extra_key(E, H, SIK),
+
+            SessionBin = session2(Properties),
+            RequestBin = request(Properties, Req, Data),
+            Encrypted = eipmi_auth:encrypt(E, K2, RequestBin),
+            Length = size(Encrypted),
+            ToHash = <<SessionBin/binary, Length:16/little, Encrypted/binary>>,
+            % AuthCode needs payload to be a multiple of 4 bytes, but we add 2
+            % bytes for the padding length itself and the NextHeader field.
+            % PadLength = (6 - size(ToHash) rem 4) rem 4,
+            PadLength = case size(ToHash) rem 4 of
+                            0 -> 2;
+                            1 -> 1;
+                            2 -> 0;
+                            3 -> 3
+                        end,
+            Padding = binary:copy(<<255>>, PadLength),
+            NextHeader = 7,
+            K1 = eipmi_auth:extra_key(1, H, SIK),
+            Hashed = <<ToHash/binary, Padding/binary, PadLength:8, NextHeader:8>>,
+            AuthCode = eipmi_auth:hash(H, K1, Hashed),
+            <<HeaderBin/binary, SessionBin/binary, Hashed/binary, AuthCode/binary>>;
+        AuthType ->
+            S = proplists:get_value(inbound_seq_nr, Properties),
+            I = proplists:get_value(session_id, Properties),
+            P = proplists:get_value(password, Properties),
+            SessionBin = session1(AuthType, S, I, P, Data),
+            RequestBin = request(Properties, Req, Data),
+            Length = size(RequestBin),
+            <<HeaderBin/binary, SessionBin/binary, Length:8, RequestBin/binary>>
+    end.
 
 %%------------------------------------------------------------------------------
 %% @doc
@@ -100,32 +132,45 @@ header(#rmcp_header{version = V, seq_nr = S, class = C}, Ack) ->
 
 %%------------------------------------------------------------------------------
 %% @private
-%%------------------------------------------------------------------------------
-session(Properties, Data) ->
-    S = proplists:get_value(inbound_seq_nr, Properties),
-    I = proplists:get_value(session_id, Properties),
-    P = proplists:get_value(password, Properties),
-    AuthType = proplists:get_value(auth_type, Properties),
-    session(AuthType, S, I, P, Data).
-
-%%------------------------------------------------------------------------------
-%% @private
 %% This will also do the authentication according to the multi session
 %% authentication.
 %%------------------------------------------------------------------------------
-session(none, S, I, _P, _Data) ->
+% v1.5
+session1(none, S, I, _P, _Data) ->
     Type = eipmi_auth:encode_type(none),
     <<0:4, Type:4, S:32/little, I:32/little>>;
-session(pwd, S, I, P, _Data) ->
+session1(pwd, S, I, P, _Data) ->
     Type = eipmi_auth:encode_type(pwd),
-    C = eipmi_auth:encrypt(pwd, P),
+    C = eipmi_auth:hash(pwd, P),
     <<0:4, Type:4, S:32/little, I:32/little, C/binary>>;
-session(T, S, I, P, Data) ->
+session1(T, S, I, P, Data) ->
     Type = eipmi_auth:encode_type(T),
     C = eipmi_util:normalize(16, P),
-    ToEncrypt = <<C/binary, I:32/little, Data/binary, S:32/little, C/binary>>,
-    Ci = eipmi_auth:encrypt(T, ToEncrypt),
+    ToHash = <<C/binary, I:32/little, Data/binary, S:32/little, C/binary>>,
+    Ci = eipmi_auth:hash(T, ToHash),
     <<0:4, Type:4, S:32/little, I:32/little, Ci/binary>>.
+
+% v2.0
+session2(Properties) ->
+    I = proplists:get_value(session_id, Properties, <<0:32>>),
+    E = proplists:get_value(encrypt_type, Properties, none),
+    P = proplists:get_value(payload_type, Properties),
+    AuthType = eipmi_auth:encode_type(rmcp_plus),
+    Pt = eipmi_auth:encode_payload_type(P),
+    {Authenticated, Seq} = case I of
+                        <<0:32>> -> {0, inbound_unauth_seq_nr};
+                        _ -> {1, inbound_auth_seq_nr}
+                    end,
+    S = proplists:get_value(Seq, Properties),
+    % Even if we have determined what encryption algorithm to use in the middle
+    % of the RAKP process, we still don't encrypt the messages until the
+    % session is fully activated.
+    Encrypted = case {E, P} of
+                    {none, ipmi} -> 0;
+                    {_, ipmi} -> 1;
+                    _ -> 0
+                end,
+    <<AuthType:8, Encrypted:1, Authenticated:1, Pt:6, I:32/little, S:32/little>>.
 
 %%------------------------------------------------------------------------------
 %% @private
