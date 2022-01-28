@@ -339,7 +339,7 @@ decode_storage(Cmd,
      {free_space, get_free_space(Cmd, Free)},
      {most_recent_addition, Addition},
      {most_recent_erase, Erase},
-     {overflow, case Overflow of 1 -> true; 0 -> false end},
+     {overflow, eipmi_util:get_bool(Overflow)},
      {operations, get_operations(Operations)}];
 decode_storage(Cmd, <<Reservation:16/little>>)
   when Cmd =:= ?RESERVE_SEL orelse Cmd =:= ?RESERVE_SDR_REPOSITORY ->
@@ -383,10 +383,10 @@ decode_chassis(?GET_CHASSIS_CAPABILITIES, <<?EIPMI_RESERVED:4, L:1, D:1, F:1,
             <<Bridge:8>> ->
                [{bridge_address, Bridge}]
            end,
-    [{interlock, case L of 1 -> true; 0 -> false end},
-     {lockout, case F of 1 -> true; 0 -> false end},
-     {diagnostic, case D of 1 -> true; 0 -> false end},
-     {intrusion, case I of 1 -> true; 0 -> false end},
+    [{interlock, eipmi_util:get_bool(L)},
+     {lockout, eipmi_util:get_bool(F)},
+     {diagnostic, eipmi_util:get_bool(D)},
+     {intrusion, eipmi_util:get_bool(I)},
      {fru_address, Fru},
      {sdr_address, Sdr},
      {sel_address, Sel},
