@@ -33,7 +33,8 @@
          decode_rakp_type/1,
          decode_type/1,
          hash/2,
-         hash/3
+         hash/3,
+         extra_key/3
         ]).
 
 -type encrypt_type() :: none | aes_cbc.
@@ -76,9 +77,24 @@ hash(HashType, Key, Binary) ->
     Algo = hash_algo(HashType),
     crypto:mac(hmac, Algo, Key, Binary).
 
+-spec extra_key(encrypt_type() | 1..255, integrity_type(), binary()) -> binary().
+extra_key(none, _Ht, _Sk) ->
+    <<>>;
+extra_key(aes_cbc, Ht, Sk) ->
+    extra_key(2, Ht, Sk);
+extra_key(N, HashType, SessionKey) ->
+    Algo = hash_algo(HashType),
+    L = block_size(Algo),
+    Const = binary:copy(<<N:8>>, L),
+    crypto:macN(hmac, Algo, SessionKey, Const, L).
+
 hash_algo(hmac_md5) -> md5;
 hash_algo(hmac_sha1) -> sha;
 hash_algo(hmac_sha256) -> sha256.
+
+block_size(Algo) ->
+    #{block_size := S} = crypto:hash_info(Algo),
+    S.
 
 %%-------------------------------------------------------------------------------
 %% @doc
