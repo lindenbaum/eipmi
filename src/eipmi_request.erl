@@ -45,6 +45,8 @@ encode({?IPMI_NETFN_STORAGE_REQUEST, Cmd}, Properties) ->
     encode_storage(Cmd, Properties);
 encode({?IPMI_NETFN_TRANSPORT_REQUEST, Cmd}, Properties) ->
     encode_transport(Cmd, Properties);
+encode({?IPMI_NETFN_CHASSIS_REQUEST, Cmd}, Properties) ->
+    encode_chassis(Cmd, Properties);
 encode({?IPMI_NETFN_PICMG_REQUEST, Cmd}, Properties) ->
     encode_picmg(Cmd, Properties);
 encode({NetFn, Cmd}, Properties) when NetFn >= 16#2e ->
@@ -239,6 +241,72 @@ encode_transport(?GET_LAN_CONFIGURATION_PARAMETERS, Properties) ->
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
+encode_chassis(?CHASSIS_CONTROL, Properties) ->
+    C = proplists:get_value(command, Properties),
+    <<0:4, (chassis_command(C)):4>>;
+encode_chassis(?CHASSIS_IDENTIFY, Properties) ->
+    F = proplists:get_value(force, Properties),
+    T = proplists:get_value(interval, Properties),
+    case {T, F} of
+        {undefined, undefined} ->
+            <<>>;
+        {T, undefined} ->
+            <<T:8>>;
+        {undefined, false} ->
+            <<0:8, 0:7, 0:1>>;
+        {T, false} ->
+            <<T:8, 0:7, 0:1>>;
+        {_, true} ->
+            <<0:8, 0:7, 1:1>>
+    end;
+encode_chassis(?SET_CHASSIS_CAPABILITIES, Properties) ->
+    Lockout = proplists:get_bool(lockout, Properties),
+    L = case Lockout of true -> 1; false -> 0 end,
+    Intrusion = proplists:get_bool(intrusion, Properties),
+    I = case Intrusion of true -> 1; false -> 0 end,
+    F = proplists:get_value(fru_address, Properties),
+    Sdr = proplists:get_value(sdr_address, Properties),
+    Sel = proplists:get_value(sel_address, Properties),
+    Sm = proplists:get_value(sm_address, Properties),
+    Acc = <<0:6, L:1, I:1, F:8, Sdr:8, Sel:8, Sm:8>>,
+    case proplists:get_value(bridge_address, Properties) of
+        undefined ->
+            Acc;
+        B ->
+            <<Acc/binary, B:8>>
+    end;
+encode_chassis(?SET_POWER_RESTORE_POLICY, Properties) ->
+    P = case proplists:get_value(policy, Properties) of
+            no_change -> 3;
+            always_on -> 2;
+            last_state -> 1;
+            always_off -> 0
+        end,
+    <<0:5, P:3>>;
+encode_chassis(?SET_FRONT_PANEL_ENABLES, Properties) ->
+    Standby = proplists:get_bool(disable_standby, Properties),
+    S = case Standby of true -> 1; false -> 0 end,
+    Diagnostic = proplists:get_bool(disable_diagnostic_interrupt, Properties),
+    D = case Diagnostic of true -> 1; false -> 0 end,
+    Reset = proplists:get_bool(disable_reset, Properties),
+    R = case Reset of true -> 1; false -> 0 end,
+    Power = proplists:get_bool(disable_power, Properties),
+    P = case Power of true -> 1; false -> 0 end,
+    <<0:4, S:1, D:1, R:1, P:1>>;
+encode_chassis(?SET_POWER_CYCLE_INTERVAL, Properties) ->
+    I = proplists:get_value(interval, Properties, 0),
+    <<I:8>>;
+encode_chassis(Req, _Properties)
+  when Req =:= ?GET_CHASSIS_CAPABILITIES orelse
+       Req =:= ?GET_CHASSIS_STATUS orelse
+       Req =:= ?CHASSIS_RESET orelse
+       Req =:= ?GET_SYSTEM_RESTART_CAUSE orelse
+       Req =:= ?GET_POH_COUNTER ->
+    <<>>.
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
 encode_picmg(?GET_PICMG_PROPERTIES, _Properties) ->
     <<?PICMG_ID:8>>;
 encode_picmg(?GET_ADDRESS_INFO, Properties) ->
@@ -299,6 +367,16 @@ set_activation_policy(List) ->
     Set.
 set_activation_policy(true, {Set, Bit}) -> {Set + (1 bsl Bit), Bit + 1};
 set_activation_policy(_, {Set, Bit}) -> {Set, Bit + 1}.
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+chassis_command(power_down) -> 0;
+chassis_command(power_up) -> 1;
+chassis_command(power_cycle) -> 2;
+chassis_command(hard_reset) -> 3;
+chassis_command(diagnostic_interrupt) -> 4;
+chassis_command(acpi_shutdown) -> 5.
 
 %%------------------------------------------------------------------------------
 %% @private

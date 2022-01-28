@@ -90,6 +90,16 @@
 -define(ASF_NOREPLY, 255).
 
 %%------------------------------------------------------------------------------
+%% The IPMI net function for chassis requests.
+%%------------------------------------------------------------------------------
+-define(IPMI_NETFN_CHASSIS_REQUEST, 16#00).
+
+%%------------------------------------------------------------------------------
+%% The IPMI net function for chassis responses.
+%%------------------------------------------------------------------------------
+-define(IPMI_NETFN_CHASSIS_RESPONSE, 16#01).
+
+%%------------------------------------------------------------------------------
 %% The IPMI net function for sensor and event requests (length is 6bits).
 %%------------------------------------------------------------------------------
 -define(IPMI_NETFN_SENSOR_EVENT_REQUEST, 16#04).
@@ -249,6 +259,21 @@
 -define(GET_USER_NAME, 16#46).                                      %% mandatory
 -define(SET_USER_PASSWORD, 16#47).                                  %% mandatory
 -define(MASTER_WRITE_READ, 16#52).                                  %% mandatory
+
+%% Chassis
+-define(GET_CHASSIS_CAPABILITIES, 16#00).                           %% mandatory
+-define(GET_CHASSIS_STATUS, 16#01).                                 %% mandatory
+-define(CHASSIS_CONTROL, 16#02).                                    %% mandatory
+-define(CHASSIS_RESET, 16#03).
+-define(CHASSIS_IDENTIFY, 16#04).
+-define(SET_CHASSIS_CAPABILITIES, 16#05).
+-define(SET_POWER_RESTORE_POLICY, 16#06).
+-define(GET_SYSTEM_RESTART_CAUSE, 16#07).
+%-define(SET_SYSTEM_BOOT_OPTIONS, 16#08).
+%-define(GET_SYSTEM_BOOT_OPTIONS, 16#09).
+-define(SET_FRONT_PANEL_ENABLES, 16#0a).
+-define(SET_POWER_CYCLE_INTERVAL, 16#0b).
+-define(GET_POH_COUNTER, 16#0f).
 
 %% Events (Sensor/Event)
 -define(SET_EVENT_RECEIVER, 16#00).

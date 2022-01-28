@@ -54,6 +54,8 @@ decode(?IPMI_NETFN_STORAGE_RESPONSE, Cmd, Data) ->
     {ok, decode_storage(Cmd, Data)};
 decode(?IPMI_NETFN_TRANSPORT_RESPONSE, Cmd, Data) ->
     {ok, decode_transport(Cmd, Data)};
+decode(?IPMI_NETFN_CHASSIS_RESPONSE, Cmd, Data) ->
+    {ok, decode_chassis(Cmd, Data)};
 decode(?IPMI_NETFN_PICMG_RESPONSE, Cmd, Data) ->
     {ok, decode_picmg(Cmd, Data)};
 decode(NetFn, Cmd, Data) when NetFn >= 16#2f ->
@@ -371,6 +373,86 @@ decode_transport(?GET_LAN_CONFIGURATION_PARAMETERS, <<Rev:8, Data/binary>>) ->
 
 %%------------------------------------------------------------------------------
 %% @private
+%%------------------------------------------------------------------------------
+decode_chassis(?GET_CHASSIS_CAPABILITIES, <<?EIPMI_RESERVED:4, L:1, D:1, F:1,
+                                            I:1, Fru:8, Sdr: 8, Sel:8, Sm:8,
+                                            Rest/binary>>) ->
+    Caps = case Rest of
+            <<>> ->
+                [];
+            <<Bridge:8>> ->
+               [{bridge_address, Bridge}]
+           end,
+    [{interlock, case L of 1 -> true; 0 -> false end},
+     {lockout, case F of 1 -> true; 0 -> false end},
+     {diagnostic, case D of 1 -> true; 0 -> false end},
+     {intrusion, case I of 1 -> true; 0 -> false end},
+     {fru_address, Fru},
+     {sdr_address, Sdr},
+     {sel_address, Sel},
+     {sm_address, Sm}
+     | Caps];
+decode_chassis(?GET_CHASSIS_STATUS, <<?EIPMI_RESERVED:1, Policy:2,
+                                      ControlFault:1, Fault:1, Interlock:1,
+                                      Overload:1, OnOff:1,
+                                      LastPowerRsn:8,
+                                      ?EIPMI_RESERVED:1, Identifies:1,
+                                      Identifying:2, FanFault:1, DriveFault:1,
+                                      PanelLockout:1, Intrusion:1, Rest/binary>>)
+->
+    Front = case Rest of
+                <<>> ->
+                    [];
+                <<DisableStandby:1, DisableDiagInterrupt:1, DisableReset:1,
+                  DisablePowerOff:1, StandbyDisabled:1,
+                  DiagInterruptDisabled:1, ResetDisabled:1,
+                  PowerOffDisabled:1>> ->
+                    [{disable_standby_allowed, DisableStandby},
+                     {disable_diagnostic_allowed, DisableDiagInterrupt},
+                     {disable_reset_allowed, DisableReset},
+                     {disable_power_off_allowed, DisablePowerOff},
+                     {standby_disabled, StandbyDisabled},
+                     {diagnostic_disabled, DiagInterruptDisabled},
+                     {reset_disabled, ResetDisabled},
+                     {power_off_disabled, PowerOffDisabled}]
+            end,
+    [{power_restore_policy, Policy},
+     {power_control_fault, ControlFault},
+     {power_fault, Fault},
+     {interlock_status, Interlock},
+     {overload, Overload},
+     {power_status, OnOff},
+     {last_power_reason, LastPowerRsn},
+     {identify_supported, Identifies},
+     {identify_status, Identifying},
+     {fan_fault, FanFault},
+     {drive_fault, DriveFault},
+     {lockout_active, PanelLockout},
+     {intrusion_detection, Intrusion}
+     | Front];
+decode_chassis(?GET_POH_COUNTER, <<MinPerCount:8, Count:32/little>>) ->
+    [{counter, Count},
+     {minutes_per_count, MinPerCount}];
+decode_chassis(?GET_SYSTEM_RESTART_CAUSE, <<?EIPMI_RESERVED:4, Cause:4,
+                                            Channel:8>>) ->
+    [{restart_cause, decode_restart_cause(Cause)},
+     {channel, Channel}];
+decode_chassis(?SET_POWER_RESTORE_POLICY, <<?EIPMI_RESERVED:5, PowerUp:1,
+                                            LastState:1, PowerOff:1>>) ->
+    [{supports_always_on, PowerUp},
+     {supports_last_state, LastState},
+     {supports_always_off, PowerOff}];
+decode_chassis(Cmd, _)
+  when Cmd =:= ?CHASSIS_CONTROL orelse
+       Cmd =:= ?CHASSIS_IDENTIFY orelse
+       Cmd =:= ?CHASSIS_RESET orelse
+       Cmd =:= ?SET_CHASSIS_CAPABILITIES orelse
+       Cmd =:= ?SET_FRONT_PANEL_ENABLES orelse
+       Cmd =:= ?SET_POWER_CYCLE_INTERVAL ->
+    [].
+
+%%------------------------------------------------------------------------------
+%% @private
 %% we've seen error prone implementation that do not include the PICMG
 %% identifier into the reponse.
 %%------------------------------------------------------------------------------
@@ -502,6 +584,23 @@ decode_privilege(1) -> callback;
 decode_privilege(2) -> user;
 decode_privilege(3) -> operator;
 decode_privilege(4) -> administrator.
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+decode_restart_cause(0) -> unknown;
+decode_restart_cause(1) -> control_command;
+decode_restart_cause(2) -> reset_button;
+decode_restart_cause(3) -> power_button;
+decode_restart_cause(4) -> watchdog_expired;
+decode_restart_cause(5) -> oem;
+decode_restart_cause(6) -> always_on_restore_policy;
+decode_restart_cause(7) -> last_state_restore_policy;
+decode_restart_cause(8) -> pef_reset;
+decode_restart_cause(9) -> pef_power_cycle;
+decode_restart_cause(10) -> soft_reset;
+decode_restart_cause(11) -> clock_wakeup;
+decode_restart_cause(_) -> reserved.
 
 %%------------------------------------------------------------------------------
 %% @private
