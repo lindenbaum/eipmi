@@ -1425,7 +1425,7 @@ do_ping(IPAddress, Timeout, Socket) ->
 %%------------------------------------------------------------------------------
 do_ping_receive(IPAddress, Timeout, Socket) ->
     {ok, {_, _, Packet}} = gen_udp:recv(Socket, 8192, Timeout),
-    case eipmi_decoder:packet(Packet) of
+    case eipmi_decoder:packet(Packet, []) of
         {ok, #rmcp_ack{}} ->
             do_ping_receive(IPAddress, Timeout, Socket);
         {ok, #rmcp_asf{header = H, payload = #asf_pong{entities = Es}}} ->

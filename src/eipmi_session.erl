@@ -245,7 +245,7 @@ handle_cast(Request, State) ->
 handle_info({udp_closed, Socket}, State = #state{socket = Socket}) ->
     {stop, socket_closed, State};
 handle_info({udp, Socket, _, _, Bin}, State = #state{socket = Socket}) ->
-    try {noreply, handle_rmcp(eipmi_decoder:packet(Bin), State)}
+    try {noreply, handle_rmcp(eipmi_decoder:packet(Bin, State#state.properties), State)}
     catch
         C:E -> {stop, {C, E}, State}
     end;
@@ -293,7 +293,7 @@ get_authentication_capabilities(State = #state{socket = Socket}) ->
     State1 = element(2, send_request(Request, Data, State)),
     Timeout = get_state_val(timeout, State1),
     {ok, {_, _, Bin}} = gen_udp:recv(Socket, 2000, Timeout),
-    {ok, Packet = #rmcp_ipmi{header = Header}} = eipmi_decoder:packet(Bin),
+    {ok, Packet = #rmcp_ipmi{header = Header}} = eipmi_decoder:packet(Bin, State#state.properties),
     State2 = maybe_send_ack(Header, State1),
     {ok, Fields} = get_response(Packet),
     {ok, select_auth(Fields, check_login(Fields, State2))}.
@@ -307,7 +307,7 @@ get_session_challenge(State = #state{socket = Socket}) ->
     State1 = element(2, send_request(Request, Data, State)),
     Timeout = get_state_val(timeout, State1),
     {ok, {_, _, Bin}} = gen_udp:recv(Socket, 2000, Timeout),
-    {ok, Packet = #rmcp_ipmi{header = Header}} = eipmi_decoder:packet(Bin),
+    {ok, Packet = #rmcp_ipmi{header = Header}} = eipmi_decoder:packet(Bin, State1#state.properties),
     State2 = maybe_send_ack(Header, State1),
     {ok, Fields} = get_response(Packet),
     {ok, copy_state_vals([challenge, session_id], Fields, State2)}.
@@ -321,7 +321,7 @@ activate_session(State = #state{socket = Socket}) ->
     State1 = element(2, send_request(Request, Data, State)),
     Timeout = get_state_val(timeout, State1),
     {ok, {_, _, Bin}} = gen_udp:recv(Socket, 2000, Timeout),
-    {ok, Packet = #rmcp_ipmi{header = Header}} = eipmi_decoder:packet(Bin),
+    {ok, Packet = #rmcp_ipmi{header = Header}} = eipmi_decoder:packet(Bin, State1#state.properties),
     State2 = maybe_send_ack(Header, State1),
     {ok, Fields} = get_response(Packet),
     {ok, copy_state_vals([auth_type, session_id, inbound_seq_nr], Fields, State2)}.
@@ -335,7 +335,7 @@ set_session_privilege_level(State = #state{socket = Socket}) ->
     State1 = element(2, send_request(Request, Data, State)),
     Timeout = get_state_val(timeout, State1),
     {ok, {_, _, Bin}} = gen_udp:recv(Socket, 2000, Timeout),
-    {ok, Packet = #rmcp_ipmi{header = Header}} = eipmi_decoder:packet(Bin),
+    {ok, Packet = #rmcp_ipmi{header = Header}} = eipmi_decoder:packet(Bin, State1#state.properties),
     State2 = maybe_send_ack(Header, State1),
     {ok, Fields} = get_response(Packet),
     RequestedPrivilege = get_state_val(privilege, State),

@@ -20,7 +20,7 @@
 
 -module(eipmi_decoder).
 
--export([packet/1,
+-export([packet/2,
          response/1]).
 
 -include("eipmi.hrl").
@@ -36,15 +36,15 @@
 %% representation.
 %% @end
 %%------------------------------------------------------------------------------
--spec packet(binary()) ->
+-spec packet(binary(), proplists:proplist()) ->
                     {ok, #rmcp_ack{} | #rmcp_asf{} | #rmcp_ipmi{}} |
                     {error, term()}.
-packet(<<?RMCP_VERSION:8, ?EIPMI_RESERVED:8, SeqNr:8, Rest/binary>>) ->
-    try class(SeqNr, Rest)
+packet(<<?RMCP_VERSION:8, ?EIPMI_RESERVED:8, SeqNr:8, Rest/binary>>, Ps) ->
+    try class(SeqNr, Rest, Ps)
     catch
         C:E -> {error, {C, E}}
     end;
-packet(Binary) ->
+packet(Binary, _) ->
     {error, {not_rmcp_packet, Binary}}.
 
 %%------------------------------------------------------------------------------
@@ -65,16 +65,16 @@ response(Binary) -> response(#rmcp_ipmi{}, byte_size(Binary) - 4, Binary).
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-class(SeqNr, <<?RMCP_ACK:1, ?EIPMI_RESERVED:2, Class:5>>) ->
+class(SeqNr, <<?RMCP_ACK:1, ?EIPMI_RESERVED:2, Class:5>>, _) ->
     Header = #rmcp_header{seq_nr = SeqNr, class = Class},
     {ok, #rmcp_ack{header = Header}};
-class(SeqNr, <<?RMCP_NORMAL:1, ?EIPMI_RESERVED:2, ?RMCP_ASF:5, Rest/binary>>) ->
+class(SeqNr, <<?RMCP_NORMAL:1, ?EIPMI_RESERVED:2, ?RMCP_ASF:5, Rest/binary>>, _) ->
     Header = #rmcp_header{seq_nr = SeqNr, class = ?RMCP_ASF},
     asf(#rmcp_asf{header = Header}, Rest);
-class(SeqNr, <<?RMCP_NORMAL:1, ?EIPMI_RESERVED:2, ?RMCP_IPMI:5, Rest/binary>>) ->
+class(SeqNr, <<?RMCP_NORMAL:1, ?EIPMI_RESERVED:2, ?RMCP_IPMI:5, Rest/binary>>, Ps) ->
     Header = #rmcp_header{seq_nr = SeqNr, class = ?RMCP_IPMI},
-    ipmi(#rmcp_ipmi{header = Header}, Rest);
-class(_SeqNr, _Binary) ->
+    ipmi(#rmcp_ipmi{header = Header, properties = Ps}, Rest);
+class(_SeqNr, _Binary, _) ->
     {error, unsupported_rmcp_packet}.
 
 %%------------------------------------------------------------------------------
@@ -92,7 +92,8 @@ asf(_Asf, _Binary) ->
 %% @private
 %%------------------------------------------------------------------------------
 ipmi(Ipmi, Binary) ->
-    {SessionProps, Response} = session(Binary),
+    {Props, Response} = session(Binary),
+    SessionProps = Props ++ Ipmi#rmcp_ipmi.properties,
     I = Ipmi#rmcp_ipmi{properties = SessionProps},
     case proplists:get_value(auth_type, SessionProps) of
         rmcp_plus ->
