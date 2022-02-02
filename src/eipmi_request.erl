@@ -99,7 +99,7 @@ encode_application(?SEND_MESSAGE, Properties) ->
     <<1:2, 0:2, Channel:4, Request/binary>>;
 encode_application(?GET_CHANNEL_AUTHENTICATION_CAPABILITIES, Properties) ->
     P = encode_privilege(proplists:get_value(privilege, Properties)),
-    <<0:1, 0:3, ?IPMI_REQUESTED_CHANNEL:4, 0:4,P:4>>;
+    <<1:1, 0:3, ?IPMI_REQUESTED_CHANNEL:4, 0:4,P:4>>;
 encode_application(?GET_SESSION_CHALLENGE, Properties) ->
     A = eipmi_auth:encode_type(proplists:get_value(rq_auth_type, Properties)),
     U = eipmi_util:normalize(16, proplists:get_value(user, Properties)),

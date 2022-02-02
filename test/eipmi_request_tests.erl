@@ -90,7 +90,7 @@ encode_send_message_test() ->
 encode_get_channel_authentication_capabilities_test() ->
     Req = {?IPMI_NETFN_APPLICATION_REQUEST, ?GET_CHANNEL_AUTHENTICATION_CAPABILITIES},
     Properties = [{privilege, administrator}],
-    ?assertEqual(<<16#0e, 16#04>>, eipmi_request:encode(Req, Properties)).
+    ?assertEqual(<<16#8e, 16#04>>, eipmi_request:encode(Req, Properties)).
 
 encode_get_session_challenge_test() ->
     Req = {?IPMI_NETFN_APPLICATION_REQUEST, ?GET_SESSION_CHALLENGE},

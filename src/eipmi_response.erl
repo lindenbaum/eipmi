@@ -298,14 +298,25 @@ decode_application(?SEND_MESSAGE, <<Binary/binary>>) ->
 decode_application(?GET_SYSTEM_GUID, <<GUID/binary>>) ->
     {ok, [{guid, eipmi_util:binary_to_string(GUID)}]};
 decode_application(?GET_CHANNEL_AUTHENTICATION_CAPABILITIES,
-                   <<Channel:8, 0:1, ?EIPMI_RESERVED:1, A:6,
-                     ?EIPMI_RESERVED:3, P:1, U:1, L:3,
-                     ?EIPMI_RESERVED:40>>) ->
+                   <<Channel:8, E:1, ?EIPMI_RESERVED:1, A:6,
+                     ?EIPMI_RESERVED:2, K:1, P:1, U:1, L:3,
+                     ?EIPMI_RESERVED:6, Two:1, One:1,
+                     ?EIPMI_RESERVED:32>>) ->
+    Extended = case E of
+                   1 ->
+                       [
+                        {no_device_key, not eipmi_util:get_bool(K)},
+                        {supports_v2, eipmi_util:get_bool(Two)},
+                        {supports_v1_5, eipmi_util:get_bool(One)}
+                       ];
+                   0 ->
+                       []
+               end,
     {ok, [{channel, Channel},
           {auth_types, get_auth_types(A)},
           {per_message_authentication_enabled, not eipmi_util:get_bool(P)},
           {user_level_authentication_enabled, not eipmi_util:get_bool(U)},
-          {login_status, get_login_status(L)}]};
+          {login_status, get_login_status(L)} | Extended]};
 decode_application(?GET_SESSION_CHALLENGE, <<I:32/little, C/binary>>) ->
     {ok, [{session_id, I}, {challenge, C}]};
 decode_application(?ACTIVATE_SESSION,
