@@ -79,6 +79,7 @@
         {inbound_seq_nr, non_neg_integer()} |
         {login_status, [anonymous | null | non_null]} |
         {outbound_seq_nr, non_neg_integer()} |
+        {rq_auth_type, none | pwd | md5 | md2} |
         {rq_seq_nr, 0..16#40} |
         {session_id, non_neg_integer()}.
 
@@ -91,6 +92,7 @@
         inbound_seq_nr |
         login_status |
         outbound_seq_nr |
+        rq_auth_type |
         rq_seq_nr |
         session_id.
 
@@ -309,8 +311,10 @@ get_session_challenge(State = #state{socket = Socket}) ->
     {ok, {_, _, Bin}} = gen_udp:recv(Socket, 2000, Timeout),
     {ok, Packet = #rmcp_ipmi{header = Header}} = eipmi_decoder:packet(Bin, State1#state.properties),
     State2 = maybe_send_ack(Header, State1),
+    AuthType = get_state_val(rq_auth_type, State2),
+    State3 = update_state_val(auth_type, AuthType, State2),
     {ok, Fields} = get_response(Packet),
-    {ok, copy_state_vals([challenge, session_id], Fields, State2)}.
+    {ok, copy_state_vals([challenge, session_id], Fields, State3)}.
 
 %%------------------------------------------------------------------------------
 %% @private
@@ -449,23 +453,29 @@ udp_send(Bin, S = #state{socket = Socket, address = IPAddress}) ->
 %%------------------------------------------------------------------------------
 %% @private
 %% Selects an authentication method from the available methods. Preferred
-%% selection order is none, pwd, md5, md2.
+%% selection order is md5, md2, pwd, none.
 %%------------------------------------------------------------------------------
 select_auth(Fields, State) ->
     AuthTypes = proplists:get_value(auth_types, Fields),
-    None = lists:member(none, AuthTypes),
-    Pwd = lists:member(pwd, AuthTypes),
-    Md5 = lists:member(md5, AuthTypes),
-    Md2 = lists:member(md2, AuthTypes),
-    case {None, Pwd, Md5, Md2} of
-        {true, _, _, _} ->
-            update_state_val(auth_type, none, State);
-        {false, true, _, _} ->
-            update_state_val(auth_type, pwd, State);
-        {false, false, true, _} ->
-            update_state_val(auth_type, md5, State);
-        {false, false, false, true} ->
-            update_state_val(auth_type, md2, State)
+    RqAuthType = get_state_val(rq_auth_type, State),
+    case lists:member(RqAuthType, AuthTypes) of
+        true ->
+            State;
+        _ ->
+            None = lists:member(none, AuthTypes),
+            Pwd = lists:member(pwd, AuthTypes),
+            Md5 = lists:member(md5, AuthTypes),
+            Md2 = lists:member(md2, AuthTypes),
+            case {Md5, Md2, Pwd, None} of
+                {true, _, _, _} ->
+                    update_state_val(rq_auth_type, md5, State);
+                {false, true, _, _} ->
+                    update_state_val(rq_auth_type, md2, State);
+                {false, false, true, _} ->
+                    update_state_val(rq_auth_type, pwd, State);
+                {false, false, false, true} ->
+                    update_state_val(rq_auth_type, none, State)
+            end
     end.
 
 %%------------------------------------------------------------------------------

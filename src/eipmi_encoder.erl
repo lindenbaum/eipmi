@@ -94,11 +94,11 @@ ipmi(Header = #rmcp_header{class = ?RMCP_IPMI}, Properties, Req, Data) ->
             AuthCode = eipmi_auth:hash(H, K1, Hashed),
             <<HeaderBin/binary, SessionBin/binary, Hashed/binary, AuthCode/binary>>;
         AuthType ->
+            RequestBin = request(Properties, Req, Data),
             S = proplists:get_value(inbound_seq_nr, Properties),
             I = proplists:get_value(session_id, Properties),
             P = proplists:get_value(password, Properties),
-            SessionBin = session1(AuthType, S, I, P, Data),
-            RequestBin = request(Properties, Req, Data),
+            SessionBin = session1(AuthType, S, I, P, RequestBin),
             Length = size(RequestBin),
             <<HeaderBin/binary, SessionBin/binary, Length:8, RequestBin/binary>>
     end.

@@ -92,7 +92,7 @@ asf(_Asf, _Binary) ->
 %% @private
 %%------------------------------------------------------------------------------
 ipmi(Ipmi, Binary) ->
-    {Props, Response} = session(Binary),
+    {Props, Size, Response} = session(Binary, Ipmi#rmcp_ipmi.properties),
     SessionProps = Props ++ Ipmi#rmcp_ipmi.properties,
     I = Ipmi#rmcp_ipmi{properties = SessionProps},
     case proplists:get_value(auth_type, SessionProps) of
@@ -103,11 +103,10 @@ ipmi(Ipmi, Binary) ->
                 _ ->
                     ok
             end,
-            <<Size:16/little, Data:Size/binary, _/binary>> = Response,
+            <<Data:Size/binary, _/binary>> = Response,
             maybe_encrypted(I, Size, Data);
         _ ->
-            <<Size:8, Rest:Size/binary>> = Response,
-            response(I, Size - 4, Rest)
+            response(I, Size - 4, Response)
     end.
 
 %%------------------------------------------------------------------------------
@@ -162,17 +161,23 @@ response(I, Len, Rest) ->
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-session(<<?EIPMI_RESERVED:4, 0:4, S:32/little, I:32/little, Rest/binary>>) ->
-    {[{auth_type, none}, {outbound_seq_nr, S}, {session_id, I}], Rest};
-session(<<?EIPMI_RESERVED:4, 1:4, S:32/little, I:32/little, H:16/binary, Rest/binary>>) ->
-    ?assertEqual(H, eipmi_auth:hash(md2, Rest), "AuthCode does not match"),
-    {[{auth_type, md2}, {outbound_seq_nr, S}, {session_id, I}], Rest};
-session(<<?EIPMI_RESERVED:4, 2:4, S:32/little, I:32/little, H:16/binary, Rest/binary>>) ->
-    ?assertEqual(H, eipmi_auth:hash(md5, Rest), "AuthCode does  not match"),
-    {[{auth_type, md5}, {outbound_seq_nr, S}, {session_id, I}], Rest};
-session(<<?EIPMI_RESERVED:4, 4:4, S:32/little, I:32/little, _:128, Rest/binary>>) ->
-    {[{auth_type, pwd}, {outbound_seq_nr, S}, {session_id, I}], Rest};
-session(<<?EIPMI_RESERVED:4, 6:4, E:1, A:1, P:6, I:32/little, S:32/little, Rest/binary>>) ->
+session(<<?EIPMI_RESERVED:4, 0:4, S:32/little, I:32/little, L:8, Rest/binary>>, _) ->
+    {[{auth_type, none}, {outbound_seq_nr, S}, {session_id, I}], L, Rest};
+session(<<?EIPMI_RESERVED:4, 1:4, S:32/little, I:32/little, H:16/binary, L:8, Rest/binary>>, Ps) ->
+    P = proplists:get_value(password, Ps),
+    C = eipmi_util:normalize(16, P),
+    ToHash = <<C/binary, I:32/little, Rest/binary, S:32/little, C/binary>>,
+    ?assertEqual(H, eipmi_auth:hash(md2, ToHash), "AuthCode does not match"),
+    {[{auth_type, md2}, {outbound_seq_nr, S}, {session_id, I}], L, Rest};
+session(<<?EIPMI_RESERVED:4, 2:4, S:32/little, I:32/little, H:16/binary, L:8, Rest/binary>>, Ps) ->
+    P = proplists:get_value(password, Ps),
+    C = eipmi_util:normalize(16, P),
+    ToHash = <<C/binary, I:32/little, Rest/binary, S:32/little, C/binary>>,
+    ?assertEqual(H, eipmi_auth:hash(md5, ToHash), "AuthCode does not match"),
+    {[{auth_type, md5}, {outbound_seq_nr, S}, {session_id, I}], L, Rest};
+session(<<?EIPMI_RESERVED:4, 4:4, S:32/little, I:32/little, _:128, L:8, Rest/binary>>, _) ->
+    {[{auth_type, pwd}, {outbound_seq_nr, S}, {session_id, I}], L, Rest};
+session(<<?EIPMI_RESERVED:4, 6:4, E:1, A:1, P:6, I:32/little, S:32/little, L:16/little, Rest/binary>>, _) ->
     Seq = case A of
               0 -> outbound_unauth_seq_nr;
               1 -> outbound_auth_seq_nr
@@ -183,6 +188,7 @@ session(<<?EIPMI_RESERVED:4, 6:4, E:1, A:1, P:6, I:32/little, S:32/little, Rest/
       {payload_type, P},
       {Seq, S},
       {session_id, I}],
+     L,
      Rest}.
 
 %%------------------------------------------------------------------------------

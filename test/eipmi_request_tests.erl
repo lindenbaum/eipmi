@@ -94,7 +94,7 @@ encode_get_channel_authentication_capabilities_test() ->
 
 encode_get_session_challenge_test() ->
     Req = {?IPMI_NETFN_APPLICATION_REQUEST, ?GET_SESSION_CHALLENGE},
-    Properties = [{auth_type, none}, {user, "hello_world"}],
+    Properties = [{rq_auth_type, none}, {user, "hello_world"}],
     ?assertEqual(
        <<16#00, $h, $e, $l, $l, $o, $_, $w, $o, $r, $l, $d,
          16#00, 16#00, 16#00, 16#00, 16#00>>,
