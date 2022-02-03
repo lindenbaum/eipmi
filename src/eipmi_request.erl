@@ -36,7 +36,7 @@
 %% values will be retrieved from the provided property list.
 %% @end
 %%------------------------------------------------------------------------------
--spec encode(eipmi:request(), proplists:proplist()) -> binary().
+-spec encode(eipmi:request() | open_session_rq | rakp1 | rakp3, proplists:proplist()) -> binary().
 encode({?IPMI_NETFN_SENSOR_EVENT_REQUEST, Cmd}, Properties) ->
     encode_sensor_event(Cmd, Properties);
 encode({?IPMI_NETFN_APPLICATION_REQUEST, Cmd}, Properties) ->
@@ -50,7 +50,13 @@ encode({?IPMI_NETFN_CHASSIS_REQUEST, Cmd}, Properties) ->
 encode({?IPMI_NETFN_PICMG_REQUEST, Cmd}, Properties) ->
     encode_picmg(Cmd, Properties);
 encode({NetFn, Cmd}, Properties) when NetFn >= 16#2e ->
-    encode_oem(NetFn, Cmd, Properties).
+    encode_oem(NetFn, Cmd, Properties);
+encode(open_session_rq, Properties) ->
+    encode_open_session_rq(Properties);
+encode(rakp1, Properties) ->
+    encode_rakp1(Properties);
+encode(rakp3, Properties) ->
+    encode_rakp3(Properties).
 
 %%%=============================================================================
 %%% Internal functions
@@ -344,6 +350,51 @@ encode_picmg(?FRU_CONTROL, Properties) ->
 encode_picmg(?GET_DEVICE_LOCATOR_RECORD_ID, Properties) ->
     FruId = proplists:get_value(fru_id, Properties),
     <<?PICMG_ID:8, FruId:8>>.
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+encode_open_session_rq(Properties) ->
+    Tag = proplists:get_value(message_tag, Properties),
+    P = encode_privilege(proplists:get_value(privilege, Properties)),
+    S = proplists:get_value(rq_session_id, Properties),
+    A = eipmi_auth:encode_rakp_type(proplists:get_value(rakp_auth_type, Properties)),
+    I = eipmi_auth:encode_integrity_type(proplists:get_value(integrity_type, Properties)),
+    E = eipmi_auth:encode_encrypt_type(proplists:get_value(encrypt_type, Properties)),
+    <<Tag:8, 0:4, P:4, 0:16, S:32/little,
+      0:8, 0:16, 8:8, 0:2, A:6, 0:24,
+      1:8, 0:16, 8:8, 0:2, I:6, 0:24,
+      2:8, 0:16, 8:8, 0:2, E:6, 0:24>>.
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+encode_rakp1(Properties) ->
+    Tag = proplists:get_value(message_tag, Properties),
+    S = proplists:get_value(rs_session_id, Properties),
+    R = proplists:get_value(rq_nonce, Properties),
+    L = proplists:get_value(lookup_type, Properties),
+    P = encode_privilege(proplists:get_value(privilege, Properties)),
+    U = proplists:get_value(user, Properties, <<>>),
+    <<Tag:8, 0:24, S:32/little, R:128/little,
+      0:3, L:1, P:4, 0:16, (byte_size(U)):8, U/binary>>.
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+encode_rakp3(Properties) ->
+    Tag = proplists:get_value(message_tag, Properties),
+    C = proplists:get_value(status_code, Properties),
+    Rs = proplists:get_value(rs_nonce, Properties),
+    P = encode_privilege(proplists:get_value(privilege, Properties)),
+    Sq = proplists:get_value(rq_session_id, Properties),
+    Ss = proplists:get_value(rs_session_id, Properties),
+    A = proplists:get_value(rakp_auth_type, Properties),
+    U = proplists:get_value(user, Properties, <<>>),
+    K = eipmi_util:normalize(20, proplists:get_value(password, Properties)),
+    ToHash = <<Rs:128/little, Sq:32/little, P:8, (byte_size(U)):8, U/binary>>,
+    Hmac = eipmi_auth:rakp_hash(A, rakp3, K, ToHash),
+    <<Tag:8, C:8, 0:16, Ss:32/little, Hmac/binary>>.
 
 %%------------------------------------------------------------------------------
 %% @private

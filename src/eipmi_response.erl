@@ -39,13 +39,19 @@
 %% property list with the decoded values.
 %% @end
 %%------------------------------------------------------------------------------
--spec decode(eipmi:response(), binary()) ->
+-spec decode(eipmi:response() | open_session_rs | rakp2 | rakp4, binary()) ->
                     {ok, proplists:proplist()} | {error, term()}.
 decode({NetFn, Cmd}, Data) ->
     try decode(NetFn, Cmd, Data)
     catch
         C:E -> {error, {C, E}}
-    end.
+    end;
+decode(open_session_rs, Data) ->
+    decode_open_session_rs(Data);
+decode(rakp2, Data) ->
+    decode_rakp2(Data);
+decode(rakp4, Data) ->
+    decode_rakp4(Data).
 decode(?IPMI_NETFN_SENSOR_EVENT_RESPONSE, Cmd, Data) ->
     {ok, decode_sensor_event(Cmd, Data)};
 decode(?IPMI_NETFN_APPLICATION_RESPONSE, Cmd, Data) ->
@@ -517,6 +523,51 @@ decode_picmg_(?GET_DEVICE_LOCATOR_RECORD_ID, [Id]) ->
 %% @private
 %%------------------------------------------------------------------------------
 decode_oem(_, _, Data) -> [{data, Data}].
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+decode_open_session_rs(<<Status:8, ?EIPMI_RESERVED:8, Sq:32/little>>) ->
+    {error, [{status_code, Status},
+             {rq_session_id, Sq}]};
+decode_open_session_rs(<<Tag:8, Status:8, ?EIPMI_RESERVED:4, P:4, ?EIPMI_RESERVED:8, Sq:32/little, Ss:32/little,
+                         0:8, ?EIPMI_RESERVED:16, 8:8, ?EIPMI_RESERVED:2, A:6, ?EIPMI_RESERVED:24,
+                         1:8, ?EIPMI_RESERVED:16, 8:8, ?EIPMI_RESERVED:2, I:6, ?EIPMI_RESERVED:24,
+                         2:8, ?EIPMI_RESERVED:16, 8:8, ?EIPMI_RESERVED:2, E:6, ?EIPMI_RESERVED:24>>) ->
+    {ok, [{message_tag, Tag},
+     {status_code, Status},
+     {privilege, decode_privilege(P)},
+     {rq_session_id, Sq},
+     {rs_session_id, Ss},
+     {rakp_auth_type, eipmi_auth:decode_rakp_type(A)},
+     {integrity_type, eipmi_auth:decode_integrity_type(I)},
+     {encrypt_type, eipmi_auth:decode_encrypt_type(E)}]}.
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+decode_rakp2(<<Status:8, ?EIPMI_RESERVED:32, Sq:32/little>>) ->
+    {error, [{status_code, Status},
+             {rq_session_id, Sq}]};
+decode_rakp2(<<Tag:8, Status:8, ?EIPMI_RESERVED:32, Sq:32/little, Rs:128/little, Guid:128/little, Auth/binary>>) ->
+    {ok, [{message_tag, Tag},
+          {status_code, Status},
+          {rq_session_id, Sq},
+          {rs_nonce, Rs},
+          {system_guid, Guid},
+          {auth_code, Auth}]}.
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+decode_rakp4(<<Status:8, ?EIPMI_RESERVED:16, Ss:32/little>>) ->
+    {error, [{status_code, Status},
+             {rs_session_id, Ss}]};
+decode_rakp4(<<Tag:8, Status:8, ?EIPMI_RESERVED:16, Ss:32/little, Integrity/binary>>) ->
+    {ok, [{message_tag, Tag},
+          {status_code, Status},
+          {rs_session_id, Ss},
+          {integrity_value, Integrity}]}.
 
 %%------------------------------------------------------------------------------
 %% @private

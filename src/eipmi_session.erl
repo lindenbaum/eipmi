@@ -72,13 +72,22 @@
 
 -type property() ::
         eipmi:option() |
-        {auth_type, none | pwd | md5 | md2} |
-        {auth_types, [none | pwd | md5 | md2]} |
+        {auth_type, eipmi_auth:type()} |
+        {auth_types, [eipmi_auth:type()]} |
         {challenge, binary()} |
         {completion, atom()} |
+        {encrypt_type, eipmi_auth:encrypt_type()} |
+        {encrypt_types, [eipmi_auth:encrypt_type()]} |
         {inbound_seq_nr, non_neg_integer()} |
+        {inbound_unauth_seq_nr, non_neg_integer()} |
+        {inbound_auth_seq_nr, non_neg_integer()} |
+        {integrity_type, eipmi_auth:integrity_type()} |
+        {integrity_types, [eipmi_auth:integrity_type()]} |
         {login_status, [anonymous | null | non_null]} |
         {outbound_seq_nr, non_neg_integer()} |
+        {outbound_unauth_seq_nr, non_neg_integer()} |
+        {outbound_auth_seq_nr, non_neg_integer()} |
+        {payload_type, eipmi_auth:payload_type()} |
         {rq_auth_type, none | pwd | md5 | md2} |
         {rq_seq_nr, 0..16#40} |
         {session_id, non_neg_integer()}.
@@ -89,9 +98,16 @@
         auth_types |
         challenge |
         completion |
+        encrypt_type |
+        encrypt_types |
         inbound_seq_nr |
+        inbound_unauth_seq_nr |
+        inbound_auth_seq_nr |
         login_status |
         outbound_seq_nr |
+        outbound_unauth_seq_nr |
+        outbound_auth_seq_nr |
+        payload_type |
         rq_auth_type |
         rq_seq_nr |
         session_id.
@@ -112,17 +128,24 @@
          {port, ?RMCP_PORT_NUMBER},
          {privilege, administrator},
          {rq_addr, ?IPMI_REQUESTOR_ADDR},
+         {rq_auth_type, md5},
          {timeout, 1000},
          {user, ""},
          %% unmodifyable session defaults
-         {auth_type, none},    %% initial packets are not authenticated
-         {inbound_seq_nr, 0},  %% initial packets have the null seqnr
-         {outbound_seq_nr, 0}, %% initial packets have the null seqnr
+         {auth_type, none},      %% initial packets are not authenticated
+         {encrypt_type, none},   %% initial packets are not encrypted
+         {integrity_type, none}, %% AuthCode type when `auth_type` is `rmcp_plus`
+         {inbound_seq_nr, 0},    %% initial packets have the null seqnr
+         {inbound_unauth_seq_nr, 0},
+         {inbound_auth_seq_nr, 0},
+         {outbound_seq_nr, 0},   %% initial packets have the null seqnr
+         {outbound_unauth_seq_nr, 0},
+         {outbound_auth_seq_nr, 0},
          {rq_lun, ?IPMI_REQUESTOR_LUN},
-         {rq_seq_nr, 0},       %% initial requests have the null seqnr
+         {rq_seq_nr, 0},         %% initial requests have the null seqnr
          {rs_addr, ?IPMI_RESPONDER_ADDR},
          {rs_lun, ?IPMI_RESPONDER_LUN},
-         {session_id, 0}       %% initial have the null session id
+         {session_id, 0}         %% initial have the null session id
         ]).
 
 %%%=============================================================================
