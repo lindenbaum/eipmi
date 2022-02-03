@@ -122,7 +122,7 @@ authenticate(Ps, Binary) ->
                     3 -> 3
                 end,
     <<Padding:PadLength/binary, PadLength:8, 16#07:8, AuthCode/binary>> = SessionTrailer,
-    H = proplists:get_value(hash_type, Ps),
+    H = proplists:get_value(integrity_type, Ps),
     SIK = proplists:get_value(session_key, Ps),
     K1 = eipmi_auth:extra_key(1, H, SIK),
     Hashed = <<SessionHeader/binary, Size:16/little, Data/binary,
@@ -137,7 +137,7 @@ maybe_encrypted(#rmcp_ipmi{properties = Ps} = I, Len, Data) ->
     case proplists:get_value(encrypted, Ps) of
         true ->
             E = proplists:get_value(encrypt_type, Ps, none),
-            H = proplists:get_value(hash_type, Ps),
+            H = proplists:get_value(integrity_type, Ps),
             SIK = proplists:get_value(session_key, Ps),
             K2 = eipmi_auth:extra_key(E, H, SIK),
             Resp = eipmi_auth:decrypt(E, K2, Data),

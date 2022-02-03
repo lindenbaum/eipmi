@@ -69,7 +69,7 @@ ipmi(Header = #rmcp_header{class = ?RMCP_IPMI}, Properties, Req, Data) ->
     case proplists:get_value(auth_type, Properties) of
         rmcp_plus ->
             E = proplists:get_value(encrypt_type, Properties),
-            H = proplists:get_value(hash_type, Properties),
+            H = proplists:get_value(integrity_type, Properties),
             SIK = proplists:get_value(session_key, Properties),
             K2 = eipmi_auth:extra_key(E, H, SIK),
 
@@ -77,11 +77,11 @@ ipmi(Header = #rmcp_header{class = ?RMCP_IPMI}, Properties, Req, Data) ->
             RequestBin = request(Properties, Req, Data),
             Encrypted = eipmi_auth:encrypt(E, K2, RequestBin),
             Length = size(Encrypted),
-            ToHash = <<SessionBin/binary, Length:16/little, Encrypted/binary>>,
+            Unpadded = <<SessionBin/binary, Length:16/little, Encrypted/binary>>,
             % AuthCode needs payload to be a multiple of 4 bytes, but we add 2
             % bytes for the padding length itself and the NextHeader field.
             % PadLength = (6 - size(ToHash) rem 4) rem 4,
-            PadLength = case size(ToHash) rem 4 of
+            PadLength = case size(Unpadded) rem 4 of
                             0 -> 2;
                             1 -> 1;
                             2 -> 0;
@@ -90,9 +90,9 @@ ipmi(Header = #rmcp_header{class = ?RMCP_IPMI}, Properties, Req, Data) ->
             Padding = binary:copy(<<255>>, PadLength),
             NextHeader = 7,
             K1 = eipmi_auth:extra_key(1, H, SIK),
-            Hashed = <<ToHash/binary, Padding/binary, PadLength:8, NextHeader:8>>,
-            AuthCode = eipmi_auth:hash(H, K1, Hashed),
-            <<HeaderBin/binary, SessionBin/binary, Hashed/binary, AuthCode/binary>>;
+            ToHash = <<Unpadded/binary, Padding/binary, PadLength:8, NextHeader:8>>,
+            AuthCode = eipmi_auth:hash(H, K1, ToHash),
+            <<HeaderBin/binary, ToHash/binary, AuthCode/binary>>;
         AuthType ->
             RequestBin = request(Properties, Req, Data),
             S = proplists:get_value(inbound_seq_nr, Properties),

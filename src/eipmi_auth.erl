@@ -24,27 +24,31 @@
 
 -export([encrypt/3,
          decrypt/3,
+         encode_encrypt_type/1,
          encode_integrity_type/1,
          encode_payload_type/1,
          encode_rakp_type/1,
          encode_type/1,
+         decode_encrypt_type/1,
          decode_integrity_type/1,
          decode_payload_type/1,
          decode_rakp_type/1,
          decode_type/1,
          hash/2,
          hash/3,
-         extra_key/3
+         extra_key/3,
+         rakp_hash/4
         ]).
 
 -type encrypt_type() :: none | aes_cbc.
--type integrity_type() :: none | hmac_sha1 | hmac_md5 | md5 | hmac_sha256.
+-type integrity_type() :: none | hmac_sha1_96 | hmac_md5_128 | md5_128 | hmac_sha256_128.
 -type payload_type() :: ipmi | open_session_rq | open_session_rs |
                         rakp1 | rakp2 | rakp3 | rakp4.
 -type rakp_type() :: none | hmac_sha1 | hmac_md5 | hmac_sha256.
 -type type() :: none | md2 | md5 | pwd.
 
--export_type([type/0]).
+-export_type([encrypt_type/0, integrity_type/0, payload_type/0,
+              rakp_type/0, type/0]).
 
 %%%=============================================================================
 %%% API
@@ -71,30 +75,51 @@ hash(pwd, Password) ->
 -spec hash(integrity_type(), binary(), binary()) -> binary().
 hash(none, _Key, _Ignored) ->
     <<>>;
-hash(md5, Key, Binary) ->
+hash(md5_128, Key, Binary) ->
     crypto:hash(md5, <<Key/binary, Binary/binary, Key/binary>>);
-hash(HashType, Key, Binary) ->
-    Algo = hash_algo(HashType),
-    crypto:mac(hmac, Algo, Key, Binary).
+hash(hmac_sha1_96, K, B) ->
+    crypto:macN(hmac, sha, K, B, 12);
+hash(hmac_md5_128, K, B) ->
+    crypto:macN(hmac, md5, K, B, 16);
+hash(hmac_sha256_128, K, B) ->
+    crypto:macN(hmac, sha256, K, B, 16).
 
--spec extra_key(encrypt_type() | 1..255, integrity_type(), binary()) -> binary().
+-spec extra_key(encrypt_type() | 1..255, rakp_type() | integrity_type(), binary()) -> binary().
 extra_key(none, _Ht, _Sk) ->
     <<>>;
 extra_key(aes_cbc, Ht, Sk) ->
-    extra_key(2, Ht, Sk);
+    binary_part(extra_key(2, Ht, Sk), {0, 16});
 extra_key(N, HashType, SessionKey) ->
     Algo = hash_algo(HashType),
-    L = block_size(Algo),
-    Const = binary:copy(<<N:8>>, L),
-    crypto:macN(hmac, Algo, SessionKey, Const, L).
+    % NB: A plain reading of the IPMI spec would indicate that
+    % the constants used to generate extra keying material
+    % should be as large as the block size of the hash
+    % algorithm. The creators of `ipmitool` thought the spec
+    % only indicated constants of a 20-byte length. As ipmitool
+    % works with the hardware I have tested against, I'm going
+    % to consider them correct. -JLM
+    Const = binary:copy(<<N:8>>, 20),
+    crypto:mac(hmac, Algo, SessionKey, Const).
 
+-spec hash_algo(rakp_type() | integrity_type()) -> md5 | sha | sha256.
 hash_algo(hmac_md5) -> md5;
+hash_algo(hmac_md5_128) -> md5;
 hash_algo(hmac_sha1) -> sha;
-hash_algo(hmac_sha256) -> sha256.
+hash_algo(hmac_sha1_96) -> sha;
+hash_algo(hmac_sha256) -> sha256;
+hash_algo(hmac_sha256_128) -> sha256.
 
-block_size(Algo) ->
-    #{block_size := S} = crypto:hash_info(Algo),
-    S.
+-spec rakp_hash(rakp_type(), payload_type(), binary(), binary()) -> binary().
+rakp_hash(hmac_md5, _, Key, Bin) ->
+    hash(hmac_md5_128, Key, Bin);
+rakp_hash(hmac_sha1, rakp4, Key, Bin) ->
+    crypto:macN(hmac, sha, Key, Bin, 12);
+rakp_hash(hmac_sha1, _, Key, Bin) ->
+    crypto:mac(hmac, sha, Key, Bin);
+rakp_hash(hmac_sha256, rakp4, Key, Bin) ->
+    crypto:macN(hmac, sha256, Key, Bin, 16);
+rakp_hash(hmac_sha256, _, Key, Bin) ->
+    crypto:mac(hmac, sha256, Key, Bin).
 
 %%-------------------------------------------------------------------------------
 %% @doc
@@ -129,15 +154,23 @@ decrypt(aes_cbc, Key, <<Iv:16/binary, Encrypted/binary>>) ->
 
 %%------------------------------------------------------------------------------
 %% @doc
+%% Encodes an encryption algorithm into its integer representation.
+%% @end
+%%------------------------------------------------------------------------------
+encode_encrypt_type(none) -> 0;
+encode_encrypt_type(aes_cbc) -> 1.
+
+%%------------------------------------------------------------------------------
+%% @doc
 %% Encodes an integrity algorithm into its integer representation.
 %% @end
 %%------------------------------------------------------------------------------
 -spec encode_integrity_type(integrity_type()) -> 0..4.
 encode_integrity_type(none) -> 0;
-encode_integrity_type(hmac_sha1) -> 1;
-encode_integrity_type(hmac_md5) -> 2;
-encode_integrity_type(md5) -> 3;
-encode_integrity_type(hmac_sha256) -> 4.
+encode_integrity_type(hmac_sha1_96) -> 1;
+encode_integrity_type(hmac_md5_128) -> 2;
+encode_integrity_type(md5_128) -> 3;
+encode_integrity_type(hmac_sha256_128) -> 4.
 
 %%------------------------------------------------------------------------------
 %% @doc
@@ -178,15 +211,23 @@ encode_type(rmcp_plus) -> 6.
 
 %%------------------------------------------------------------------------------
 %% @doc
+%% Decodes an encryption algorithm into human readable format.
+%% @end
+%%------------------------------------------------------------------------------
+decode_encrypt_type(0) -> none;
+decode_encrypt_type(1) -> aes_cbc.
+
+%%------------------------------------------------------------------------------
+%% @doc
 %% Decodes an integrity algorithm integer into human readable format.
 %% @end
 %%------------------------------------------------------------------------------
--spec decode_integrity_type(integrity_type()) -> 0..4.
-decode_integrity_type(none) -> 0;
-decode_integrity_type(hmac_sha1) -> 1;
-decode_integrity_type(hmac_md5) -> 2;
-decode_integrity_type(md5) -> 3;
-decode_integrity_type(hmac_sha256) -> 4.
+-spec decode_integrity_type(0..4) -> integrity_type().
+decode_integrity_type(0) -> none;
+decode_integrity_type(1) -> hmac_sha1_96;
+decode_integrity_type(2) -> hmac_md5_128;
+decode_integrity_type(3) -> md5_128;
+decode_integrity_type(4) -> hmac_sha256_128.
 
 %%------------------------------------------------------------------------------
 %% @doc
