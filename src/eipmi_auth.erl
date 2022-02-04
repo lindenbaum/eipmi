@@ -72,10 +72,11 @@ hash(md5, Binary) ->
 hash(pwd, Password) ->
     eipmi_util:normalize(16, Password).
 
--spec hash(integrity_type(), binary(), binary()) -> binary().
+-spec hash(integrity_type(), iodata(), binary()) -> binary().
 hash(none, _Key, _Ignored) ->
     <<>>;
-hash(md5_128, Key, Binary) ->
+hash(md5_128, K, Binary) ->
+    Key = iolist_to_binary(K),
     crypto:hash(md5, <<Key/binary, Binary/binary, Key/binary>>);
 hash(hmac_sha1_96, K, B) ->
     crypto:macN(hmac, sha, K, B, 12);

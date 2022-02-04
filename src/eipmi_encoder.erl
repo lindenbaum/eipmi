@@ -62,12 +62,14 @@ ping(Header = #rmcp_header{class = ?RMCP_ASF}, #asf_ping{iana = I, tag = T}) ->
 %% currently only IPMI requests are supported.
 %% @end
 %%------------------------------------------------------------------------------
--spec ipmi(#rmcp_header{}, proplists:proplist(), eipmi:request(), binary()) ->
+-spec ipmi(#rmcp_header{}, proplists:proplist(), eipmi:request() | open_session_rq | rakp1 | rakp3, binary()) ->
                   binary().
 ipmi(Header = #rmcp_header{class = ?RMCP_IPMI}, Properties, Req, Data) ->
     HeaderBin = header(Header, ?RMCP_NORMAL),
-    case proplists:get_value(auth_type, Properties) of
-        rmcp_plus ->
+    A = proplists:get_value(auth_type, Properties),
+    Pt = proplists:get_value(payload_type, Properties, ipmi),
+    case {A, Pt} of
+        {rmcp_plus, ipmi} ->
             E = proplists:get_value(encrypt_type, Properties),
             H = proplists:get_value(integrity_type, Properties),
             SIK = proplists:get_value(session_key, Properties),
@@ -93,7 +95,13 @@ ipmi(Header = #rmcp_header{class = ?RMCP_IPMI}, Properties, Req, Data) ->
             ToHash = <<Unpadded/binary, Padding/binary, PadLength:8, NextHeader:8>>,
             AuthCode = eipmi_auth:hash(H, K1, ToHash),
             <<HeaderBin/binary, ToHash/binary, AuthCode/binary>>;
-        AuthType ->
+        {rmcp_plus, _} ->
+            % Open Session and RAKP messages should be neither encrypted nor
+            % authenticated. There are also no completion code or checksums.
+            SessionBin = session2(Properties),
+            Length = size(Data),
+            <<HeaderBin/binary, SessionBin/binary, Length:16/little, Data/binary>>;
+        {AuthType, _} ->
             RequestBin = request(Properties, Req, Data),
             S = proplists:get_value(inbound_seq_nr, Properties),
             I = proplists:get_value(session_id, Properties),
@@ -152,13 +160,13 @@ session1(T, S, I, P, Data) ->
 
 % v2.0
 session2(Properties) ->
-    I = proplists:get_value(session_id, Properties, <<0:32>>),
+    I = proplists:get_value(session_id, Properties, 0),
     E = proplists:get_value(encrypt_type, Properties, none),
     P = proplists:get_value(payload_type, Properties),
     AuthType = eipmi_auth:encode_type(rmcp_plus),
     Pt = eipmi_auth:encode_payload_type(P),
     {Authenticated, Seq} = case I of
-                        <<0:32>> -> {0, inbound_unauth_seq_nr};
+                        0 -> {0, inbound_unauth_seq_nr};
                         _ -> {1, inbound_auth_seq_nr}
                     end,
     S = proplists:get_value(Seq, Properties),

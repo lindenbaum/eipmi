@@ -126,15 +126,21 @@
         clock_wakeup.
 
 -type option_name() ::
-        initial_outbound_seq_nr | keep_alive_retransmits | password | port |
-        privilege | rq_addr | timeout | user.
+        encrypt_type | initial_outbound_seq_nr | integrity_type |
+        keep_alive_retransmits | lookup_type | password | port | privilege |
+        rakp_auth_type | rq_addr | timeout | user.
 -type option() ::
+        {encrypt_type, eipmi_auth:encrypt_type()} |
         {initial_outbound_seq_nr, non_neg_integer()} |
+        {integrity_type, eipmi_auth:integrity_type()} |
         {keep_alive_retransmits, non_neg_integer()} |
+        {lookup_type, 0..1} |
         {password, string()} |
         {port, inet:port_number()} |
         {privilege, privilege()} |
+        {rakp_auth_type, eipmi_auth:rakp_type()} |
         {rq_addr, 16#81..16#8d} |
+        {rq_auth_type, eimpi_auth:type() | rmcp_plus} |
         {timeout, non_neg_integer()} |
         {user, string()}.
 
@@ -451,20 +457,35 @@ open(Host) ->
 %% Same as {@link open/1} but allows the specification of the following custom
 %% options:
 %% <dl>
+%%   <dt>`{encrypt_type, eipmi_auth:encrypt_type()}'</dt>
+%%   <dd>
+%%     <p>
+%%     The Confidentiality algorithm used to encrypt RMCP+ sessions, default
+%%     is `none'.
+%%     </p>
+%%   </dd>
 %%   <dt>`{initial_outbound_seq_nr, non_neg_integer()}'</dt>
 %%   <dd>
 %%     <p>
-%%     The initial outbound sequence number that will be requested on the BMC,
+%%     The initial outbound sequence number that will be requested on the
+%%     BMC,
 %%     default is `16#1337'.
 %%     </p>
-%%  </dd>
+%%   </dd>
+%%   <dt>`{integrity_type, eipmi_auth:integrity_type()}'</dt>
+%%   <dd>
+%%     <p>
+%%     The Integrity algorithm used to sign RMCP+ session messages, default
+%%     is `none'.
+%%     </p>
+%%   </dd>
 %%   <dt>`{keep_alive_retransmits, non_neg_integer()}'</dt>
 %%   <dd>
 %%     <p>
 %%     The number of retransmits allowed for session keep_alive requests,
 %%     default is `2'.
 %%     </p>
-%%  </dd>
+%%   </dd>
 %%   <dt>`{password, string() with length <= 16bytes}'</dt>
 %%   <dd>
 %%     <p>
@@ -486,11 +507,35 @@ open(Host) ->
 %%     `administrator'.
 %%     </p>
 %%   </dd>
+%%   <dt>`{rakp_auth_type, eipmi_auth:rakp_type()}'</dt>
+%%   <dd>
+%%     <p>
+%%     The RMCP+ Authenticated Key-Exchange Protocol used to activate a
+%%     session, referring to the HMAC algorithm used to authenticate the key
+%%     exchange. Default is `none', meaning RAKP happens, but no messages are
+%%     signed.
+%%     </p>
+%%   </dd>
 %%   <dt>`{rq_addr, 16#81..16#8d}'</dt>
 %%   <dd>
 %%     <p>
 %%     The requestor address used in IPMI lan packages, the default value of
 %%     `16#81' should be suitable for all common cases.
+%%     </p>
+%%   </dd>
+%%   <dt>`{rq_auth_type, none | pwd | md5 | md2}'</dt>
+%%   <dd>
+%%     <p>
+%%     The requested authentication algorithm used to sign IPMI v1.5 messages
+%%     in active sessions. If the device does not support the requested
+%%     algorithm, another will be used.
+%%     </p>
+%%   </dd>
+%%   <dt>`{rq_session_id, non_neg_integer()}'</dt>
+%%   <dd>
+%%     <p>
+%%     The requested session ID the device should use when sending responses
+%%     during RAKP, default is 16#1337c0de.
 %%     </p>
 %%   </dd>
 %%   <dt>`{timeout, non_neg_integer()}'</dt>

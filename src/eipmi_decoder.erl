@@ -95,8 +95,10 @@ ipmi(Ipmi, Binary) ->
     {Props, Size, Response} = session(Binary, Ipmi#rmcp_ipmi.properties),
     SessionProps = Props ++ Ipmi#rmcp_ipmi.properties,
     I = Ipmi#rmcp_ipmi{properties = SessionProps},
-    case proplists:get_value(auth_type, SessionProps) of
-        rmcp_plus ->
+    A = proplists:get_value(auth_type, SessionProps),
+    P = proplists:get_value(payload_type, SessionProps),
+    case {A, P} of
+        {rmcp_plus, ipmi} ->
             case proplists:get_value(authenticated, SessionProps) of
                 true ->
                     authenticate(SessionProps, Binary);
@@ -105,7 +107,11 @@ ipmi(Ipmi, Binary) ->
             end,
             <<Data:Size/binary, _/binary>> = Response,
             maybe_encrypted(I, Size, Data);
-        _ ->
+        {rmcp_plus, _} ->
+            % Open Session and RAKP messages should be neither encrypted nor
+            % authenticated. There are also no completion code or checksums.
+            rakp(I, Response);
+        {_, _} ->
             response(I, Size - 4, Response)
     end.
 
@@ -183,9 +189,9 @@ session(<<?EIPMI_RESERVED:4, 6:4, E:1, A:1, P:6, I:32/little, S:32/little, L:16/
               1 -> outbound_auth_seq_nr
           end,
     {[{auth_type, rmcp_plus},
-      {encrypted, eipmi_utils:get_bool(E)},
-      {authenticated, eipmi_utils:get_bool(A)},
-      {payload_type, P},
+      {encrypted, eipmi_util:get_bool(E)},
+      {authenticated, eipmi_util:get_bool(A)},
+      {payload_type, eipmi_auth:decode_payload_type(P)},
       {Seq, S},
       {session_id, I}],
      L,
@@ -213,6 +219,16 @@ lan(_Ipmi, _Head, _Tail) ->
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
+rakp(Ipmi = #rmcp_ipmi{properties = Ps}, <<_Tag:8, Code:8, Data/binary>>) ->
+    Payload = proplists:get_value(payload_type, Ps),
+    {ok, Ipmi#rmcp_ipmi{
+           properties = [{completion, completion_code(Payload, Code)} | Ps],
+           cmd = Payload,
+           data = Data}}.
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
 has_integrity(Binary, Checksum) ->
     (Checksum + sum(Binary, 0)) rem 256 =:= 0.
 
@@ -223,6 +239,50 @@ sum(<<>>, Sum) ->
     Sum;
 sum(<<Byte:8, Rest/binary>>, Sum) ->
     sum(Rest, Sum + Byte).
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+completion_code(_,               16#00) ->
+    normal;
+completion_code(_,               16#01) ->
+    insufficient_resources;
+completion_code(_,               16#02) ->
+    invalid_session_id;
+completion_code(open_session_rs, 16#03) ->
+    invalid_payload_type;
+completion_code(open_session_rs, 16#04) ->
+    invalid_auth_type;
+completion_code(open_session_rs, 16#05) ->
+    invalid_integrity_type;
+completion_code(open_session_rs, 16#06) ->
+    no_matching_auth_payload;
+completion_code(open_session_rs, 16#07) ->
+    no_matching_integrity_payload;
+completion_code(_,               16#08) ->
+    inactive_session_id;
+completion_code(_,               16#09) ->
+    invalid_role;
+completion_code(rakp2,           16#0a) ->
+    unauthorized_role_or_privilege_level;
+completion_code(rakp2,           16#0b) ->
+    insufficient_resources_at_role;
+completion_code(rakp2,           16#0c) ->
+    invalid_name_length;
+completion_code(rakp2,           16#0d) ->
+    unauthorized_name;
+completion_code(rakp3,           16#0e) ->
+    unauthorized_guid;
+completion_code(rakp4,           16#0f) ->
+    invalid_integrity_value;
+completion_code(open_session_rs, 16#10) ->
+    invalid_encrypt_type;
+completion_code(open_session_rs, 16#11) ->
+    no_matching_cipher_suite;
+completion_code(_,               16#12) ->
+    parameter_not_supported;
+completion_code(_,               _) ->
+    reserved.
 
 %%------------------------------------------------------------------------------
 %% @private

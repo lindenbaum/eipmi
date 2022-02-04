@@ -22,7 +22,7 @@
 
 -module(eipmi_request).
 
--export([encode/2]).
+-export([encode/2, encode_privilege/1]).
 
 -include("eipmi.hrl").
 
@@ -375,8 +375,8 @@ encode_rakp1(Properties) ->
     R = proplists:get_value(rq_nonce, Properties),
     L = proplists:get_value(lookup_type, Properties),
     P = encode_privilege(proplists:get_value(privilege, Properties)),
-    U = proplists:get_value(user, Properties, <<>>),
-    <<Tag:8, 0:24, S:32/little, R:128/little,
+    U = iolist_to_binary(proplists:get_value(user, Properties, <<>>)),
+    <<Tag:8, 0:24, S:32/little, R:16/binary,
       0:3, L:1, P:4, 0:16, (byte_size(U)):8, U/binary>>.
 
 %%------------------------------------------------------------------------------
@@ -384,17 +384,17 @@ encode_rakp1(Properties) ->
 %%------------------------------------------------------------------------------
 encode_rakp3(Properties) ->
     Tag = proplists:get_value(message_tag, Properties),
-    C = proplists:get_value(status_code, Properties),
     Rs = proplists:get_value(rs_nonce, Properties),
+    L = proplists:get_value(lookup_type, Properties),
     P = encode_privilege(proplists:get_value(privilege, Properties)),
     Sq = proplists:get_value(rq_session_id, Properties),
     Ss = proplists:get_value(rs_session_id, Properties),
     A = proplists:get_value(rakp_auth_type, Properties),
-    U = proplists:get_value(user, Properties, <<>>),
+    U = iolist_to_binary(proplists:get_value(user, Properties, "")),
     K = eipmi_util:normalize(20, proplists:get_value(password, Properties)),
-    ToHash = <<Rs:128/little, Sq:32/little, P:8, (byte_size(U)):8, U/binary>>,
+    ToHash = <<Rs/binary, Sq:32/little, L:4, P:4, (byte_size(U)):8, U/binary>>,
     Hmac = eipmi_auth:rakp_hash(A, rakp3, K, ToHash),
-    <<Tag:8, C:8, 0:16, Ss:32/little, Hmac/binary>>.
+    <<Tag:8, 0:8, 0:16, Ss:32/little, Hmac/binary>>.
 
 %%------------------------------------------------------------------------------
 %% @private
@@ -430,7 +430,9 @@ chassis_command(diagnostic_interrupt) -> 4;
 chassis_command(acpi_shutdown) -> 5.
 
 %%------------------------------------------------------------------------------
-%% @private
+%% @doc
+%% Encodes privilege level as an integer.
+%% @end
 %%------------------------------------------------------------------------------
 encode_privilege(present) -> 0;
 encode_privilege(callback) -> 1;
