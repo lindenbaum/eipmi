@@ -428,7 +428,8 @@ rakp34(State = #state{socket = Socket, properties = Ps}) ->
     State2 = update_state_val(session_key, SIK, State1),
     authenticate(rakp4, IntegrityCode, State2),
     SessionId = get_state_val(rs_session_id, State2),
-    State3 = update_state_val(session_id, SessionId, State2),
+    % Can't let the authenticated session sequence number start at 0.
+    State3 = incr_inbound_seq_nr(update_state_val(session_id, SessionId, State2)),
     {ok, update_state_val(payload_type, ipmi, State3)}.
 
 %%------------------------------------------------------------------------------
@@ -548,8 +549,15 @@ incr_rq_seq_nr(State) ->
 %% if prior to a session the inbound seq nr will not be updated
 %%------------------------------------------------------------------------------
 incr_inbound_seq_nr(State) ->
-    SeqNr = get_state_val(inbound_seq_nr, State),
-    update_state_val(inbound_seq_nr, (SeqNr + 1) rem (16#ffffffff + 1), State).
+    AuthType = get_state_val(auth_type, State),
+    SessID = get_state_val(session_id, State),
+    Seq = case {AuthType, SessID} of
+              {rmcp_plus, 0} -> inbound_unauth_seq_nr;
+              {rmcp_plus, _} -> inbound_auth_seq_nr;
+              _ -> inbound_seq_nr
+          end,
+    SeqNr = get_state_val(Seq, State),
+    update_state_val(Seq, (SeqNr + 1) rem (16#ffffffff + 1), State).
 
 %%------------------------------------------------------------------------------
 %% @private
