@@ -753,7 +753,7 @@ set_chassis_capabilities(Session, FruAddr, SdrAddr, SelAddr, SmAddr, Extra) ->
 %% @doc
 %% Returns the capabilities reported by the Chassis device as a proplist. In
 %% addition to those modifiable by {@link set_chassis_capabilities/6}, also
-%% reports whether it has apower interlock (`interlock`) and diagnostic
+%% reports whether it has a power interlock (`interlock`) and diagnostic
 %% interrupt (`diagnostic`).
 %% @end
 %%------------------------------------------------------------------------------
