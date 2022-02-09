@@ -36,11 +36,12 @@
 %% representation.
 %% @end
 %%------------------------------------------------------------------------------
--spec packet(binary(), proplists:proplist()) ->
+-spec packet(binary(), [eipmi_session:property()]) ->
                     {ok, #rmcp_ack{} | #rmcp_asf{} | #rmcp_ipmi{}} |
                     {error, term()}.
-packet(<<?RMCP_VERSION:8, ?EIPMI_RESERVED:8, SeqNr:8, Rest/binary>>, Ps) ->
-    try class(SeqNr, Rest, Ps)
+packet(<<?RMCP_VERSION:8, ?EIPMI_RESERVED:8, SeqNr:8, Rest/binary>>,
+       SessionState) ->
+    try class(SeqNr, Rest, SessionState)
     catch
         C:E -> {error, {C, E}}
     end;
@@ -68,12 +69,15 @@ response(Binary) -> response(#rmcp_ipmi{}, byte_size(Binary) - 4, Binary).
 class(SeqNr, <<?RMCP_ACK:1, ?EIPMI_RESERVED:2, Class:5>>, _) ->
     Header = #rmcp_header{seq_nr = SeqNr, class = Class},
     {ok, #rmcp_ack{header = Header}};
-class(SeqNr, <<?RMCP_NORMAL:1, ?EIPMI_RESERVED:2, ?RMCP_ASF:5, Rest/binary>>, _) ->
+class(SeqNr, <<?RMCP_NORMAL:1, ?EIPMI_RESERVED:2, ?RMCP_ASF:5, Rest/binary>>,
+      _) ->
     Header = #rmcp_header{seq_nr = SeqNr, class = ?RMCP_ASF},
     asf(#rmcp_asf{header = Header}, Rest);
-class(SeqNr, <<?RMCP_NORMAL:1, ?EIPMI_RESERVED:2, ?RMCP_IPMI:5, Rest/binary>>, Ps) ->
+class(SeqNr,
+      <<?RMCP_NORMAL:1, ?EIPMI_RESERVED:2, ?RMCP_IPMI:5, Rest/binary>>,
+      SessionState) ->
     Header = #rmcp_header{seq_nr = SeqNr, class = ?RMCP_IPMI},
-    ipmi(#rmcp_ipmi{header = Header, properties = Ps}, Rest);
+    ipmi(#rmcp_ipmi{header = Header}, SessionState, Rest);
 class(_SeqNr, _Binary, _) ->
     {error, unsupported_rmcp_packet}.
 
@@ -91,25 +95,23 @@ asf(_Asf, _Binary) ->
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-ipmi(Ipmi, Binary) ->
-    {Props, Size, Response} = session(Binary, Ipmi#rmcp_ipmi.properties),
-    SessionProps = Props ++ Ipmi#rmcp_ipmi.properties,
+ipmi(Ipmi, SessionState, Binary) ->
+    {SessionProps, Size, Response} = session(Binary, SessionState),
+    AllProperties = SessionProps ++ SessionState,
     I = Ipmi#rmcp_ipmi{properties = SessionProps},
-    A = proplists:get_value(auth_type, SessionProps),
-    P = proplists:get_value(payload_type, SessionProps),
+    A = proplists:get_value(auth_type, AllProperties),
+    P = proplists:get_value(payload_type, AllProperties),
     case {A, P} of
         {rmcp_plus, ipmi} ->
-            case proplists:get_value(authenticated, SessionProps) of
-                true ->
-                    authenticate(SessionProps, Binary);
-                _ ->
-                    ok
+            case proplists:get_value(authenticated, AllProperties) of
+                true -> authenticate(AllProperties, Binary);
+                _    -> ok
             end,
             <<Data:Size/binary, _/binary>> = Response,
-            maybe_encrypted(I, Size, Data);
+            maybe_encrypted(I, AllProperties, Size, Data);
         {rmcp_plus, _} ->
-            % Open Session and RAKP messages should be neither encrypted nor
-            % authenticated. There are also no completion code or checksums.
+            %% Open Session and RAKP messages should be neither encrypted nor
+            %% authenticated. There are also no completion code or checksums.
             rakp(I, Response);
         {_, _} ->
             response(I, Size - 4, Response)
@@ -119,32 +121,42 @@ ipmi(Ipmi, Binary) ->
 %% @private
 %%------------------------------------------------------------------------------
 authenticate(Ps, Binary) ->
-    <<SessionHeader:10/binary, Size:16/little, Data:Size/binary, SessionTrailer/binary>> = Binary,
-    % PadLength = (6 - Size rem 4) rem 4,
+    <<SessionHeader:10/binary,
+      Size:16/little,
+      Data:Size/binary,
+      SessionTrailer/binary>> = Binary,
+    %% PadLength = (6 - Size rem 4) rem 4,
     PadLength = case Size rem 4 of
                     0 -> 2;
                     1 -> 1;
                     2 -> 0;
                     3 -> 3
                 end,
-    <<Padding:PadLength/binary, PadLength:8, 16#07:8, AuthCode/binary>> = SessionTrailer,
+    <<Padding:PadLength/binary,
+      PadLength:8,
+      16#07:8,
+      AuthCode/binary>> = SessionTrailer,
     H = proplists:get_value(integrity_type, Ps),
     SIK = proplists:get_value(session_key, Ps),
     K1 = eipmi_auth:extra_key(1, H, SIK),
-    Hashed = <<SessionHeader/binary, Size:16/little, Data/binary,
-               Padding/binary, PadLength:8, 16#07:8>>,
-    ?assertEqual(AuthCode, eipmi_auth:hash(H, K1, Hashed),
+    Hashed = <<SessionHeader/binary,
+               Size:16/little,
+               Data/binary,
+               Padding/binary,
+               PadLength:8, 16#07:8>>,
+    ?assertEqual(AuthCode,
+                 eipmi_auth:hash(H, K1, Hashed),
                  "AuthCode does not match").
 
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-maybe_encrypted(#rmcp_ipmi{properties = Ps} = I, Len, Data) ->
-    case proplists:get_value(encrypted, Ps) of
+maybe_encrypted(I, AllProperties, Len, Data) ->
+    case proplists:get_value(encrypted, AllProperties) of
         true ->
-            E = proplists:get_value(encrypt_type, Ps, none),
-            H = proplists:get_value(integrity_type, Ps),
-            SIK = proplists:get_value(session_key, Ps),
+            E = proplists:get_value(encrypt_type, AllProperties, none),
+            H = proplists:get_value(integrity_type, AllProperties),
+            SIK = proplists:get_value(session_key, AllProperties),
             K2 = eipmi_auth:extra_key(E, H, SIK),
             Resp = eipmi_auth:decrypt(E, K2, Data),
             response(I, size(Resp) - 4, Resp);
@@ -167,23 +179,48 @@ response(I, Len, Rest) ->
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-session(<<?EIPMI_RESERVED:4, 0:4, S:32/little, I:32/little, L:8, Rest/binary>>, _) ->
+session(<<?EIPMI_RESERVED:4, 0:4, S:32/little, I:32/little, L:8, Rest/binary>>,
+        _) ->
     {[{auth_type, none}, {outbound_seq_nr, S}, {session_id, I}], L, Rest};
-session(<<?EIPMI_RESERVED:4, 1:4, S:32/little, I:32/little, H:16/binary, L:8, Rest/binary>>, Ps) ->
-    P = proplists:get_value(password, Ps),
-    C = eipmi_util:normalize(16, P),
+session(<<?EIPMI_RESERVED:4, 1:4,
+          S:32/little,
+          I:32/little,
+          H:16/binary,
+          L:8,
+          Rest/binary>>,
+        SessionState) ->
+    Password = proplists:get_value(password, SessionState),
+    C = eipmi_util:normalize(16, Password),
     ToHash = <<C/binary, I:32/little, Rest/binary, S:32/little, C/binary>>,
     ?assertEqual(H, eipmi_auth:hash(md2, ToHash), "AuthCode does not match"),
     {[{auth_type, md2}, {outbound_seq_nr, S}, {session_id, I}], L, Rest};
-session(<<?EIPMI_RESERVED:4, 2:4, S:32/little, I:32/little, H:16/binary, L:8, Rest/binary>>, Ps) ->
-    P = proplists:get_value(password, Ps),
-    C = eipmi_util:normalize(16, P),
+session(<<?EIPMI_RESERVED:4, 2:4,
+          S:32/little,
+          I:32/little,
+          H:16/binary,
+          L:8,
+          Rest/binary>>,
+        SessionState) ->
+    Password = proplists:get_value(password, SessionState),
+    C = eipmi_util:normalize(16, Password),
     ToHash = <<C/binary, I:32/little, Rest/binary, S:32/little, C/binary>>,
     ?assertEqual(H, eipmi_auth:hash(md5, ToHash), "AuthCode does not match"),
     {[{auth_type, md5}, {outbound_seq_nr, S}, {session_id, I}], L, Rest};
-session(<<?EIPMI_RESERVED:4, 4:4, S:32/little, I:32/little, _:128, L:8, Rest/binary>>, _) ->
+session(<<?EIPMI_RESERVED:4, 4:4,
+          S:32/little,
+          I:32/little,
+          _:128,
+          L:8,
+          Rest/binary>>,
+        _) ->
     {[{auth_type, pwd}, {outbound_seq_nr, S}, {session_id, I}], L, Rest};
-session(<<?EIPMI_RESERVED:4, 6:4, E:1, A:1, P:6, I:32/little, S:32/little, L:16/little, Rest/binary>>, _) ->
+session(<<?EIPMI_RESERVED:4, 6:4,
+          E:1, A:1, P:6,
+          I:32/little,
+          S:32/little,
+          L:16/little,
+          Rest/binary>>,
+        _) ->
     Seq = case A of
               0 -> outbound_unauth_seq_nr;
               1 -> outbound_auth_seq_nr
