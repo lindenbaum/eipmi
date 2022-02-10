@@ -21,8 +21,10 @@
 
 -module(eipmi_sel).
 
--export([read/2,
-         clear/1]).
+-export([
+    read/2,
+    clear/1
+]).
 
 -include("eipmi.hrl").
 
@@ -34,20 +36,21 @@
 -type record_type() :: system_event | oem_timestamped | oem_non_timestamped.
 
 -type entry() ::
-        {record_type(),
-         [{record_id, non_neg_integer()} |
-          {type, record_type()} |
-          {oem_type, non_neg_integer()} |
-          {time, non_neg_integer()} |
-          {manufacturer_id, non_neg_integer()} |
-          {data, binary()} |
-          {revision, non_neg_integer()} |
-          {sensor_type, eipmi_sensor:type()} |
-          {sensor_number, non_neg_integer()} |
-          {raw_reading, binary()} |
-          {raw_threshold, binary()} |
-          eipmi_sensor:value() |
-          eipmi_sensor:addr()]}.
+    {record_type(), [
+        {record_id, non_neg_integer()}
+        | {type, record_type()}
+        | {oem_type, non_neg_integer()}
+        | {time, non_neg_integer()}
+        | {manufacturer_id, non_neg_integer()}
+        | {data, binary()}
+        | {revision, non_neg_integer()}
+        | {sensor_type, eipmi_sensor:type()}
+        | {sensor_number, non_neg_integer()}
+        | {raw_reading, binary()}
+        | {raw_threshold, binary()}
+        | eipmi_sensor:value()
+        | eipmi_sensor:addr()
+    ]}.
 
 -export_type([entry/0]).
 
@@ -81,7 +84,7 @@ read(SessionPid, true) ->
 read(SessionPid, false) ->
     case do_read(SessionPid, all) of
         {Error = {error, _}, []} -> Error;
-        {_, Entries}             -> {ok, Entries}
+        {_, Entries} -> {ok, Entries}
     end.
 
 %%------------------------------------------------------------------------------
@@ -115,8 +118,9 @@ do_read(SessionPid, Id, {clear, Acc}) ->
             catch
                 C:E ->
                     eipmi_util:warn(
-                      "Failed to decode SEL entry with record_id ~w (~w)",
-                      [Id, {error, {C, E}}]),
+                        "Failed to decode SEL entry with record_id ~w (~w)",
+                        [Id, {error, {C, E}}]
+                    ),
                     {{error, {C, E}}, Acc}
             end;
         {error, {bmc_error, _}} when Id =:= 0 ->
@@ -155,17 +159,23 @@ do_clear(SessionPid, ReservationId, Initiate, false) ->
 %%------------------------------------------------------------------------------
 decode(<<Id:16/little, 16#02:8, Rest/binary>>) ->
     {system_event,
-     decode_system_event0([{record_id, Id}, {type, system_event}], Rest)};
-decode(<<Id:16/little, Type:8, Rest/binary>>)
-  when Type >= 16#c0 andalso Type =< 16#df ->
+        decode_system_event0([{record_id, Id}, {type, system_event}], Rest)};
+decode(<<Id:16/little, Type:8, Rest/binary>>) when
+    Type >= 16#c0 andalso Type =< 16#df
+->
     {oem_timestamped,
-     decode_oem_timestamped(
-       [{record_id, Id}, {type, oem_timestamped}, {oem_type, Type}], Rest)};
-decode(<<Id:16/little, Type:8, Rest/binary>>)
-  when Type >= 16#e0 andalso Type =< 16#ff ->
+        decode_oem_timestamped(
+            [{record_id, Id}, {type, oem_timestamped}, {oem_type, Type}],
+            Rest
+        )};
+decode(<<Id:16/little, Type:8, Rest/binary>>) when
+    Type >= 16#e0 andalso Type =< 16#ff
+->
     {oem_non_timestamped,
-     decode_oem_non_timestamped(
-       [{record_id, Id}, {type, oem_non_timestamped}, {oem_type, Type}], Rest)}.
+        decode_oem_non_timestamped(
+            [{record_id, Id}, {type, oem_non_timestamped}, {oem_type, Type}],
+            Rest
+        )}.
 
 %%------------------------------------------------------------------------------
 %% @private
@@ -177,11 +187,15 @@ decode_system_event0(Acc, <<Time:32/little, Generator:2/binary, Rest/binary>>) -
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-decode_system_event1(Acc, <<16#04:8, SensorType:8, SensorNum:8, Assertion:1,
-                            EventType:7, EventData/binary>>) ->
+decode_system_event1(
+    Acc,
+    <<16#04:8, SensorType:8, SensorNum:8, Assertion:1, EventType:7,
+        EventData/binary>>
+) ->
     {Reading, Sensor} = eipmi_sensor:get_type(EventType, SensorType),
-    Acc ++ [{revision, 16#04}, {sensor_type, Sensor}, {sensor_number, SensorNum}]
-        ++ eipmi_util:decode_event_data(Reading, Sensor, Assertion, EventData);
+    Acc ++
+        [{revision, 16#04}, {sensor_type, Sensor}, {sensor_number, SensorNum}] ++
+        eipmi_util:decode_event_data(Reading, Sensor, Assertion, EventData);
 decode_system_event1(Acc, <<Revision:8, Data/binary>>) ->
     Acc ++ [{revision, Revision}, {data, Data}].
 

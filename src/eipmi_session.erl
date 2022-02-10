@@ -55,64 +55,68 @@
 -behaviour(gen_server).
 
 %% API
--export([start_link/2,
-         rpc/3,
-         rpc/4,
-         stop/2]).
+-export([
+    start_link/2,
+    rpc/3,
+    rpc/4,
+    stop/2
+]).
 
 %% gen_server callbacks
--export([init/1,
-         handle_call/3,
-         handle_cast/2,
-         handle_info/2,
-         terminate/2,
-         code_change/3]).
+-export([
+    init/1,
+    handle_call/3,
+    handle_cast/2,
+    handle_info/2,
+    terminate/2,
+    code_change/3
+]).
 
 -include("eipmi.hrl").
 
 -type property() ::
-        eipmi:option() |
-        {auth_type, eipmi_auth:type()} |
-        {auth_types, [eipmi_auth:type()]} |
-        {challenge, binary()} |
-        {completion, atom()} |
-        {inbound_seq_nr, non_neg_integer()} |
-        {inbound_unauth_seq_nr, non_neg_integer()} |
-        {inbound_auth_seq_nr, non_neg_integer()} |
-        {login_status, [anonymous | null | non_null]} |
-        {message_tag, byte()} |
-        {outbound_seq_nr, non_neg_integer()} |
-        {outbound_unauth_seq_nr, non_neg_integer()} |
-        {outbound_auth_seq_nr, non_neg_integer()} |
-        {payload_type, eipmi_auth:payload_type()} |
-        {rakp_auth_type, eipmi_auth:rakp_type()} |
-        {rq_seq_nr, 0..16#40} |
-        {rq_nonce, binary()} |
-        {rq_session_id, non_neg_integer()} |
-        {rs_nonce, binary()} |
-        {rs_session_id, non_neg_integer()} |
-        {session_id, non_neg_integer()}.
+    eipmi:option()
+    | {auth_type, eipmi_auth:type()}
+    | {auth_types, [eipmi_auth:type()]}
+    | {challenge, binary()}
+    | {completion, atom()}
+    | {inbound_seq_nr, non_neg_integer()}
+    | {inbound_unauth_seq_nr, non_neg_integer()}
+    | {inbound_auth_seq_nr, non_neg_integer()}
+    | {login_status, [anonymous | null | non_null]}
+    | {message_tag, byte()}
+    | {outbound_seq_nr, non_neg_integer()}
+    | {outbound_unauth_seq_nr, non_neg_integer()}
+    | {outbound_auth_seq_nr, non_neg_integer()}
+    | {payload_type, eipmi_auth:payload_type()}
+    | {rakp_auth_type, eipmi_auth:rakp_type()}
+    | {rq_seq_nr, 0..16#40}
+    | {rq_nonce, binary()}
+    | {rq_session_id, non_neg_integer()}
+    | {rs_nonce, binary()}
+    | {rs_session_id, non_neg_integer()}
+    | {session_id, non_neg_integer()}.
 
 -type property_name() ::
-        eipmi:option_name() |
-        auth_type |
-        auth_types |
-        challenge |
-        completion |
-        encrypt_type |
-        inbound_seq_nr |
-        inbound_unauth_seq_nr |
-        inbound_auth_seq_nr |
-        integrity_type |
-        login_status |
-        message_tag |
-        outbound_seq_nr |
-        outbound_unauth_seq_nr |
-        outbound_auth_seq_nr |
-        payload_type |
-        rq_auth_type |
-        rq_seq_nr |
-        session_id.
+    eipmi:option_name()
+    | auth_type
+    | auth_types
+    | challenge
+    | completion
+    | encrypt_type
+    | inbound_seq_nr
+    | inbound_unauth_seq_nr
+    | inbound_auth_seq_nr
+    | integrity_type
+    | login_status
+    | message_tag
+    | outbound_seq_nr
+    | outbound_unauth_seq_nr
+    | outbound_auth_seq_nr
+    | payload_type
+    | rq_auth_type
+    | rq_seq_nr
+    | session_id.
 
 -export_type([property/0, property_name/0]).
 
@@ -121,37 +125,42 @@
 %%------------------------------------------------------------------------------
 %% Session defaults, partially modifyable by the user.
 %%------------------------------------------------------------------------------
--define(DEFAULTS,
-        [
-         %% default values modifyable through eipmi:open/2
-         {encrypt_type, none},
-         {initial_outbound_seq_nr, 16#1337},
-         {integrity_type, none},
-         {keep_alive_retransmits, ?IPMI_RETRANSMITS},
-         {password, ""},
-         {port, ?RMCP_PORT_NUMBER},
-         {privilege, administrator},
-         {rakp_auth_type, none},
-         {rq_addr, ?IPMI_REQUESTOR_ADDR},
-         {rq_auth_type, none},
-         {rq_session_id, 16#1337c0de},
-         {timeout, 1000},
-         {user, ""},
-         %% unmodifyable session defaults
-         {auth_type, none},      %% initial packets are not authenticated
-         {inbound_seq_nr, 0},    %% initial packets have the null seqnr
-         {inbound_unauth_seq_nr, 0},
-         {inbound_auth_seq_nr, 0},
-         {message_tag, 0},
-         {outbound_seq_nr, 0},   %% initial packets have the null seqnr
-         {outbound_unauth_seq_nr, 0},
-         {outbound_auth_seq_nr, 0},
-         {rq_lun, ?IPMI_REQUESTOR_LUN},
-         {rq_seq_nr, 0},         %% initial requests have the null seqnr
-         {rs_addr, ?IPMI_RESPONDER_ADDR},
-         {rs_lun, ?IPMI_RESPONDER_LUN},
-         {session_id, 0}         %% initial have the null session id
-        ]).
+-define(DEFAULTS, [
+    %% default values modifyable through eipmi:open/2
+    {encrypt_type, none},
+    {initial_outbound_seq_nr, 16#1337},
+    {integrity_type, none},
+    {keep_alive_retransmits, ?IPMI_RETRANSMITS},
+    {password, ""},
+    {port, ?RMCP_PORT_NUMBER},
+    {privilege, administrator},
+    {rakp_auth_type, none},
+    {rq_addr, ?IPMI_REQUESTOR_ADDR},
+    {rq_auth_type, none},
+    {rq_session_id, 16#1337c0de},
+    {timeout, 1000},
+    {user, ""},
+    %% unmodifyable session defaults
+
+    %% initial packets are not authenticated
+    {auth_type, none},
+    %% initial packets have the null seqnr
+    {inbound_seq_nr, 0},
+    {inbound_unauth_seq_nr, 0},
+    {inbound_auth_seq_nr, 0},
+    {message_tag, 0},
+    %% initial packets have the null seqnr
+    {outbound_seq_nr, 0},
+    {outbound_unauth_seq_nr, 0},
+    {outbound_auth_seq_nr, 0},
+    {rq_lun, ?IPMI_REQUESTOR_LUN},
+    %% initial requests have the null seqnr
+    {rq_seq_nr, 0},
+    {rs_addr, ?IPMI_RESPONDER_ADDR},
+    {rs_lun, ?IPMI_RESPONDER_LUN},
+    %% initial have the null session id
+    {session_id, 0}
+]).
 
 %%%=============================================================================
 %%% API
@@ -167,7 +176,8 @@
 %% be queued and sent as soon as the session is established.
 %% @end
 %%------------------------------------------------------------------------------
--spec start_link(eipmi:session(), [property()]) -> {ok, pid()} | {error, term()}.
+-spec start_link(eipmi:session(), [property()]) ->
+    {ok, pid()} | {error, term()}.
 start_link(Session, Options) ->
     gen_server:start_link(?MODULE, [Session, Options], []).
 
@@ -180,7 +190,7 @@ start_link(Session, Options) ->
 %% @end
 %%------------------------------------------------------------------------------
 -spec rpc(pid(), eipmi:request(), proplists:proplist()) ->
-                 {ok, proplists:proplist()} | {error, term()}.
+    {ok, proplists:proplist()} | {error, term()}.
 rpc(Pid, Request, Properties) ->
     Retransmits = eipmi_util:get_env(retransmits, ?IPMI_RETRANSMITS),
     rpc(Pid, Request, Properties, Retransmits).
@@ -193,11 +203,13 @@ rpc(Pid, Request, Properties) ->
 %% @end
 %%------------------------------------------------------------------------------
 -spec rpc(pid(), eipmi:request(), proplists:proplist(), non_neg_integer()) ->
-                 {ok, proplists:proplist()} | {error, term()}.
+    {ok, proplists:proplist()} | {error, term()}.
 rpc(Pid, Request, Properties, Retransmits) ->
     Data = eipmi_request:encode(Request, Properties),
     RqSeqNr = gen_server:call(Pid, get_rq_seq_nr),
-    F = fun() -> gen_server:call(Pid, {rpc, Request, Data, RqSeqNr}, infinity) end,
+    F = fun() ->
+        gen_server:call(Pid, {rpc, Request, Data, RqSeqNr}, infinity)
+    end,
     rpc_(F(), F, Retransmits).
 rpc_({error, timeout}, Fun, Retransmits) when Retransmits > 0 ->
     rpc_(Fun(), Fun, Retransmits - 1);
@@ -220,15 +232,16 @@ stop(Pid, Reason) -> gen_server:cast(Pid, {stop, Reason}).
 
 -type rq() :: {eipmi:response(), 0..63}.
 
-    -record(state, {
-              owner          :: {pid(), reference()},
-              keep_alive     :: non_neg_integer() | undefined,
-              last_send      :: non_neg_integer() | undefined,
-              requests = []  :: [{rq(), reference(), term()}],
-              session        :: eipmi:session(),
-              address        :: inet:ip_address() | inet:hostname(),
-              socket         :: inet:socket(),
-              properties     :: [property()]}).
+-record(state, {
+    owner :: {pid(), reference()},
+    keep_alive :: non_neg_integer() | undefined,
+    last_send :: non_neg_integer() | undefined,
+    requests = [] :: [{rq(), reference(), term()}],
+    session :: eipmi:session(),
+    address :: inet:ip_address() | inet:hostname(),
+    socket :: inet:socket(),
+    properties :: [property()]
+}).
 
 %%------------------------------------------------------------------------------
 %% @private
@@ -238,22 +251,25 @@ init([Session = {session, {Addr, _}, {Owner, _}}, Options]) ->
     Ref = erlang:monitor(process, Owner),
     Opts = eipmi_util:merge_vals(Options, ?DEFAULTS),
     {ok, Sock} = gen_udp:open(0, [binary, {active, false}]),
-    State = #state{owner = {Owner, Ref},
-                   session = Session,
-                   address = Addr,
-                   socket = Sock,
-                   properties = Opts},
+    State = #state{
+        owner = {Owner, Ref},
+        session = Session,
+        address = Addr,
+        socket = Sock,
+        properties = Opts
+    },
     try
         {ok, State1} = get_authentication_capabilities(State),
-        {ok, State3} = case get_state_val(rq_auth_type, State1) of
-                           rmcp_plus ->
-                               {ok, Rakp} = open_session(State1),
-                               {ok, Rakp2} = rakp12(Rakp),
-                               rakp34(Rakp2);
-                           _ ->
-                               {ok, State2} = get_session_challenge(State1),
-                               activate_session(State2)
-                       end,
+        {ok, State3} =
+            case get_state_val(rq_auth_type, State1) of
+                rmcp_plus ->
+                    {ok, Rakp} = open_session(State1),
+                    {ok, Rakp2} = rakp12(Rakp),
+                    rakp34(Rakp2);
+                _ ->
+                    {ok, State2} = get_session_challenge(State1),
+                    activate_session(State2)
+            end,
         {ok, State4} = set_session_privilege_level(State3),
         ok = inet:setopts(Sock, [{active, true}]),
         {ok, State4}
@@ -285,14 +301,20 @@ handle_cast(Request, State) ->
 handle_info({udp_closed, Socket}, State = #state{socket = Socket}) ->
     {stop, socket_closed, State};
 handle_info({udp, Socket, _, _, Bin}, State = #state{socket = Socket}) ->
-    try {noreply, handle_rmcp(eipmi_decoder:packet(Bin, State#state.properties), State)}
+    try
+        {noreply,
+            handle_rmcp(
+                eipmi_decoder:packet(Bin, State#state.properties),
+                State
+            )}
     catch
         C:E -> {stop, {C, E}, State}
     end;
 handle_info({timeout, Rq = {{NetFn, Cmd}, RqSeqNr}}, State) ->
     NewState1 = fire({timeout, {{NetFn - 1, Cmd}, RqSeqNr}}, State),
     {Requests, NewState2} = unregister_request(Rq, NewState1),
-    try {noreply, lists:foldl(reply({error, timeout}), NewState2, Requests)}
+    try
+        {noreply, lists:foldl(reply({error, timeout}), NewState2, Requests)}
     catch
         C:E -> {stop, {C, E}, NewState2}
     end;
@@ -327,14 +349,18 @@ code_change(_OldVsn, State, _Extra) ->
 %% @private
 %%------------------------------------------------------------------------------
 get_authentication_capabilities(State = #state{socket = Socket}) ->
-    Request = {?IPMI_NETFN_APPLICATION_REQUEST,
-               ?GET_CHANNEL_AUTHENTICATION_CAPABILITIES},
+    Request =
+        {?IPMI_NETFN_APPLICATION_REQUEST,
+            ?GET_CHANNEL_AUTHENTICATION_CAPABILITIES},
     Data = eipmi_request:encode(Request, State#state.properties),
     {RqSeqNr, State1} = incr_rq_seq_nr(State),
     State2 = send_request(Request, Data, RqSeqNr, State1),
     Timeout = get_state_val(timeout, State2),
     {ok, {_, _, Bin}} = gen_udp:recv(Socket, 2000, Timeout),
-    {ok, Packet = #rmcp_ipmi{header = Header}} = eipmi_decoder:packet(Bin, State#state.properties),
+    {ok, Packet = #rmcp_ipmi{header = Header}} = eipmi_decoder:packet(
+        Bin,
+        State#state.properties
+    ),
     State3 = maybe_send_ack(Header, State2),
     {ok, Fields} = get_response(Packet),
     {ok, select_version(Fields, check_login(Fields, State3))}.
@@ -349,7 +375,10 @@ get_session_challenge(State = #state{socket = Socket}) ->
     State2 = send_request(Request, Data, RqSeqNr, State1),
     Timeout = get_state_val(timeout, State2),
     {ok, {_, _, Bin}} = gen_udp:recv(Socket, 2000, Timeout),
-    {ok, Packet = #rmcp_ipmi{header = Header}} = eipmi_decoder:packet(Bin, State1#state.properties),
+    {ok, Packet = #rmcp_ipmi{header = Header}} = eipmi_decoder:packet(
+        Bin,
+        State1#state.properties
+    ),
     State3 = maybe_send_ack(Header, State2),
     AuthType = get_state_val(rq_auth_type, State3),
     State4 = update_state_val(auth_type, AuthType, State3),
@@ -366,10 +395,18 @@ activate_session(State = #state{socket = Socket}) ->
     State2 = send_request(Request, Data, RqSeqNr, State1),
     Timeout = get_state_val(timeout, State2),
     {ok, {_, _, Bin}} = gen_udp:recv(Socket, 2000, Timeout),
-    {ok, Packet = #rmcp_ipmi{header = Header}} = eipmi_decoder:packet(Bin, State2#state.properties),
+    {ok, Packet = #rmcp_ipmi{header = Header}} = eipmi_decoder:packet(
+        Bin,
+        State2#state.properties
+    ),
     State3 = maybe_send_ack(Header, State2),
     {ok, Fields} = get_response(Packet),
-    {ok, copy_state_vals([auth_type, session_id, inbound_seq_nr], Fields, State3)}.
+    {ok,
+        copy_state_vals(
+            [auth_type, session_id, inbound_seq_nr],
+            Fields,
+            State3
+        )}.
 
 %%------------------------------------------------------------------------------
 %% @private
@@ -381,12 +418,17 @@ set_session_privilege_level(State = #state{socket = Socket}) ->
     State2 = send_request(Request, Data, RqSeqNr, State1),
     Timeout = get_state_val(timeout, State2),
     {ok, {_, _, Bin}} = gen_udp:recv(Socket, 2000, Timeout),
-    {ok, Packet = #rmcp_ipmi{header = Header}} = eipmi_decoder:packet(Bin, State1#state.properties),
+    {ok, Packet = #rmcp_ipmi{header = Header}} = eipmi_decoder:packet(
+        Bin,
+        State1#state.properties
+    ),
     State3 = maybe_send_ack(Header, State2),
     {ok, Fields} = get_response(Packet),
     RequestedPrivilege = get_state_val(privilege, State),
-    assert(RequestedPrivilege == proplists:get_value(privilege, Fields),
-           failed_to_set_requested_privilege),
+    assert(
+        RequestedPrivilege == proplists:get_value(privilege, Fields),
+        failed_to_set_requested_privilege
+    ),
     {ok, keep_alive(to_millis(os:timestamp()), fire(established, State3))}.
 
 %%------------------------------------------------------------------------------
@@ -399,22 +441,43 @@ open_session(State = #state{socket = Socket, properties = Ps}) ->
     State2 = send_request(open_session_rq, Data, RqSeqNr, State1),
     Timeout = get_state_val(timeout, State2),
     {ok, {_, _, Bin}} = gen_udp:recv(Socket, 2000, Timeout),
-    {ok, Packet = #rmcp_ipmi{}} = eipmi_decoder:packet(Bin, State2#state.properties),
+    {ok, Packet = #rmcp_ipmi{}} = eipmi_decoder:packet(
+        Bin,
+        State2#state.properties
+    ),
     {ok, Fields} = get_response(Packet),
-    {ok, copy_state_vals([message_tag, rs_session_id, rakp_auth_type, integrity_type, encrypt_type], Fields, State2)}.
+    {ok,
+        copy_state_vals(
+            [
+                message_tag,
+                rs_session_id,
+                rakp_auth_type,
+                integrity_type,
+                encrypt_type
+            ],
+            Fields,
+            State2
+        )}.
 
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
 rakp12(State = #state{socket = Socket, properties = Ps}) ->
-    Properties = [{rq_nonce, crypto:strong_rand_bytes(16)}, {lookup_type, 1},
-                  {payload_type, rakp1} | Ps],
+    Properties = [
+        {rq_nonce, crypto:strong_rand_bytes(16)},
+        {lookup_type, 1},
+        {payload_type, rakp1}
+        | Ps
+    ],
     Data = eipmi_request:encode(rakp1, Properties),
     {RqSeqNr, State1} = incr_rq_seq_nr(State#state{properties = Properties}),
     State2 = send_request(rakp1, Data, RqSeqNr, State1),
     Timeout = get_state_val(timeout, State2),
     {ok, {_, _, Bin}} = gen_udp:recv(Socket, 2000, Timeout),
-    {ok, Packet = #rmcp_ipmi{}} = eipmi_decoder:packet(Bin, State2#state.properties),
+    {ok, Packet = #rmcp_ipmi{}} = eipmi_decoder:packet(
+        Bin,
+        State2#state.properties
+    ),
     {ok, Fields} = get_response(Packet),
     AuthCode = proplists:get_value(auth_code, Fields),
     State3 = copy_state_vals([rs_nonce, system_guid], Fields, State2),
@@ -439,7 +502,9 @@ rakp34(State = #state{socket = Socket, properties = Ps}) ->
     authenticate(rakp4, IntegrityCode, State3),
     SessionId = get_state_val(rs_session_id, State3),
     % Can't let the authenticated session sequence number start at 0.
-    State4 = incr_inbound_seq_nr(update_state_val(session_id, SessionId, State3)),
+    State4 = incr_inbound_seq_nr(
+        update_state_val(session_id, SessionId, State3)
+    ),
     {ok, update_state_val(payload_type, ipmi, State4)}.
 
 %%------------------------------------------------------------------------------
@@ -456,10 +521,13 @@ authenticate(rakp2, AuthCode, State) ->
     L = get_state_val(lookup_type, State),
     Priv = eipmi_request:encode_privilege(get_state_val(privilege, State)),
     User = iolist_to_binary(get_state_val(user, State)),
-    ToHash = <<Sq:32/little, Ss:32/little, Rq:16/binary, Rs:16/binary,
-               Guid:128/little, L:4, Priv:4, (byte_size(User)):8, User/binary>>,
-    assert(AuthCode == eipmi_auth:rakp_hash(AuthType, rakp2, Pass, ToHash),
-           failed_to_authenticate);
+    ToHash =
+        <<Sq:32/little, Ss:32/little, Rq:16/binary, Rs:16/binary,
+            Guid:128/little, L:4, Priv:4, (byte_size(User)):8, User/binary>>,
+    assert(
+        AuthCode == eipmi_auth:rakp_hash(AuthType, rakp2, Pass, ToHash),
+        failed_to_authenticate
+    );
 authenticate(rakp4, AuthCode, State) ->
     AuthType = get_state_val(rakp_auth_type, State),
     SIK = get_state_val(session_key, State),
@@ -467,8 +535,10 @@ authenticate(rakp4, AuthCode, State) ->
     Ss = get_state_val(rs_session_id, State),
     Guid = get_state_val(system_guid, State),
     ToHash = <<Rq:16/binary, Ss:32/little, Guid:128/little>>,
-    assert(AuthCode == eipmi_auth:rakp_hash(AuthType, rakp4, SIK, ToHash),
-           failed_to_authenticate).
+    assert(
+        AuthCode == eipmi_auth:rakp_hash(AuthType, rakp4, SIK, ToHash),
+        failed_to_authenticate
+    ).
 
 %%------------------------------------------------------------------------------
 %% @private
@@ -481,7 +551,9 @@ calculate_session_key(State) ->
     L = get_state_val(lookup_type, State),
     Priv = eipmi_request:encode_privilege(get_state_val(privilege, State)),
     User = iolist_to_binary(get_state_val(user, State)),
-    ToHash = <<Rq:16/binary, Rs:16/binary, L:4, Priv:4, (byte_size(User)):8, User/binary>>,
+    ToHash =
+        <<Rq:16/binary, Rs:16/binary, L:4, Priv:4, (byte_size(User)):8,
+            User/binary>>,
     eipmi_auth:rakp_hash(AuthType, ipmi, Pass, ToHash).
 
 %%------------------------------------------------------------------------------
@@ -545,10 +617,11 @@ process_request({{NetFn, Cmd}, Data, RqSeqNr, Receiver}, State) ->
 send_request(Request, Data, RqSeqNr, State = #state{properties = Ps}) ->
     Header = #rmcp_header{seq_nr = ?RMCP_NOREPLY, class = ?RMCP_IPMI},
     Bin = eipmi_encoder:ipmi(
-            Header,
-            eipmi_util:update_val(rq_seq_nr, RqSeqNr, Ps),
-            Request,
-            Data),
+        Header,
+        eipmi_util:update_val(rq_seq_nr, RqSeqNr, Ps),
+        Request,
+        Data
+    ),
     udp_send(Bin, State).
 
 %%------------------------------------------------------------------------------
@@ -566,11 +639,12 @@ incr_rq_seq_nr(State) ->
 incr_inbound_seq_nr(State) ->
     AuthType = get_state_val(auth_type, State),
     SessID = get_state_val(session_id, State),
-    Seq = case {AuthType, SessID} of
-              {rmcp_plus, 0} -> inbound_unauth_seq_nr;
-              {rmcp_plus, _} -> inbound_auth_seq_nr;
-              _ -> inbound_seq_nr
-          end,
+    Seq =
+        case {AuthType, SessID} of
+            {rmcp_plus, 0} -> inbound_unauth_seq_nr;
+            {rmcp_plus, _} -> inbound_auth_seq_nr;
+            _ -> inbound_seq_nr
+        end,
     SeqNr = get_state_val(Seq, State),
     update_state_val(Seq, (SeqNr + 1) rem (16#ffffffff + 1), State).
 
@@ -673,8 +747,9 @@ assert(false, MsgTerm) -> throw(MsgTerm).
 %% probably be sent in this period anyways. In the other case we need to send a
 %% keep-alive request.
 %%------------------------------------------------------------------------------
-keep_alive(Now, State = #state{last_send = Last})
-  when Now - Last + ?KEEP_ALIVE_TIMER < 55000 ->
+keep_alive(Now, State = #state{last_send = Last}) when
+    Now - Last + ?KEEP_ALIVE_TIMER < 55000
+->
     start_keep_alive_timer(State);
 keep_alive(_, State) ->
     send_keep_alive(State).

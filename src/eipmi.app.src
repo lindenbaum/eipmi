@@ -13,15 +13,14 @@
 %%% ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 %%% OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 %%%=============================================================================
-{application, eipmi,
- [
-  {description, "A native Erlang IMPI library."},
-  {vsn, "4.0.0"},
-  {registered, [eipmi]},
-  {applications, [kernel, stdlib, sasl, crypto, snmp, md2]},
-  {mod, {eipmi, []}},
-  {env, []},
-  {maintainers, ["Tobias Schlager", "Sven Heyll"]},
-  {licenses, ["MIT"]},
-  {links, [{"Github", "https://github.com/lindenbaum/eipmi"}]}
- ]}.
+{application, eipmi, [
+    {description, "A native Erlang IMPI library."},
+    {vsn, "4.0.0"},
+    {registered, [eipmi]},
+    {applications, [kernel, stdlib, sasl, crypto, snmp, md2]},
+    {mod, {eipmi, []}},
+    {env, []},
+    {maintainers, ["Tobias Schlager", "Sven Heyll"]},
+    {licenses, ["MIT"]},
+    {links, [{"Github", "https://github.com/lindenbaum/eipmi"}]}
+]}.

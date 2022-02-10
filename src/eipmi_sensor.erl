@@ -21,98 +21,278 @@
 
 -module(eipmi_sensor).
 
--export([get_addr/1,
-         get_type/2,
-         get_value/6,
-         get_entity/2,
-         get_entity_id/1,
-         get_unit/1,
-         to_list/1]).
+-export([
+    get_addr/1,
+    get_type/2,
+    get_value/6,
+    get_entity/2,
+    get_entity_id/1,
+    get_unit/1,
+    to_list/1
+]).
 
 -include("eipmi.hrl").
 
 -type addr() ::
-        {fru_id, non_neg_integer()} |
-        {fru_lun, non_neg_integer()} |
-        {sensor_addr, non_neg_integer()} |
-        {sensor_lun, non_neg_integer()} |
-        {bus_id, non_neg_integer()} |
-        {channel, non_neg_integer()} |
-        {software_id, non_neg_integer()}.
+    {fru_id, non_neg_integer()}
+    | {fru_lun, non_neg_integer()}
+    | {sensor_addr, non_neg_integer()}
+    | {sensor_lun, non_neg_integer()}
+    | {bus_id, non_neg_integer()}
+    | {channel, non_neg_integer()}
+    | {software_id, non_neg_integer()}.
 
 -type entity_id() ::
-        unspecified | other | unknown | processor | disk_or_disk_bay |
-        peripheral_bay | system_management_module | system_board |
-        memory_module | processor_module | power_supply | add_in_card |
-        front_panel_board | back_panel_board | power_system_board |
-        drive_backplane | system_internal_expansion_board | other_system_board |
-        processor_board | power_unit | power_module | power_management |
-        chassis_back_panel_board | system_chassis | sub_chassis |
-        other_chassis_board | disk_drive_bay | peripheral_bay | device_bay |
-        cooling_device | cooling_unit | interconnect | memory_device |
-        system_management_software | system_firmware | operating_system |
-        system_bus | group | remote_management_communication_device |
-        external_environment | battery | processing_blade |
-        connectivity_switch | processor_memory_module | io_module |
-        processor_io_module | management_controller_firmware | ipmi_channel |
-        pci_bus | pci_expresstm_bus | scsi_bus | sata_bus | front_side_bus |
-        real_time_clock | air_inlet | air_inlet | processor |
-        main_system_board | front_board | amc | mch |
-        shelf_management_controller | filtration_unit | shelf_fru_information |
-        alarm_panel | non_neg_integer().
+    unspecified
+    | other
+    | unknown
+    | processor
+    | disk_or_disk_bay
+    | peripheral_bay
+    | system_management_module
+    | system_board
+    | memory_module
+    | processor_module
+    | power_supply
+    | add_in_card
+    | front_panel_board
+    | back_panel_board
+    | power_system_board
+    | drive_backplane
+    | system_internal_expansion_board
+    | other_system_board
+    | processor_board
+    | power_unit
+    | power_module
+    | power_management
+    | chassis_back_panel_board
+    | system_chassis
+    | sub_chassis
+    | other_chassis_board
+    | disk_drive_bay
+    | peripheral_bay
+    | device_bay
+    | cooling_device
+    | cooling_unit
+    | interconnect
+    | memory_device
+    | system_management_software
+    | system_firmware
+    | operating_system
+    | system_bus
+    | group
+    | remote_management_communication_device
+    | external_environment
+    | battery
+    | processing_blade
+    | connectivity_switch
+    | processor_memory_module
+    | io_module
+    | processor_io_module
+    | management_controller_firmware
+    | ipmi_channel
+    | pci_bus
+    | pci_expresstm_bus
+    | scsi_bus
+    | sata_bus
+    | front_side_bus
+    | real_time_clock
+    | air_inlet
+    | air_inlet
+    | processor
+    | main_system_board
+    | front_board
+    | amc
+    | mch
+    | shelf_management_controller
+    | filtration_unit
+    | shelf_fru_information
+    | alarm_panel
+    | non_neg_integer().
 
 -type entity() ::
-        {entity_id, entity_id()} |
-        {entity_type, logical | physical} |
-        {entity_instance, non_neg_integer()}.
+    {entity_id, entity_id()}
+    | {entity_type, logical | physical}
+    | {entity_instance, non_neg_integer()}.
 
 -type reading() ::
-        threshold | dmi_usage | state | predictive_failure | limit |
-        performance | severity | availability0 | availability1 | availability2 |
-        redundancy | acpi_power_state | specific | non_neg_integer().
+    threshold
+    | dmi_usage
+    | state
+    | predictive_failure
+    | limit
+    | performance
+    | severity
+    | availability0
+    | availability1
+    | availability2
+    | redundancy
+    | acpi_power_state
+    | specific
+    | non_neg_integer().
 
 -type type() ::
-        temperature | voltage | current | fan | intrusion | violation_attempt |
-        processor | power_supply | power_unit | cooling_unit | other_unit |
-        memory | drive_slot | post_memory_resize | system_firmware |
-        event_logging | watchdog_old | system_event | critical_interrupt |
-        switch | board | microcontroller | add_in_card | chassis | chip_set |
-        other_fru | interconnect | terminator | system_boot | boot_error |
-        os_boot | os_shutdown | slot | system_acpi_power_state | watchdog |
-        platform_alert | entity_presence | monitor_asic_ic | lan |
-        management_subsystem_health | battery | session | version | fru_state |
-        fru_hot_swap | ipmb_physical | module_hot_swap | power_channel |
-        telco_alarm | non_neg_integer().
+    temperature
+    | voltage
+    | current
+    | fan
+    | intrusion
+    | violation_attempt
+    | processor
+    | power_supply
+    | power_unit
+    | cooling_unit
+    | other_unit
+    | memory
+    | drive_slot
+    | post_memory_resize
+    | system_firmware
+    | event_logging
+    | watchdog_old
+    | system_event
+    | critical_interrupt
+    | switch
+    | board
+    | microcontroller
+    | add_in_card
+    | chassis
+    | chip_set
+    | other_fru
+    | interconnect
+    | terminator
+    | system_boot
+    | boot_error
+    | os_boot
+    | os_shutdown
+    | slot
+    | system_acpi_power_state
+    | watchdog
+    | platform_alert
+    | entity_presence
+    | monitor_asic_ic
+    | lan
+    | management_subsystem_health
+    | battery
+    | session
+    | version
+    | fru_state
+    | fru_hot_swap
+    | ipmb_physical
+    | module_hot_swap
+    | power_channel
+    | telco_alarm
+    | non_neg_integer().
 
 -type value() ::
-        {sensor_value, term()} |
-        {previous_value, term()} |
-        {severity_value, term()} |
-        term().
+    {sensor_value, term()}
+    | {previous_value, term()}
+    | {severity_value, term()}
+    | term().
 
 -type unit() ::
-        celsius | fahrenheit | kelvin | volts | amps | watts | joules |
-        coulombs | va | nits | lumen | lux | candela | kPa | psi | newton |
-        cfm | rpm | hz | microsecond | millisecond | second | minute | hour |
-        day | week | mil | inches | feet | cubic_inches | cubic_feet | mm | cm |
-        m | cubic_cm | cubic_m | liters | fluid_ounce | radians | steradians |
-        revolutions | cycles | gravities | ounce | pound | ft_lb | oz_inch |
-        gauss | gilberts | henry | millihenry | farad | microfarad | ohms |
-        siemens | mole | becquerel | ppm | reserved | decibels | dBA | dBC |
-        gray | sievert | color_temperature_kelvin | bit | kilobit | megabit |
-        gigabit | byte | kilobyte | megabyte | gigabyte | word | dword | qword |
-        memory_line | hit | miss | retry | reset | overrun | underrun |
-        collision | packets | messages | characters | error |
-        correctable_error | uncorrectable_error | fatal_error | grams |
-        unspecified.
+    celsius
+    | fahrenheit
+    | kelvin
+    | volts
+    | amps
+    | watts
+    | joules
+    | coulombs
+    | va
+    | nits
+    | lumen
+    | lux
+    | candela
+    | kPa
+    | psi
+    | newton
+    | cfm
+    | rpm
+    | hz
+    | microsecond
+    | millisecond
+    | second
+    | minute
+    | hour
+    | day
+    | week
+    | mil
+    | inches
+    | feet
+    | cubic_inches
+    | cubic_feet
+    | mm
+    | cm
+    | m
+    | cubic_cm
+    | cubic_m
+    | liters
+    | fluid_ounce
+    | radians
+    | steradians
+    | revolutions
+    | cycles
+    | gravities
+    | ounce
+    | pound
+    | ft_lb
+    | oz_inch
+    | gauss
+    | gilberts
+    | henry
+    | millihenry
+    | farad
+    | microfarad
+    | ohms
+    | siemens
+    | mole
+    | becquerel
+    | ppm
+    | reserved
+    | decibels
+    | dBA
+    | dBC
+    | gray
+    | sievert
+    | color_temperature_kelvin
+    | bit
+    | kilobit
+    | megabit
+    | gigabit
+    | byte
+    | kilobyte
+    | megabyte
+    | gigabyte
+    | word
+    | dword
+    | qword
+    | memory_line
+    | hit
+    | miss
+    | retry
+    | reset
+    | overrun
+    | underrun
+    | collision
+    | packets
+    | messages
+    | characters
+    | error
+    | correctable_error
+    | uncorrectable_error
+    | fatal_error
+    | grams
+    | unspecified.
 
--export_type([addr/0,
-              entity_id/0,
-              entity/0,
-              reading/0,
-              type/0,
-              value/0,
-              unit/0]).
+-export_type([
+    addr/0,
+    entity_id/0,
+    entity/0,
+    reading/0,
+    type/0,
+    value/0,
+    unit/0
+]).
 
 %%%=============================================================================
 %%% API
@@ -158,7 +338,7 @@ get_type(ReadingType, SensorType) ->
 %% @end
 %%------------------------------------------------------------------------------
 -spec get_value(reading(), type(), non_neg_integer(), 0 | 1, 0..255, 0..255) ->
-                       [value()].
+    [value()].
 get_value(Reading, Type, Offset, Assertion, Value1, Value2) ->
     map(Type, Reading, Offset, Assertion, Value1, Value2).
 
@@ -255,7 +435,7 @@ get_entity_id(16#f0) -> [{entity_id, shelf_management_controller}];
 get_entity_id(16#f1) -> [{entity_id, filtration_unit}];
 get_entity_id(16#f2) -> [{entity_id, shelf_fru_information}];
 get_entity_id(16#f3) -> [{entity_id, alarm_panel}];
-get_entity_id(Id)    -> [{entity_id, Id}].
+get_entity_id(Id) -> [{entity_id, Id}].
 
 %%------------------------------------------------------------------------------
 %% @doc
@@ -264,15 +444,15 @@ get_entity_id(Id)    -> [{entity_id, Id}].
 %% @end
 %%------------------------------------------------------------------------------
 -spec get_unit(non_neg_integer()) -> unit().
-get_unit(1) ->  celsius;
-get_unit(2) ->  fahrenheit;
-get_unit(3) ->  kelvin;
-get_unit(4) ->  volts;
-get_unit(5) ->  amps;
-get_unit(6) ->  watts;
-get_unit(7) ->  joules;
-get_unit(8) ->  coulombs;
-get_unit(9) ->  va;
+get_unit(1) -> celsius;
+get_unit(2) -> fahrenheit;
+get_unit(3) -> kelvin;
+get_unit(4) -> volts;
+get_unit(5) -> amps;
+get_unit(6) -> watts;
+get_unit(7) -> joules;
+get_unit(8) -> coulombs;
+get_unit(9) -> va;
 get_unit(10) -> nits;
 get_unit(11) -> lumen;
 get_unit(12) -> lux;
@@ -356,7 +536,7 @@ get_unit(89) -> correctable_error;
 get_unit(90) -> uncorrectable_error;
 get_unit(91) -> fatal_error;
 get_unit(92) -> grams;
-get_unit(_)  -> unspecified.
+get_unit(_) -> unspecified.
 
 %%------------------------------------------------------------------------------
 %% @doc
@@ -365,9 +545,9 @@ get_unit(_)  -> unspecified.
 %% @end
 %%------------------------------------------------------------------------------
 -spec to_list(atom() | string() | integer()) -> string().
-to_list(Int)  when is_integer(Int) -> to_list(integer_to_list(Int));
-to_list(Atom) when is_atom(Atom)   -> to_list(atom_to_list(Atom));
-to_list(List) when is_list(List)   -> string:to_upper(List).
+to_list(Int) when is_integer(Int) -> to_list(integer_to_list(Int));
+to_list(Atom) when is_atom(Atom) -> to_list(atom_to_list(Atom));
+to_list(List) when is_list(List) -> string:to_upper(List).
 
 %%%=============================================================================
 %%% Internal functions
@@ -425,121 +605,126 @@ get_sensor_type(16#f1) -> ipmb_physical;
 get_sensor_type(16#f2) -> module_hot_swap;
 get_sensor_type(16#f3) -> power_channel;
 get_sensor_type(16#f4) -> telco_alarm;
-get_sensor_type(Type)  -> Type.
+get_sensor_type(Type) -> Type.
 
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-get_sensor_reading(16#01)   -> threshold;
-get_sensor_reading(16#02)   -> dmi_usage;
-get_sensor_reading(16#03)   -> state;
-get_sensor_reading(16#04)   -> predictive_failure;
-get_sensor_reading(16#05)   -> limit;
-get_sensor_reading(16#06)   -> performance;
-get_sensor_reading(16#07)   -> severity;
-get_sensor_reading(16#08)   -> availability0;
-get_sensor_reading(16#09)   -> availability1;
-get_sensor_reading(16#0a)   -> availability2;
-get_sensor_reading(16#0b)   -> redundancy;
-get_sensor_reading(16#0c)   -> acpi_power_state;
-get_sensor_reading(16#6f)   -> specific;
+get_sensor_reading(16#01) -> threshold;
+get_sensor_reading(16#02) -> dmi_usage;
+get_sensor_reading(16#03) -> state;
+get_sensor_reading(16#04) -> predictive_failure;
+get_sensor_reading(16#05) -> limit;
+get_sensor_reading(16#06) -> performance;
+get_sensor_reading(16#07) -> severity;
+get_sensor_reading(16#08) -> availability0;
+get_sensor_reading(16#09) -> availability1;
+get_sensor_reading(16#0a) -> availability2;
+get_sensor_reading(16#0b) -> redundancy;
+get_sensor_reading(16#0c) -> acpi_power_state;
+get_sensor_reading(16#6f) -> specific;
 get_sensor_reading(Reading) -> Reading.
 
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-map(_,                           threshold,          A, _, _, _) ->
+map(_, threshold, A, _, _, _) ->
     get_threshold(A);
-map(_,                           dmi_usage,          A, _, _, _) ->
+map(_, dmi_usage, A, _, _, _) ->
     get_dmi_usage(A);
-map(_,                           state,              A, _, _, _) ->
+map(_, state, A, _, _, _) ->
     get_assertion(A);
-map(_,                           predictive_failure, A, _, _, _) ->
+map(_, predictive_failure, A, _, _, _) ->
     get_assertion(A);
-map(_,                           limit,              A, _, _, _) ->
+map(_, limit, A, _, _, _) ->
     get_limit(A);
-map(_,                           performance,        A, _, _, _) ->
+map(_, performance, A, _, _, _) ->
     get_performance(A);
-map(_,                           severity,           A, _, _, _) ->
+map(_, severity, A, _, _, _) ->
     get_severity(A);
-map(_,                           availability0,      A, _, _, _) ->
+map(_, availability0, A, _, _, _) ->
     get_availability08(A);
-map(_,                           availability1,      A, _, _, _) ->
+map(_, availability1, A, _, _, _) ->
     get_availability09(A);
-map(_,                           availability2,      A, _, _, _) ->
+map(_, availability2, A, _, _, _) ->
     get_availability0a(A);
-map(_,                           redundancy,         A, _, _, _) ->
+map(_, redundancy, A, _, _, _) ->
     get_redundancy(A);
-map(_,                           acpi_power_state,   A, _, _, _) ->
+map(_, acpi_power_state, A, _, _, _) ->
     get_acpi_power_state(A);
-map(intrusion,                   specific,           A, _, _, _) ->
+map(intrusion, specific, A, _, _, _) ->
     get_intrusion(A);
-map(violation_attempt,           specific,           A, _, _, _) ->
+map(violation_attempt, specific, A, _, _, _) ->
     get_violation_attempt(A);
-map(processor,                   specific,           A, _, _, _) ->
+map(processor, specific, A, _, _, _) ->
     get_processor_failure(A);
-map(power_supply,                specific,           A, _, _, D) ->
+map(power_supply, specific, A, _, _, D) ->
     get_power_supply_event(A, D);
-map(power_unit,                  specific,           A, _, _, _) ->
+map(power_unit, specific, A, _, _, _) ->
     get_power_unit_event(A);
-map(memory,                      specific,           A, _, _, D) ->
+map(memory, specific, A, _, _, D) ->
     get_memory_event(A, D);
-map(drive_slot,                  specific,           A, _, _, _) ->
+map(drive_slot, specific, A, _, _, _) ->
     get_drive_slot_state(A);
-map(system_firmware,             specific,           A, _, C, _) ->
+map(system_firmware, specific, A, _, C, _) ->
     get_system_firmware_event(A, C);
-map(event_logging,               specific,           A, _, C, D) ->
+map(event_logging, specific, A, _, C, D) ->
     get_event_logging_event(A, C, D);
-map(watchdog_old,                specific,           A, _, _, _) ->
+map(watchdog_old, specific, A, _, _, _) ->
     get_watchdog_old(A);
-map(system_event,                specific,           A, _, C, _) ->
+map(system_event, specific, A, _, C, _) ->
     get_system_event(A, C);
-map(critical_interrupt,          specific,           A, _, _, _) ->
+map(critical_interrupt, specific, A, _, _, _) ->
     get_critical_interrupt(A);
-map(switch,                      specific,           A, _, _, _) ->
+map(switch, specific, A, _, _, _) ->
     get_switch_event(A);
-map(chip_set,                    specific,           A, _, C, D) ->
+map(chip_set, specific, A, _, C, D) ->
     get_chip_set_event(A, C, D);
-map(interconnect,                specific,           A, _, _, _) ->
+map(interconnect, specific, A, _, _, _) ->
     get_interconnect(A);
-map(system_boot,                 specific,           A, _, C, D) ->
+map(system_boot, specific, A, _, C, D) ->
     get_system_boot_event(A, C, D);
-map(boot_error,                  specific,           A, _, _, _) ->
+map(boot_error, specific, A, _, _, _) ->
     get_boot_error(A);
-map(os_boot,                     specific,           A, _, _, _) ->
+map(os_boot, specific, A, _, _, _) ->
     get_os_boot_event(A);
-map(os_shutdown,                 specific,           A, _, _, _) ->
+map(os_shutdown, specific, A, _, _, _) ->
     get_os_shutdown_event(A);
-map(slot,                        specific,           A, _, C, D) ->
+map(slot, specific, A, _, C, D) ->
     get_slot_event(A, C, D);
-map(system_acpi_power_state,     specific,           A, _, _, _) ->
+map(system_acpi_power_state, specific, A, _, _, _) ->
     get_power_state(A);
-map(watchdog,                    specific,           A, _, C, _) ->
+map(watchdog, specific, A, _, C, _) ->
     get_watchdog_new(A, C);
-map(platform_alert,              specific,           A, _, _, _) ->
+map(platform_alert, specific, A, _, _, _) ->
     get_platform_alert(A);
-map(entity_presence,             specific,           A, B, _, _) ->
+map(entity_presence, specific, A, B, _, _) ->
     get_entity_presence(A, B);
-map(lan,                         specific,           A, _, _, _) ->
+map(lan, specific, A, _, _, _) ->
     get_lan_event(A);
-map(management_subsystem_health, specific,           A, _, C, D) ->
+map(management_subsystem_health, specific, A, _, C, D) ->
     get_management_subsystem_health(A, C, D);
-map(battery,                     specific,           A, _, _, _) ->
+map(battery, specific, A, _, _, _) ->
     get_battery_state(A);
-map(session,                     specific,           A, _, C, D) ->
+map(session, specific, A, _, C, D) ->
     get_session_event(A, C, D);
-map(version,                     specific,           A, B, C, _) ->
+map(version, specific, A, B, C, _) ->
     get_version_change(A, B, C);
-map(fru_state,                   specific,           A, _, C, _) ->
+map(fru_state, specific, A, _, C, _) ->
     get_fru_event(A, C);
-map(fru_hot_swap,                specific,           A, _, C, D) ->
+map(fru_hot_swap, specific, A, _, C, D) ->
     get_fru_hot_swap_event(A, C, D);
-map(module_hot_swap,             specific,           A, _, _, _) ->
+map(module_hot_swap, specific, A, _, _, _) ->
     get_module_hot_swap_event(A);
-map(power_channel,               specific,           A, _, C, D) ->
+map(power_channel, specific, A, _, C, D) ->
     get_power_channel_notification(A, C, D);
-map(_,                           _,                  A, B, C, D) ->
-    [{offset, A}, {data2, C}, {data3, D}, {asserted, not eipmi_util:get_bool(B)}].
+map(_, _, A, B, C, D) ->
+    [
+        {offset, A},
+        {data2, C},
+        {data3, D},
+        {asserted, not eipmi_util:get_bool(B)}
+    ].
 
 %%------------------------------------------------------------------------------
 %% @private
@@ -706,17 +891,17 @@ get_processor_failure(16#0c) ->
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-get_power_supply_event(16#00,     _) ->
+get_power_supply_event(16#00, _) ->
     [{sensor_value, presence_detected}];
-get_power_supply_event(16#01,     _) ->
+get_power_supply_event(16#01, _) ->
     [{sensor_value, failure_detected}];
-get_power_supply_event(16#02,     _) ->
+get_power_supply_event(16#02, _) ->
     [{sensor_value, predictive_failure}];
-get_power_supply_event(16#03,     _) ->
+get_power_supply_event(16#03, _) ->
     [{sensor_value, input_lost}];
-get_power_supply_event(16#04,     _) ->
+get_power_supply_event(16#04, _) ->
     [{sensor_value, input_lost_or_out_of_range}];
-get_power_supply_event(16#05,     _) ->
+get_power_supply_event(16#05, _) ->
     [{sensor_value, input_out_of_range_but_present}];
 get_power_supply_event(16#06, 16#00) ->
     [{sensor_value, configuration_error}, {reason, vendor_mismatch}];
@@ -725,10 +910,13 @@ get_power_supply_event(16#06, 16#01) ->
 get_power_supply_event(16#06, 16#02) ->
     [{sensor_value, configuration_error}, {reason, processor_missing}];
 get_power_supply_event(16#06, 16#03) ->
-    [{sensor_value, configuration_error}, {reason, power_supply_rating_mismatch}];
+    [
+        {sensor_value, configuration_error},
+        {reason, power_supply_rating_mismatch}
+    ];
 get_power_supply_event(16#06, 16#04) ->
     [{sensor_value, configuration_error}, {reason, voltage_rating_mismatch}];
-get_power_supply_event(16#06,     _) ->
+get_power_supply_event(16#06, _) ->
     [{sensor_value, configuration_error}, {reason, unknown}].
 
 %%------------------------------------------------------------------------------
@@ -746,18 +934,18 @@ get_power_unit_event(16#07) -> [{sensor_value, predictive_failure}].
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-get_memory_event(16#00,     _) -> [{sensor_value, correctable_ecc}];
-get_memory_event(16#01,     _) -> [{sensor_value, uncorrectable_ecc}];
-get_memory_event(16#02,     _) -> [{sensor_value, parity}];
-get_memory_event(16#03,     _) -> [{sensor_value, memory_scrub_failed}];
-get_memory_event(16#04,     _) -> [{sensor_value, device_disabled}];
-get_memory_event(16#05,     _) -> [{sensor_value, error_logging_limit_reached}];
-get_memory_event(16#06,     _) -> [{sensor_value, presence_detected}];
-get_memory_event(16#07,     _) -> [{sensor_value, configuration_error}];
+get_memory_event(16#00, _) -> [{sensor_value, correctable_ecc}];
+get_memory_event(16#01, _) -> [{sensor_value, uncorrectable_ecc}];
+get_memory_event(16#02, _) -> [{sensor_value, parity}];
+get_memory_event(16#03, _) -> [{sensor_value, memory_scrub_failed}];
+get_memory_event(16#04, _) -> [{sensor_value, device_disabled}];
+get_memory_event(16#05, _) -> [{sensor_value, error_logging_limit_reached}];
+get_memory_event(16#06, _) -> [{sensor_value, presence_detected}];
+get_memory_event(16#07, _) -> [{sensor_value, configuration_error}];
 get_memory_event(16#08, 16#ff) -> [{sensor_value, spare}];
-get_memory_event(16#08,    Id) -> [{sensor_value, spare}, {spare_id, Id}];
-get_memory_event(16#09,     _) -> [{sensor_value, throttled_automatically}];
-get_memory_event(16#0a,     _) -> [{sensor_value, critical_overtemperature}].
+get_memory_event(16#08, Id) -> [{sensor_value, spare}, {spare_id, Id}];
+get_memory_event(16#09, _) -> [{sensor_value, throttled_automatically}];
+get_memory_event(16#0a, _) -> [{sensor_value, critical_overtemperature}].
 
 %%------------------------------------------------------------------------------
 %% @private
@@ -801,9 +989,9 @@ get_system_firmware_event(16#00, 16#0c) ->
     [{sensor_value, error}, {reason, cpu_voltage_missing}];
 get_system_firmware_event(16#00, 16#0d) ->
     [{sensor_value, error}, {reason, cpu_speed_matching_failure}];
-get_system_firmware_event(16#00,     _) ->
+get_system_firmware_event(16#00, _) ->
     [{sensor_value, error}, {reason, unspecified}];
-get_system_firmware_event(16#01,     _) ->
+get_system_firmware_event(16#01, _) ->
     [{sensor_value, hang}];
 get_system_firmware_event(16#02, 16#01) ->
     [{sensor_value, progress}, {process, memory_initialization}];
@@ -840,9 +1028,15 @@ get_system_firmware_event(16#02, 16#10) ->
 get_system_firmware_event(16#02, 16#11) ->
     [{sensor_value, progress}, {process, disabling_docking_station}];
 get_system_firmware_event(16#02, 16#12) ->
-    [{sensor_value, progress}, {process, calling_operating_system_wake_up_vector}];
+    [
+        {sensor_value, progress},
+        {process, calling_operating_system_wake_up_vector}
+    ];
 get_system_firmware_event(16#02, 16#13) ->
-    [{sensor_value, progress}, {process, starting_operating_system_boot_process}];
+    [
+        {sensor_value, progress},
+        {process, starting_operating_system_boot_process}
+    ];
 get_system_firmware_event(16#02, 16#14) ->
     [{sensor_value, progress}, {process, baseboard_initialization}];
 get_system_firmware_event(16#02, 16#16) ->
@@ -853,35 +1047,43 @@ get_system_firmware_event(16#02, 16#18) ->
     [{sensor_value, progress}, {process, pointing_device_test}];
 get_system_firmware_event(16#02, 16#19) ->
     [{sensor_value, progress}, {process, prim_processor_initialization}];
-get_system_firmware_event(16#02,     _) ->
+get_system_firmware_event(16#02, _) ->
     [{sensor_value, progress}].
 
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-get_event_logging_event(16#00, 16#ff,     _) ->
+get_event_logging_event(16#00, 16#ff, _) ->
     [{sensor_value, disabled}, {component, memory}];
-get_event_logging_event(16#00,    Id,     _) ->
+get_event_logging_event(16#00, Id, _) ->
     [{sensor_value, disabled}, {component, memory}, {component_id, Id}];
-get_event_logging_event(16#02,     _,     _) ->
+get_event_logging_event(16#02, _, _) ->
     [{sensor_value, log_area_cleared}];
-get_event_logging_event(16#03,     _,     _) ->
+get_event_logging_event(16#03, _, _) ->
     [{sensor_value, disabled_all}];
-get_event_logging_event(16#04,     _,     _) ->
+get_event_logging_event(16#04, _, _) ->
     [{sensor_value, sel_full}];
-get_event_logging_event(16#05,     _, 16#ff) ->
+get_event_logging_event(16#05, _, 16#ff) ->
     [{sensor_value, sel_almost_full}, {level, unknown}];
-get_event_logging_event(16#05,     _,  Fill) ->
+get_event_logging_event(16#05, _, Fill) ->
     [{sensor_value, sel_almost_full}, {level, Fill}];
 get_event_logging_event(16#06, 16#ff, 16#ff) ->
     [{sensor_value, disabled}, {component, correctable_machine_check}];
-get_event_logging_event(16#06,    Id, 16#80) ->
-    [{sensor_value, disabled}, {component, correctable_machine_check}, {processor, Id}];
-get_event_logging_event(16#06,    Id,     _) ->
-    [{sensor_value, disabled}, {component, correctable_machine_check}, {instance, Id}];
+get_event_logging_event(16#06, Id, 16#80) ->
+    [
+        {sensor_value, disabled},
+        {component, correctable_machine_check},
+        {processor, Id}
+    ];
+get_event_logging_event(16#06, Id, _) ->
+    [
+        {sensor_value, disabled},
+        {component, correctable_machine_check},
+        {instance, Id}
+    ];
 get_event_logging_event(16#01, 16#ff, 16#ff) ->
     [{sensor_value, disabled}];
-get_event_logging_event(16#01, RType,  Byte) ->
+get_event_logging_event(16#01, RType, Byte) ->
     Event = get_event(RType, Byte band 16#0f, (Byte band 16#10) bsr 4),
     [{sensor_value, disabled}, {component, Event}].
 
@@ -889,9 +1091,11 @@ get_event_logging_event(16#01, RType,  Byte) ->
 %% @private
 %%------------------------------------------------------------------------------
 get_event(ReadingType, Offset, Assertion) ->
-    [{reading_type, get_sensor_reading(ReadingType)},
-     {offset, Offset},
-     {asserted, not eipmi_util:get_bool(Assertion)}].
+    [
+        {reading_type, get_sensor_reading(ReadingType)},
+        {offset, Offset},
+        {asserted, not eipmi_util:get_bool(Assertion)}
+    ].
 
 %%------------------------------------------------------------------------------
 %% @private
@@ -908,19 +1112,19 @@ get_watchdog_old(16#07) -> [{sensor_value, os_non_nmi}].
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-get_system_event(16#00,     _) ->
+get_system_event(16#00, _) ->
     [{sensor_value, system_reconfigured}];
-get_system_event(16#01,     _) ->
+get_system_event(16#01, _) ->
     [{sensor_value, oem_boot_event}];
-get_system_event(16#02,     _) ->
+get_system_event(16#02, _) ->
     [{sensor_value, hardware_failure}];
 get_system_event(16#04, 16#ff) ->
     [{sensor_value, pef_actions}, {pef_actions, []}];
-get_system_event(16#04,  Data) ->
+get_system_event(16#04, Data) ->
     [{sensor_value, pef_actions}, {pef_actions, get_pef_actions(Data)}];
 get_system_event(16#03, 16#ff) ->
     [{sensor_value, auxiliary_log}];
-get_system_event(16#03,  Data) ->
+get_system_event(16#03, Data) ->
     Type = get_auxiliary_log_type(Data band 16#0f),
     Action = get_auxiliary_log_action(Data band 16#f0 bsr 4),
     [{sensor_value, auxiliary_log}, {log_action, Action}, {log_type, Type}].
@@ -929,12 +1133,36 @@ get_system_event(16#03,  Data) ->
 %% @private
 %%------------------------------------------------------------------------------
 get_pef_actions(Actions) ->
-    A = case Actions band 16#20 bsr 5 of 0 -> []; 1 -> diagnostic_interrupt end,
-    B = case Actions band 16#10 bsr 4 of 0 -> []; 1 -> oem end,
-    C = case Actions band 16#08 bsr 3 of 0 -> []; 1 -> power_cycle end,
-    D = case Actions band 16#04 bsr 2 of 0 -> []; 1 -> reset end,
-    E = case Actions band 16#02 bsr 1 of 0 -> []; 1 -> power_off end,
-    F = case Actions band 16#01 of 0 -> []; 1 -> alert end,
+    A =
+        case Actions band 16#20 bsr 5 of
+            0 -> [];
+            1 -> diagnostic_interrupt
+        end,
+    B =
+        case Actions band 16#10 bsr 4 of
+            0 -> [];
+            1 -> oem
+        end,
+    C =
+        case Actions band 16#08 bsr 3 of
+            0 -> [];
+            1 -> power_cycle
+        end,
+    D =
+        case Actions band 16#04 bsr 2 of
+            0 -> [];
+            1 -> reset
+        end,
+    E =
+        case Actions band 16#02 bsr 1 of
+            0 -> [];
+            1 -> power_off
+        end,
+    F =
+        case Actions band 16#01 of
+            0 -> [];
+            1 -> alert
+        end,
     A ++ B ++ C ++ D ++ E ++ F.
 
 %%------------------------------------------------------------------------------
@@ -984,7 +1212,7 @@ get_switch_event(16#04) -> [{sensor_value, fru_service_request_button}].
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-get_chip_set_event(16#01,   _,   _) ->
+get_chip_set_event(16#01, _, _) ->
     [{sensor_value, thermal_trip}];
 get_chip_set_event(16#00, Requested, Actual) ->
     [{sensor_value, R}] = get_power_state(Requested),
@@ -1000,24 +1228,29 @@ get_interconnect(16#01) -> [{sensor_value, configuration_error}].
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-get_system_boot_event(16#00,   _,    _) ->
+get_system_boot_event(16#00, _, _) ->
     [{sensor_value, initiated_by_power_up}];
-get_system_boot_event(16#01,   _,    _) ->
+get_system_boot_event(16#01, _, _) ->
     [{sensor_value, initiated_by_hard_reset}];
-get_system_boot_event(16#02,   _,    _) ->
+get_system_boot_event(16#02, _, _) ->
     [{sensor_value, initiated_by_warm_reset}];
-get_system_boot_event(16#03,   _,    _) ->
+get_system_boot_event(16#03, _, _) ->
     [{sensor_value, user_requested_pxe_boot}];
-get_system_boot_event(16#04,   _,    _) ->
+get_system_boot_event(16#04, _, _) ->
     [{sensor_value, automatic_boot_to_diagnostic}];
-get_system_boot_event(16#05,   _,    _) ->
+get_system_boot_event(16#05, _, _) ->
     [{sensor_value, software_initiated_hard_reset}];
-get_system_boot_event(16#06,   _,    _) ->
+get_system_boot_event(16#06, _, _) ->
     [{sensor_value, software_initiated_warm_reset}];
 get_system_boot_event(16#07, Cau, Chan) ->
-    [{sensor_value, system_restart},
-     {cause, get_system_restart_cause(Cau)}]
-        ++ case Chan of 16#ff -> []; _ -> [{channel, Chan}] end.
+    [
+        {sensor_value, system_restart},
+        {cause, get_system_restart_cause(Cau)}
+    ] ++
+        case Chan of
+            16#ff -> [];
+            _ -> [{channel, Chan}]
+        end.
 
 %%------------------------------------------------------------------------------
 %% @private
@@ -1033,7 +1266,7 @@ get_system_restart_cause(16#08) -> reset_via_pef;
 get_system_restart_cause(16#09) -> power_cycle_via_pef;
 get_system_restart_cause(16#0a) -> soft_reset;
 get_system_restart_cause(16#0b) -> power_up_via_rtc;
-get_system_restart_cause(_)     -> unknown.
+get_system_restart_cause(_) -> unknown.
 
 %%------------------------------------------------------------------------------
 %% @private
@@ -1085,19 +1318,19 @@ get_slot_event(16#09) -> [{sensor_value, spare}].
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-get_slot_type(0)  -> pci;
-get_slot_type(1)  -> drive_array;
-get_slot_type(2)  -> external_connector;
-get_slot_type(3)  -> docking;
-get_slot_type(4)  -> internal_expansion;
-get_slot_type(5)  -> associated_with_entity_of_sensor;
-get_slot_type(6)  -> atca;
-get_slot_type(7)  -> memory;
-get_slot_type(8)  -> fan;
-get_slot_type(9)  -> pci_express;
+get_slot_type(0) -> pci;
+get_slot_type(1) -> drive_array;
+get_slot_type(2) -> external_connector;
+get_slot_type(3) -> docking;
+get_slot_type(4) -> internal_expansion;
+get_slot_type(5) -> associated_with_entity_of_sensor;
+get_slot_type(6) -> atca;
+get_slot_type(7) -> memory;
+get_slot_type(8) -> fan;
+get_slot_type(9) -> pci_express;
 get_slot_type(10) -> scsi;
 get_slot_type(11) -> sata;
-get_slot_type(_)  -> unknown.
+get_slot_type(_) -> unknown.
 
 %%------------------------------------------------------------------------------
 %% @private
@@ -1115,15 +1348,15 @@ get_power_state(16#09) -> [{sensor_value, {g1, sleeping}}];
 get_power_state(16#0a) -> [{sensor_value, {s5, override}}];
 get_power_state(16#0b) -> [{sensor_value, legacy_on}];
 get_power_state(16#0c) -> [{sensor_value, legacy_off}];
-get_power_state(_)     -> [{sensor_value, unknown}].
+get_power_state(_) -> [{sensor_value, unknown}].
 
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
 get_watchdog_new(Value, Data) ->
-    get_watchdog_new(Value)
-        ++ get_interrupt_type(Data band 16#f0 bsr 4)
-        ++ get_timer_use(Data band 16#0f).
+    get_watchdog_new(Value) ++
+        get_interrupt_type(Data band 16#f0 bsr 4) ++
+        get_timer_use(Data band 16#0f).
 get_watchdog_new(16#00) -> [{sensor_value, timer_expired}];
 get_watchdog_new(16#01) -> [{sensor_value, hard_reset}];
 get_watchdog_new(16#02) -> [{sensor_value, power_down}];
@@ -1174,17 +1407,17 @@ get_lan_event(16#01) -> [{sensor_value, heartbeat}].
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-get_management_subsystem_health(16#00,     _,     _) ->
+get_management_subsystem_health(16#00, _, _) ->
     [{sensor_value, sensor_access_degraded}];
-get_management_subsystem_health(16#01,     _,     _) ->
+get_management_subsystem_health(16#01, _, _) ->
     [{sensor_value, controller_access_degraded}];
-get_management_subsystem_health(16#02,     _,     _) ->
+get_management_subsystem_health(16#02, _, _) ->
     [{sensor_value, controller_offline}];
-get_management_subsystem_health(16#03,     _,     _) ->
+get_management_subsystem_health(16#03, _, _) ->
     [{sensor_value, controller_unavailable}];
-get_management_subsystem_health(16#04, 16#ff,     _) ->
+get_management_subsystem_health(16#04, 16#ff, _) ->
     [{sensor_value, sensor_failure}];
-get_management_subsystem_health(16#04,   Num,     _) ->
+get_management_subsystem_health(16#04, Num, _) ->
     [{sensor_value, sensor_failure}, {failed_sensor_number, Num}];
 get_management_subsystem_health(16#05, 16#ff, 16#ff) ->
     [{sensor_value, fru_failure}];
@@ -1299,7 +1532,7 @@ get_version_change_type(16#16) ->
     [{change_type, fru_replaced_with_older_version}];
 get_version_change_type(16#17) ->
     [{change_type, fru_hardware_configuration_change}];
-get_version_change_type(_)     ->
+get_version_change_type(_) ->
     [].
 
 %%------------------------------------------------------------------------------
@@ -1338,7 +1571,7 @@ get_fru_state_cause(16#07) -> [{cause, unexpected_extraction}];
 get_fru_state_cause(16#08) -> [{cause, update}];
 get_fru_state_cause(16#09) -> [{cause, no_ipmb_address}];
 get_fru_state_cause(16#0a) -> [{cause, unexpedcted_deactivation}];
-get_fru_state_cause(    _) -> [{cause, unknown}].
+get_fru_state_cause(_) -> [{cause, unknown}].
 
 %%------------------------------------------------------------------------------
 %% @private
@@ -1346,8 +1579,8 @@ get_fru_state_cause(    _) -> [{cause, unknown}].
 get_fru_hot_swap_event(Value, 16#ff, 16#ff) ->
     [{sensor_value, get_fru_state(Value)}];
 get_fru_hot_swap_event(Value, Data, FruId) ->
-    [{sensor_value, get_fru_state(Value)}, {fru_id, FruId}]
-        ++ get_fru_hot_swap_event(<<Data:8>>).
+    [{sensor_value, get_fru_state(Value)}, {fru_id, FruId}] ++
+        get_fru_hot_swap_event(<<Data:8>>).
 get_fru_hot_swap_event(<<C:4, P:4>>) ->
     get_fru_hot_swap_state_cause(C) ++ [{previous_value, get_fru_state(P)}].
 
@@ -1372,7 +1605,7 @@ get_fru_hot_swap_state_cause(16#07) ->
     [{cause, provided_information}];
 get_fru_hot_swap_state_cause(16#08) ->
     [{cause, invalid_hardware_address}];
-get_fru_hot_swap_state_cause(    _) ->
+get_fru_hot_swap_state_cause(_) ->
     [{cause, unknown}].
 
 %%------------------------------------------------------------------------------
@@ -1400,27 +1633,46 @@ get_power_channel_notification(1, Bitfield, Channel) ->
 %% @private
 %%------------------------------------------------------------------------------
 get_global_power_channel_notification(
-  <<?EIPMI_RESERVED:4, A:1, B:1, C:1, D:1>>) ->
-    [{sensor_value, global_state_change},
-     {redundant_pm_provides_payload_power, eipmi_util:get_bool(A)},
-     {payload_power, case B of 0 -> not_good; _ -> good end},
-     {management_power, case C of 0 -> not_good; _ -> good end},
-     {role, case D of 0 -> redundant; _ -> primary end}].
+    <<?EIPMI_RESERVED:4, A:1, B:1, C:1, D:1>>
+) ->
+    [
+        {sensor_value, global_state_change},
+        {redundant_pm_provides_payload_power, eipmi_util:get_bool(A)},
+        {payload_power,
+            case B of
+                0 -> not_good;
+                _ -> good
+            end},
+        {management_power,
+            case C of
+                0 -> not_good;
+                _ -> good
+            end},
+        {role,
+            case D of
+                0 -> redundant;
+                _ -> primary
+            end}
+    ].
 
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
 get_local_power_channel_notification(
-  <<?EIPMI_RESERVED:1, A:1, B:1, C:1, D:1, E:1, F:1, G:1>>, Channel) ->
-    [{sensor_value, local_state_change},
-     {channel, Channel},
-     {power_on_asserted, eipmi_util:get_bool(A)},
-     {payload_power_overcurrent_detected, eipmi_util:get_bool(B)},
-     {payload_power_enabled, eipmi_util:get_bool(C)},
-     {enable_asserted, eipmi_util:get_bool(D)},
-     {management_power_overcurrent_detected, eipmi_util:get_bool(E)},
-     {management_power_enabled, eipmi_util:get_bool(F)},
-     {ps1_asserted, eipmi_util:get_bool(G)}].
+    <<?EIPMI_RESERVED:1, A:1, B:1, C:1, D:1, E:1, F:1, G:1>>,
+    Channel
+) ->
+    [
+        {sensor_value, local_state_change},
+        {channel, Channel},
+        {power_on_asserted, eipmi_util:get_bool(A)},
+        {payload_power_overcurrent_detected, eipmi_util:get_bool(B)},
+        {payload_power_enabled, eipmi_util:get_bool(C)},
+        {enable_asserted, eipmi_util:get_bool(D)},
+        {management_power_overcurrent_detected, eipmi_util:get_bool(E)},
+        {management_power_enabled, eipmi_util:get_bool(F)},
+        {ps1_asserted, eipmi_util:get_bool(G)}
+    ].
 
 %%------------------------------------------------------------------------------
 %% @private

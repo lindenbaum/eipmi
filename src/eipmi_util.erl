@@ -20,20 +20,22 @@
 
 -module(eipmi_util).
 
--export([normalize/2,
-         format/2,
-         get_env/2,
-         update_val/3,
-         copy_val/3,
-         merge_vals/2,
-         from_bcd_plus/1,
-         from_packed_ascii/1,
-         from_base26/1,
-         get_bool/1,
-         binary_to_string/1,
-         join_nl/1,
-         decode_event_data/4,
-         warn/2]).
+-export([
+    normalize/2,
+    format/2,
+    get_env/2,
+    update_val/3,
+    copy_val/3,
+    merge_vals/2,
+    from_bcd_plus/1,
+    from_packed_ascii/1,
+    from_base26/1,
+    get_bool/1,
+    binary_to_string/1,
+    join_nl/1,
+    decode_event_data/4,
+    warn/2
+]).
 
 %%%=============================================================================
 %%% API
@@ -95,12 +97,11 @@ update_val(Property, Value, PropList) ->
 %% @end
 %%------------------------------------------------------------------------------
 -spec copy_val(atom(), proplists:proplist(), proplists:proplist()) ->
-                      proplists:proplist().
+    proplists:proplist().
 copy_val(Property, DestPropList, SrcPropList) ->
     case proplists:get_value(Property, SrcPropList) of
         undefined ->
             DestPropList;
-
         Value ->
             update_val(Property, Value, DestPropList)
     end.
@@ -113,17 +114,20 @@ copy_val(Property, DestPropList, SrcPropList) ->
 %% @end
 %%------------------------------------------------------------------------------
 -spec merge_vals(proplists:proplist(), proplists:proplist()) ->
-                        proplists:proplist().
+    proplists:proplist().
 merge_vals(PropList1, PropList2) ->
     lists:usort(
-      lists:foldl(
-        fun({K, V}, Acc) ->
-                update_val(K, V, Acc);
-           (K, Acc) ->
-                update_val(K, true, Acc)
-        end,
-        PropList2,
-        PropList1)).
+        lists:foldl(
+            fun
+                ({K, V}, Acc) ->
+                    update_val(K, V, Acc);
+                (K, Acc) ->
+                    update_val(K, true, Acc)
+            end,
+            PropList2,
+            PropList1
+        )
+    ).
 
 %%------------------------------------------------------------------------------
 %% @doc
@@ -233,10 +237,12 @@ join_nl(StringList) -> string:join(StringList, io_lib:nl()).
 %% A function to decode event data bytes from SEL or PET events.
 %% @end
 %%------------------------------------------------------------------------------
--spec decode_event_data(eipmi_sensor:reading(),
-                        eipmi_sensor:type(),
-                        0 | 1,
-                        binary()) -> [eipmi_sensor:value()].
+-spec decode_event_data(
+    eipmi_sensor:reading(),
+    eipmi_sensor:type(),
+    0 | 1,
+    binary()
+) -> [eipmi_sensor:value()].
 decode_event_data(threshold, Type, Assertion, Data) ->
     decode_threshold(Type, Assertion, pad_event_data(Data));
 decode_event_data(Reading, Type, Assertion, Data) when is_atom(Reading) ->
@@ -264,40 +270,79 @@ warn(Fmt, Args) -> error_logger:warning_msg(Fmt, Args).
 %% @private
 %%------------------------------------------------------------------------------
 decode_threshold(Type, Assertion, <<1:2, 0:2, Offset:4, B2:8, _:8>>) ->
-    eipmi_sensor:get_value(threshold, Type, Offset, Assertion, 16#ff, 16#ff)
-        ++ [{raw_reading, <<B2:8>>}];
+    eipmi_sensor:get_value(threshold, Type, Offset, Assertion, 16#ff, 16#ff) ++
+        [{raw_reading, <<B2:8>>}];
 decode_threshold(Type, Assertion, <<1:2, 1:2, Offset:4, B2:8, B3:8>>) ->
-    eipmi_sensor:get_value(threshold, Type, Offset, Assertion, 16#ff, 16#ff)
-        ++ [{raw_reading, <<B2:8>>}, {raw_threshold, <<B3:8>>}];
+    eipmi_sensor:get_value(threshold, Type, Offset, Assertion, 16#ff, 16#ff) ++
+        [{raw_reading, <<B2:8>>}, {raw_threshold, <<B3:8>>}];
 decode_threshold(Type, Assertion, <<E2:2, E3:2, Offset:4, B2:8, B3:8>>) ->
-    Byte2 = case E2 of 0 -> 16#ff; _ -> B2 end,
-    Byte3 = case E3 of 0 -> 16#ff; _ -> B3 end,
+    Byte2 =
+        case E2 of
+            0 -> 16#ff;
+            _ -> B2
+        end,
+    Byte3 =
+        case E3 of
+            0 -> 16#ff;
+            _ -> B3
+        end,
     eipmi_sensor:get_value(threshold, Type, Offset, Assertion, Byte2, Byte3).
 
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-decode_generic(Reading, Type, Assertion, <<1:2, E3:2, Off:4, SOff:4, POff:4, B3:8>>) ->
+decode_generic(
+    Reading,
+    Type,
+    Assertion,
+    <<1:2, E3:2, Off:4, SOff:4, POff:4, B3:8>>
+) ->
     Severity = maybe_value(severity_value, severity, Type, SOff, 0),
     Previous = maybe_value(previous_value, Reading, Type, POff, Assertion),
-    decode_generic(Reading, Type, Assertion, <<0:2, E3:2, Off:4, 16#ff:8, B3:8>>)
-        ++ Severity ++ Previous;
+    decode_generic(
+        Reading,
+        Type,
+        Assertion,
+        <<0:2, E3:2, Off:4, 16#ff:8, B3:8>>
+    ) ++
+        Severity ++ Previous;
 decode_generic(Reading, Type, Assertion, <<E2:2, E3:2, Offset:4, B2:8, B3:8>>) ->
-    Byte2 = case E2 of 0 -> 16#ff; _ -> B2 end,
-    Byte3 = case E3 of 0 -> 16#ff; _ -> B3 end,
+    Byte2 =
+        case E2 of
+            0 -> 16#ff;
+            _ -> B2
+        end,
+    Byte3 =
+        case E3 of
+            0 -> 16#ff;
+            _ -> B3
+        end,
     eipmi_sensor:get_value(Reading, Type, Offset, Assertion, Byte2, Byte3).
 
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-decode_oem(Reading, Type, Assertion, <<1:2, E3:2, Off:4, SOff:4, POff:4, B3:8>>) ->
+decode_oem(
+    Reading,
+    Type,
+    Assertion,
+    <<1:2, E3:2, Off:4, SOff:4, POff:4, B3:8>>
+) ->
     Severity = maybe_value(severity_value, severity, Type, SOff, 0),
     Previous = maybe_value(previous_value, Reading, Type, POff, Assertion),
-    decode_oem(Reading, Type, Assertion, <<0:2, E3:2, Off:4, 16#ff:8, B3:8>>)
-        ++ Severity ++ Previous;
+    decode_oem(Reading, Type, Assertion, <<0:2, E3:2, Off:4, 16#ff:8, B3:8>>) ++
+        Severity ++ Previous;
 decode_oem(Reading, Type, Assertion, <<E2:2, E3:2, Offset:4, B2:8, B3:8>>) ->
-    Byte2 = case E2 of 2 -> B2; _ -> 16#ff end,
-    Byte3 = case E3 of 2 -> B3; _ -> 16#ff end,
+    Byte2 =
+        case E2 of
+            2 -> B2;
+            _ -> 16#ff
+        end,
+    Byte3 =
+        case E3 of
+            2 -> B3;
+            _ -> 16#ff
+        end,
     eipmi_sensor:get_value(Reading, Type, Offset, Assertion, Byte2, Byte3).
 
 %%------------------------------------------------------------------------------

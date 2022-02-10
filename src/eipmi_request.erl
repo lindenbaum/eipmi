@@ -36,7 +36,10 @@
 %% values will be retrieved from the provided property list.
 %% @end
 %%------------------------------------------------------------------------------
--spec encode(eipmi:request() | open_session_rq | rakp1 | rakp3, proplists:proplist()) -> binary().
+-spec encode(
+    eipmi:request() | open_session_rq | rakp1 | rakp3,
+    proplists:proplist()
+) -> binary().
 encode({?IPMI_NETFN_SENSOR_EVENT_REQUEST, Cmd}, Properties) ->
     encode_sensor_event(Cmd, Properties);
 encode({?IPMI_NETFN_APPLICATION_REQUEST, Cmd}, Properties) ->
@@ -85,7 +88,7 @@ encode_sensor_event(?PET_ACKNOWLEDGE, Properties) ->
     SensorNumber = proplists:get_value(sensor_number, Properties, 16#00),
     <<Data:3/binary, _/binary>> = proplists:get_value(data, Properties),
     <<SeqNr:16/little, LocalTime:32/little, EventSource, SensorDevice,
-      SensorNumber, Data/binary>>.
+        SensorNumber, Data/binary>>.
 
 %%------------------------------------------------------------------------------
 %% @private
@@ -105,7 +108,7 @@ encode_application(?SEND_MESSAGE, Properties) ->
     <<1:2, 0:2, Channel:4, Request/binary>>;
 encode_application(?GET_CHANNEL_AUTHENTICATION_CAPABILITIES, Properties) ->
     P = encode_privilege(proplists:get_value(privilege, Properties)),
-    <<1:1, 0:3, ?IPMI_REQUESTED_CHANNEL:4, 0:4,P:4>>;
+    <<1:1, 0:3, ?IPMI_REQUESTED_CHANNEL:4, 0:4, P:4>>;
 encode_application(?GET_SESSION_CHALLENGE, Properties) ->
     A = eipmi_auth:encode_type(proplists:get_value(rq_auth_type, Properties)),
     U = eipmi_util:normalize(16, proplists:get_value(user, Properties)),
@@ -120,14 +123,15 @@ encode_application(?SET_SESSION_PRIVILEGE_LEVEL, Properties) ->
     <<0:4, (encode_privilege(proplists:get_value(privilege, Properties))):4>>;
 encode_application(?CLOSE_SESSION, Properties) ->
     <<(proplists:get_value(session_id, Properties)):32/little>>;
-encode_application(Req, _Properties)
-  when Req =:= ?GET_DEVICE_ID orelse
-       Req =:= ?COLD_RESET orelse
-       Req =:= ?WARM_RESET orelse
-       Req =:= ?GET_SELF_TEST_RESULTS orelse
-       Req =:= ?GET_ACPI_POWER_STATE orelse
-       Req =:= ?GET_DEVICE_GUID orelse
-       Req =:= ?GET_SYSTEM_GUID ->
+encode_application(Req, _Properties) when
+    Req =:= ?GET_DEVICE_ID orelse
+        Req =:= ?COLD_RESET orelse
+        Req =:= ?WARM_RESET orelse
+        Req =:= ?GET_SELF_TEST_RESULTS orelse
+        Req =:= ?GET_ACPI_POWER_STATE orelse
+        Req =:= ?GET_DEVICE_GUID orelse
+        Req =:= ?GET_SYSTEM_GUID
+->
     <<>>.
 
 %%------------------------------------------------------------------------------
@@ -148,7 +152,11 @@ encode_storage(?GET_SEL_ENTRY, Properties) ->
 encode_storage(?CLEAR_SEL, Properties) ->
     Reservation = proplists:get_value(reservation_id, Properties),
     Init = proplists:get_value(initiate, Properties, true),
-    InitOrGet = case Init of true -> 16#aa; false -> 0 end,
+    InitOrGet =
+        case Init of
+            true -> 16#aa;
+            false -> 0
+        end,
     <<Reservation:16/little, $C:8, $L:8, $R:8, InitOrGet:8>>;
 encode_storage(?GET_SDR, Properties) ->
     Reservation = proplists:get_value(reservation_id, Properties, 16#0000),
@@ -157,11 +165,12 @@ encode_storage(?GET_SDR, Properties) ->
     Count = proplists:get_value(count, Properties, 16#ff),
     true = Record =< 16#ffff,
     <<Reservation:16/little, Record:16/little, Offset:8, Count:8>>;
-encode_storage(Req, _Properties)
-  when Req =:= ?GET_SEL_INFO orelse
-       Req =:= ?RESERVE_SEL orelse
-       Req =:= ?GET_SDR_REPOSITORY_INFO orelse
-       Req =:= ?RESERVE_SDR_REPOSITORY ->
+encode_storage(Req, _Properties) when
+    Req =:= ?GET_SEL_INFO orelse
+        Req =:= ?RESERVE_SEL orelse
+        Req =:= ?GET_SDR_REPOSITORY_INFO orelse
+        Req =:= ?RESERVE_SDR_REPOSITORY
+->
     <<>>.
 
 %%------------------------------------------------------------------------------
@@ -169,20 +178,25 @@ encode_storage(Req, _Properties)
 %%------------------------------------------------------------------------------
 encode_transport(?GET_IP_UDP_RMCP_STATISTICS, Properties) ->
     Clear = proplists:get_value(clear_statistics, Properties, false),
-    C = case Clear of true -> 1; false -> 0 end,
+    C =
+        case Clear of
+            true -> 1;
+            false -> 0
+        end,
     <<0:4, ?IPMI_REQUESTED_CHANNEL:4, 0:7, C:1>>;
 encode_transport(?SET_LAN_CONFIGURATION_PARAMETERS, Properties) ->
     P = proplists:get_value(parameter, Properties),
-    D = case P of
+    D =
+        case P of
             ?IPMI_LAN_CONFIGURATION_PARAMETER_IP_ADDRESS ->
                 V = proplists:get_value(ip_address, Properties),
                 list_to_binary(tuple_to_list(V));
             ?IPMI_LAN_CONFIGURATION_PARAMETER_IP_ADDRESS_SOURCE ->
                 case proplists:get_value(ip_assignment, Properties) of
-                    static         -> <<0:4, 1:4>>;
-                    dhcp           -> <<0:4, 2:4>>;
+                    static -> <<0:4, 1:4>>;
+                    dhcp -> <<0:4, 2:4>>;
                     bios_or_system -> <<0:4, 3:4>>;
-                    other          -> <<0:4, 4:4>>
+                    other -> <<0:4, 4:4>>
                 end;
             ?IPMI_LAN_CONFIGURATION_PARAMETER_MAC_ADDRESS ->
                 V = proplists:get_value(mac_address, Properties),
@@ -194,30 +208,40 @@ encode_transport(?SET_LAN_CONFIGURATION_PARAMETERS, Properties) ->
                 V = proplists:get_value(default_gateway, Properties),
                 list_to_binary(tuple_to_list(V));
             ?IPMI_LAN_CONFIGURATION_PARAMETER_DEFAULT_GATEWAY_MAC_ADDRESS ->
-                V = proplists:get_value(default_gateway_mac_address, Properties),
+                V = proplists:get_value(
+                    default_gateway_mac_address,
+                    Properties
+                ),
                 list_to_binary(tuple_to_list(V));
             ?IPMI_LAN_CONFIGURATION_PARAMETER_BACKUP_GATEWAY ->
                 V = proplists:get_value(backup_gateway, Properties),
                 list_to_binary(tuple_to_list(V));
             ?IPMI_LAN_CONFIGURATION_PARAMETER_BACKUP_GATEWAY_MAC_ADDRESS ->
-                V = proplists:get_value(backup_gateway_gateway_mac_address, Properties),
+                V = proplists:get_value(
+                    backup_gateway_gateway_mac_address,
+                    Properties
+                ),
                 list_to_binary(tuple_to_list(V));
             ?IPMI_LAN_CONFIGURATION_PARAMETER_COMMUNITY_STRING ->
                 C = proplists:get_value(community, Properties),
                 Len = length(C),
                 case Len >= 18 of
-                    true  -> list_to_binary(string:substr(C, 1, 18));
+                    true -> list_to_binary(string:substr(C, 1, 18));
                     false -> list_to_binary(C ++ lists:duplicate(18 - Len, 0))
                 end;
             ?IPMI_LAN_CONFIGURATION_PARAMETER_DESTINATION_TYPE ->
                 S = proplists:get_value(set, Properties, 0),
-                T = case proplists:get_value(destination_type, Properties, trap) of
+                T =
+                    case
+                        proplists:get_value(destination_type, Properties, trap)
+                    of
                         trap -> 0;
                         oem1 -> 6;
                         oem2 -> 7
                     end,
-                A = case proplists:get_value(acknowledge, Properties, false) of
-                        true  -> 1;
+                A =
+                    case proplists:get_value(acknowledge, Properties, false) of
+                        true -> 1;
                         false -> 0
                     end,
                 To = proplists:get_value(timeout, Properties, 0),
@@ -225,9 +249,10 @@ encode_transport(?SET_LAN_CONFIGURATION_PARAMETERS, Properties) ->
                 <<0:4, S:4, A:1, 0:4, T:3, To:8, 0:5, R:3>>;
             ?IPMI_LAN_CONFIGURATION_PARAMETER_DESTINATION_ADDRESSES ->
                 S = proplists:get_value(set, Properties, 0),
-                G = case proplists:get_value(gateway, Properties, default) of
+                G =
+                    case proplists:get_value(gateway, Properties, default) of
                         default -> 0;
-                        backup  -> 1
+                        backup -> 1
                     end,
                 DefIA = {0, 0, 0, 0},
                 IA = proplists:get_value(ip_address, Properties, DefIA),
@@ -236,13 +261,13 @@ encode_transport(?SET_LAN_CONFIGURATION_PARAMETERS, Properties) ->
                 MA = proplists:get_value(mac_address, Properties, DefMA),
                 M = list_to_binary(tuple_to_list(MA)),
                 <<0:4, S:4, 0:4, 0:4, 0:7, G:1, I/binary, M/binary>>
-            end,
+        end,
     <<0:4, ?IPMI_REQUESTED_CHANNEL:4, P:8, D/binary>>;
 encode_transport(?GET_LAN_CONFIGURATION_PARAMETERS, Properties) ->
     P = proplists:get_value(parameter, Properties),
     S = proplists:get_value(set, Properties, 0),
     B = proplists:get_value(block, Properties, 0),
-    <<0:1, 0:3, ?IPMI_REQUESTED_CHANNEL:4, P:8, S:8 , B:8>>.
+    <<0:1, 0:3, ?IPMI_REQUESTED_CHANNEL:4, P:8, S:8, B:8>>.
 
 %%------------------------------------------------------------------------------
 %% @private
@@ -267,9 +292,17 @@ encode_chassis(?CHASSIS_IDENTIFY, Properties) ->
     end;
 encode_chassis(?SET_CHASSIS_CAPABILITIES, Properties) ->
     Lockout = proplists:get_bool(lockout, Properties),
-    L = case Lockout of true -> 1; false -> 0 end,
+    L =
+        case Lockout of
+            true -> 1;
+            false -> 0
+        end,
     Intrusion = proplists:get_bool(intrusion, Properties),
-    I = case Intrusion of true -> 1; false -> 0 end,
+    I =
+        case Intrusion of
+            true -> 1;
+            false -> 0
+        end,
     F = proplists:get_value(fru_address, Properties),
     Sdr = proplists:get_value(sdr_address, Properties),
     Sel = proplists:get_value(sel_address, Properties),
@@ -282,7 +315,8 @@ encode_chassis(?SET_CHASSIS_CAPABILITIES, Properties) ->
             <<Acc/binary, B:8>>
     end;
 encode_chassis(?SET_POWER_RESTORE_POLICY, Properties) ->
-    P = case proplists:get_value(policy, Properties) of
+    P =
+        case proplists:get_value(policy, Properties) of
             no_change -> 3;
             always_on -> 2;
             last_state -> 1;
@@ -291,23 +325,40 @@ encode_chassis(?SET_POWER_RESTORE_POLICY, Properties) ->
     <<0:5, P:3>>;
 encode_chassis(?SET_FRONT_PANEL_ENABLES, Properties) ->
     Standby = proplists:get_bool(disable_standby, Properties),
-    S = case Standby of true -> 1; false -> 0 end,
+    S =
+        case Standby of
+            true -> 1;
+            false -> 0
+        end,
     Diagnostic = proplists:get_bool(disable_diagnostic_interrupt, Properties),
-    D = case Diagnostic of true -> 1; false -> 0 end,
+    D =
+        case Diagnostic of
+            true -> 1;
+            false -> 0
+        end,
     Reset = proplists:get_bool(disable_reset, Properties),
-    R = case Reset of true -> 1; false -> 0 end,
+    R =
+        case Reset of
+            true -> 1;
+            false -> 0
+        end,
     Power = proplists:get_bool(disable_power, Properties),
-    P = case Power of true -> 1; false -> 0 end,
+    P =
+        case Power of
+            true -> 1;
+            false -> 0
+        end,
     <<0:4, S:1, D:1, R:1, P:1>>;
 encode_chassis(?SET_POWER_CYCLE_INTERVAL, Properties) ->
     I = proplists:get_value(interval, Properties, 0),
     <<I:8>>;
-encode_chassis(Req, _Properties)
-  when Req =:= ?GET_CHASSIS_CAPABILITIES orelse
-       Req =:= ?GET_CHASSIS_STATUS orelse
-       Req =:= ?CHASSIS_RESET orelse
-       Req =:= ?GET_SYSTEM_RESTART_CAUSE orelse
-       Req =:= ?GET_POH_COUNTER ->
+encode_chassis(Req, _Properties) when
+    Req =:= ?GET_CHASSIS_CAPABILITIES orelse
+        Req =:= ?GET_CHASSIS_STATUS orelse
+        Req =:= ?CHASSIS_RESET orelse
+        Req =:= ?GET_SYSTEM_RESTART_CAUSE orelse
+        Req =:= ?GET_POH_COUNTER
+->
     <<>>.
 
 %%------------------------------------------------------------------------------
@@ -342,7 +393,11 @@ encode_picmg(?GET_FRU_ACTIVATION_POLICY, Properties) ->
 encode_picmg(?SET_FRU_ACTIVATION, Properties) ->
     FruId = proplists:get_value(fru_id, Properties),
     Activate = proplists:get_value(activate, Properties),
-    <<?PICMG_ID:8, FruId:8, (case Activate of true -> 1; false -> 0 end):8>>;
+    <<?PICMG_ID:8, FruId:8,
+        (case Activate of
+            true -> 1;
+            false -> 0
+        end):8>>;
 encode_picmg(?FRU_CONTROL, Properties) ->
     FruId = proplists:get_value(fru_id, Properties),
     Control = proplists:get_value(control, Properties),
@@ -358,13 +413,17 @@ encode_open_session_rq(Properties) ->
     Tag = proplists:get_value(message_tag, Properties),
     P = encode_privilege(proplists:get_value(privilege, Properties)),
     S = proplists:get_value(rq_session_id, Properties),
-    A = eipmi_auth:encode_rakp_type(proplists:get_value(rakp_auth_type, Properties)),
-    I = eipmi_auth:encode_integrity_type(proplists:get_value(integrity_type, Properties)),
-    E = eipmi_auth:encode_encrypt_type(proplists:get_value(encrypt_type, Properties)),
-    <<Tag:8, 0:4, P:4, 0:16, S:32/little,
-      0:8, 0:16, 8:8, 0:2, A:6, 0:24,
-      1:8, 0:16, 8:8, 0:2, I:6, 0:24,
-      2:8, 0:16, 8:8, 0:2, E:6, 0:24>>.
+    A = eipmi_auth:encode_rakp_type(
+        proplists:get_value(rakp_auth_type, Properties)
+    ),
+    I = eipmi_auth:encode_integrity_type(
+        proplists:get_value(integrity_type, Properties)
+    ),
+    E = eipmi_auth:encode_encrypt_type(
+        proplists:get_value(encrypt_type, Properties)
+    ),
+    <<Tag:8, 0:4, P:4, 0:16, S:32/little, 0:8, 0:16, 8:8, 0:2, A:6, 0:24, 1:8,
+        0:16, 8:8, 0:2, I:6, 0:24, 2:8, 0:16, 8:8, 0:2, E:6, 0:24>>.
 
 %%------------------------------------------------------------------------------
 %% @private
@@ -376,8 +435,8 @@ encode_rakp1(Properties) ->
     L = proplists:get_value(lookup_type, Properties),
     P = encode_privilege(proplists:get_value(privilege, Properties)),
     U = iolist_to_binary(proplists:get_value(user, Properties, <<>>)),
-    <<Tag:8, 0:24, S:32/little, R:16/binary,
-      0:3, L:1, P:4, 0:16, (byte_size(U)):8, U/binary>>.
+    <<Tag:8, 0:24, S:32/little, R:16/binary, 0:3, L:1, P:4, 0:16,
+        (byte_size(U)):8, U/binary>>.
 
 %%------------------------------------------------------------------------------
 %% @private

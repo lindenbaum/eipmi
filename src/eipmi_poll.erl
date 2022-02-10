@@ -33,23 +33,24 @@
 -export([start_link/3]).
 
 %% gen_server callbacks
--export([init/1,
-         handle_call/3,
-         handle_cast/2,
-         handle_info/2,
-         terminate/2,
-         code_change/3]).
+-export([
+    init/1,
+    handle_call/3,
+    handle_cast/2,
+    handle_info/2,
+    terminate/2,
+    code_change/3
+]).
 
 -include("eipmi.hrl").
 
 %%------------------------------------------------------------------------------
 %% Polling server defaults modifyable by the user.
 %%------------------------------------------------------------------------------
--define(DEFAULTS,
-        [
-         {read_sel, 500},
-         {clear_sel, true}
-        ]).
+-define(DEFAULTS, [
+    {read_sel, 500},
+    {clear_sel, true}
+]).
 
 %%%=============================================================================
 %%% API
@@ -61,7 +62,7 @@
 %% @end
 %%------------------------------------------------------------------------------
 -spec start_link(pid(), eipmi:session(), [eipmi:option()]) ->
-          {ok, pid()} | {error, term()}.
+    {ok, pid()} | {error, term()}.
 start_link(SessionPid, Session, Options) ->
     gen_server:start_link(?MODULE, [SessionPid, Session, Options], []).
 
@@ -70,12 +71,13 @@ start_link(SessionPid, Session, Options) ->
 %%%=============================================================================
 
 -record(state, {
-          pid         :: pid(),
-          owner       :: pid(),
-          last_sucess :: erlang:timestamp() | undefined,
-          session     :: eipmi:session(),
-          address     :: inet:ip4_address(),
-          properties  :: [eipmi:option()]}).
+    pid :: pid(),
+    owner :: pid(),
+    last_sucess :: erlang:timestamp() | undefined,
+    session :: eipmi:session(),
+    address :: inet:ip4_address(),
+    properties :: [eipmi:option()]
+}).
 
 %%------------------------------------------------------------------------------
 %% @private
@@ -83,11 +85,16 @@ start_link(SessionPid, Session, Options) ->
 init([Pid, Session = {session, {Addr, _}, {Owner, _}}, Options]) ->
     erlang:monitor(process, Pid),
     Opts = eipmi_util:merge_vals(Options, ?DEFAULTS),
-    {ok, start_timers(on_success(#state{pid = Pid,
-                                        session = Session,
-                                        owner = Owner,
-                                        address = Addr,
-                                        properties = Opts}))}.
+    {ok,
+        start_timers(
+            on_success(#state{
+                pid = Pid,
+                session = Session,
+                owner = Owner,
+                address = Addr,
+                properties = Opts
+            })
+        )}.
 
 %%------------------------------------------------------------------------------
 %% @private

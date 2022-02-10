@@ -26,50 +26,62 @@
 
 not_rmcp_packet_test() ->
     ?assertEqual(
-       {error, {not_rmcp_packet, <<>>}},
-       eipmi_decoder:packet(<<>>, [])).
+        {error, {not_rmcp_packet, <<>>}},
+        eipmi_decoder:packet(<<>>, [])
+    ).
 
 unsupported_rmcp_packet_test() ->
     ?assertEqual(
-       {error, unsupported_rmcp_packet},
-       eipmi_decoder:packet(<<16#06, 16#00, 16#01, 16#00>>, [])).
+        {error, unsupported_rmcp_packet},
+        eipmi_decoder:packet(<<16#06, 16#00, 16#01, 16#00>>, [])
+    ).
 
 unsupported_asf_packet_test() ->
     ?assertEqual(
-       {error, unsupported_asf_packet},
-       eipmi_decoder:packet(<<16#06, 16#00, 16#01, 16#06, 16#00, 16#00>>, [])).
+        {error, unsupported_asf_packet},
+        eipmi_decoder:packet(<<16#06, 16#00, 16#01, 16#06, 16#00, 16#00>>, [])
+    ).
 
 ack_test() ->
     ?assertEqual(
-       {ok, #rmcp_ack{header = #rmcp_header{seq_nr = 1}}},
-       eipmi_decoder:packet(<<16#06, 16#00, 16#01, 16#86>>, [])).
+        {ok, #rmcp_ack{header = #rmcp_header{seq_nr = 1}}},
+        eipmi_decoder:packet(<<16#06, 16#00, 16#01, 16#86>>, [])
+    ).
 
 pong_test() ->
     ?assertEqual(
-       {ok, #rmcp_asf{
-               header = #rmcp_header{seq_nr = 1},
-               payload = #asf_pong{entities = [ipmi]}}},
-       eipmi_decoder:packet(
-         <<16#06, 16#00, 16#01, 16#06, 16#00, 16#00, 16#11,
-           16#be, 16#40, 16#00, 16#00, 16#10, 16#00, 16#00,
-           16#11, 16#be, 16#00, 16#00, 16#00, 16#00, 16#81,
-           16#00, 16#00, 16#00, 16#00, 16#00, 16#00, 16#00>>, [])).
+        {ok, #rmcp_asf{
+            header = #rmcp_header{seq_nr = 1},
+            payload = #asf_pong{entities = [ipmi]}
+        }},
+        eipmi_decoder:packet(
+            <<16#06, 16#00, 16#01, 16#06, 16#00, 16#00, 16#11, 16#be, 16#40,
+                16#00, 16#00, 16#10, 16#00, 16#00, 16#11, 16#be, 16#00, 16#00,
+                16#00, 16#00, 16#81, 16#00, 16#00, 16#00, 16#00, 16#00, 16#00,
+                16#00>>,
+            []
+        )
+    ).
 
 ipmi_response_test() ->
     {ok, Ipmi} =
         eipmi_decoder:packet(
-          <<16#06, 16#00, 16#ff, 16#07, 16#00, 16#00, 16#00,
-            16#00, 16#00, 16#00, 16#00, 16#00, 16#00, 16#10,
-            16#81, 16#1c, 16#63, 16#20, 16#00, 16#38, 16#00,
-            16#00, 16#01, 16#19, 16#00, 16#00, 16#00, 16#00,
-            16#00, 16#8e>>, []),
+            <<16#06, 16#00, 16#ff, 16#07, 16#00, 16#00, 16#00, 16#00, 16#00,
+                16#00, 16#00, 16#00, 16#00, 16#10, 16#81, 16#1c, 16#63, 16#20,
+                16#00, 16#38, 16#00, 16#00, 16#01, 16#19, 16#00, 16#00, 16#00,
+                16#00, 16#00, 16#8e>>,
+            []
+        ),
     ?assertMatch(
-       #rmcp_ipmi{
-          header = #rmcp_header{class = ?RMCP_IPMI},
-          cmd = {?IPMI_NETFN_APPLICATION_RESPONSE,
-                 ?GET_CHANNEL_AUTHENTICATION_CAPABILITIES},
-          data = <<16#00, 16#01, 16#19, 16#00, 16#00, 16#00, 16#00, 16#00>>},
-       Ipmi),
+        #rmcp_ipmi{
+            header = #rmcp_header{class = ?RMCP_IPMI},
+            cmd =
+                {?IPMI_NETFN_APPLICATION_RESPONSE,
+                    ?GET_CHANNEL_AUTHENTICATION_CAPABILITIES},
+            data = <<16#00, 16#01, 16#19, 16#00, 16#00, 16#00, 16#00, 16#00>>
+        },
+        Ipmi
+    ),
     Ps = Ipmi#rmcp_ipmi.properties,
     ?assertEqual(none, proplists:get_value(auth_type, Ps)),
     ?assertEqual(0, proplists:get_value(outbound_seq_nr, Ps)),

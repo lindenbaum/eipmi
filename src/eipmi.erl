@@ -31,69 +31,71 @@
 -behaviour(supervisor).
 
 %% API
--export([ping/1,
-         ping/2,
-         open/1,
-         open/2,
-         close/1,
-         get_device_id/1,
-         cold_reset/1,
-         warm_reset/1,
-         get_self_test_results/1,
-         get_acpi_power_state/1,
-         get_device_guid/1,
-         send_message/7,
-         get_system_guid/1,
-         set_session_privilege_level/2,
-         chassis_control/2,
-         chassis_identify/2,
-         set_chassis_capabilities/5,
-         set_chassis_capabilities/6,
-         get_chassis_capabilities/1,
-         get_chassis_status/1,
-         disable_front_panel_buttons/5,
-         set_power_restore_policy/2,
-         set_power_cycle_interval/2,
-         get_system_restart_cause/1,
-         get_poh_counter/1,
-         read_fru/2,
-         read_frus/2,
-         read_fru_inventory/2,
-         get_sdr/2,
-         get_sdr/3,
-         read_sdr/2,
-         read_sdr/3,
-         get_sdr_repository/1,
-         get_sdr_repository/2,
-         get_sdr_repository_info/1,
-         get_sel/2,
-         poll_sel/1,
-         poll_sel/3,
-         clear_sel/1,
-         get_sel_info/1,
-         set_lan_configuration_parameters/3,
-         get_lan_configuration_parameters/3,
-         get_ip_udp_rmcp_statistics/2,
-         get_picmg_properties/1,
-         get_address_info/1,
-         get_address_info/2,
-         get_address_info/3,
-         set_fru_activation_policy/3,
-         get_fru_activation_policy/2,
-         set_fru_activation/3,
-         fru_control/3,
-         get_device_locator_record_id/2,
-         oem/4,
-         raw/4,
-         sel_to_sdr/2,
-         sel_to_fru/2,
-         sel_to_fru/3,
-         sdr_to_fru/2,
-         sdr_to_fru/3,
-         props_to_fru/2,
-         id_to_fru/2,
-         sessions/0,
-         info/0]).
+-export([
+    ping/1,
+    ping/2,
+    open/1,
+    open/2,
+    close/1,
+    get_device_id/1,
+    cold_reset/1,
+    warm_reset/1,
+    get_self_test_results/1,
+    get_acpi_power_state/1,
+    get_device_guid/1,
+    send_message/7,
+    get_system_guid/1,
+    set_session_privilege_level/2,
+    chassis_control/2,
+    chassis_identify/2,
+    set_chassis_capabilities/5,
+    set_chassis_capabilities/6,
+    get_chassis_capabilities/1,
+    get_chassis_status/1,
+    disable_front_panel_buttons/5,
+    set_power_restore_policy/2,
+    set_power_cycle_interval/2,
+    get_system_restart_cause/1,
+    get_poh_counter/1,
+    read_fru/2,
+    read_frus/2,
+    read_fru_inventory/2,
+    get_sdr/2,
+    get_sdr/3,
+    read_sdr/2,
+    read_sdr/3,
+    get_sdr_repository/1,
+    get_sdr_repository/2,
+    get_sdr_repository_info/1,
+    get_sel/2,
+    poll_sel/1,
+    poll_sel/3,
+    clear_sel/1,
+    get_sel_info/1,
+    set_lan_configuration_parameters/3,
+    get_lan_configuration_parameters/3,
+    get_ip_udp_rmcp_statistics/2,
+    get_picmg_properties/1,
+    get_address_info/1,
+    get_address_info/2,
+    get_address_info/3,
+    set_fru_activation_policy/3,
+    get_fru_activation_policy/2,
+    set_fru_activation/3,
+    fru_control/3,
+    get_device_locator_record_id/2,
+    oem/4,
+    raw/4,
+    sel_to_sdr/2,
+    sel_to_fru/2,
+    sel_to_fru/3,
+    sdr_to_fru/2,
+    sdr_to_fru/3,
+    props_to_fru/2,
+    id_to_fru/2,
+    sessions/0,
+    info/0
+]).
 
 %% Application callbacks
 -export([start/2, stop/1]).
@@ -107,51 +109,78 @@
 
 -type session() :: {session, target(), {pid(), reference()}}.
 
--type req_net_fn()  :: 0..62. %% 0x00-0x3e
--type resp_net_fn() :: 1..63. %% 0x01-0xef
+%% 0x00-0x3e
+-type req_net_fn() :: 0..62.
+%% 0x01-0xef
+-type resp_net_fn() :: 1..63.
 
 -type request() :: {req_net_fn(), Command :: 0..255}.
 -type response() :: {resp_net_fn(), Command :: 0..255}.
 
 -type privilege() :: callback | user | operator | administrator.
 
--type chassis_command() :: power_down | power_up | power_cycle | hard_reset | diagnostic_interrupt | acpi_shutdown.
+-type chassis_command() ::
+    power_down
+    | power_up
+    | power_cycle
+    | hard_reset
+    | diagnostic_interrupt
+    | acpi_shutdown.
 
 -type power_policy() :: no_change | always_on | last_state | always_off.
 
 -type restart_cause() ::
-        unknown | control_command | reset_button | power_button |
-        watchdog_expired | oem | always_on_restore_policy |
-        last_state_restore_policy | pef_reset | pef_power_cycle | soft_reset |
-        clock_wakeup.
+    unknown
+    | control_command
+    | reset_button
+    | power_button
+    | watchdog_expired
+    | oem
+    | always_on_restore_policy
+    | last_state_restore_policy
+    | pef_reset
+    | pef_power_cycle
+    | soft_reset
+    | clock_wakeup.
 
 -type option_name() ::
-        encrypt_type | initial_outbound_seq_nr | integrity_type |
-        keep_alive_retransmits | lookup_type | password | port | privilege |
-        rakp_auth_type | rq_addr | timeout | user.
+    encrypt_type
+    | initial_outbound_seq_nr
+    | integrity_type
+    | keep_alive_retransmits
+    | lookup_type
+    | password
+    | port
+    | privilege
+    | rakp_auth_type
+    | rq_addr
+    | timeout
+    | user.
 -type option() ::
-        {encrypt_type, eipmi_auth:encrypt_type()} |
-        {initial_outbound_seq_nr, non_neg_integer()} |
-        {integrity_type, eipmi_auth:integrity_type()} |
-        {keep_alive_retransmits, non_neg_integer()} |
-        {lookup_type, 0..1} |
-        {password, string()} |
-        {port, inet:port_number()} |
-        {privilege, privilege()} |
-        {rakp_auth_type, eipmi_auth:rakp_type()} |
-        {rq_addr, 16#81..16#8d} |
-        {rq_auth_type, eimpi_auth:type() | rmcp_plus} |
-        {timeout, non_neg_integer()} |
-        {user, string()}.
+    {encrypt_type, eipmi_auth:encrypt_type()}
+    | {initial_outbound_seq_nr, non_neg_integer()}
+    | {integrity_type, eipmi_auth:integrity_type()}
+    | {keep_alive_retransmits, non_neg_integer()}
+    | {lookup_type, 0..1}
+    | {password, string()}
+    | {port, inet:port_number()}
+    | {privilege, privilege()}
+    | {rakp_auth_type, eipmi_auth:rakp_type()}
+    | {rq_addr, 16#81..16#8d}
+    | {rq_auth_type, eimpi_auth:type() | rmcp_plus}
+    | {timeout, non_neg_integer()}
+    | {user, string()}.
 
 -type repository_info() ::
-        [{version, string()} |
-         {entries, non_neg_integer()} |
-         {free_space, non_neg_integer()} |
-         {most_recent_addition, non_neg_integer()} |
-         {most_recent_erase, non_neg_integer()} |
-         {overflow, boolean()} |
-         {operations, [delete | partial_add | reserve | get_allocation_info]}].
+    [
+        {version, string()}
+        | {entries, non_neg_integer()}
+        | {free_space, non_neg_integer()}
+        | {most_recent_addition, non_neg_integer()}
+        | {most_recent_erase, non_neg_integer()}
+        | {overflow, boolean()}
+        | {operations, [delete | partial_add | reserve | get_allocation_info]}
+    ].
 -type fru_info() :: eipmi_fru:info().
 -type fru_inventory() :: [fru_info()].
 -type sdr_info() :: repository_info().
@@ -163,136 +192,172 @@
 -type trap() :: eipmi_trap:trap().
 
 -type device_support() ::
-        chassis | bridge | event_generator | event_receiver | fru_inventory |
-        sel | sdr | sensor.
+    chassis
+    | bridge
+    | event_generator
+    | event_receiver
+    | fru_inventory
+    | sel
+    | sdr
+    | sensor.
 -type device_info() ::
-        [{device_id, non_neg_integer()} |
-         {device_revision, non_neg_integer()} |
-         {operation, normal | progress} |
-         {firmware_version, string()} |
-         {ipmi_version, string()} |
-         {device_support, [device_support()]} |
-         {manufacturer_id, non_neg_integer()} |
-         {product_id, non_neg_integer()}].
+    [
+        {device_id, non_neg_integer()}
+        | {device_revision, non_neg_integer()}
+        | {operation, normal | progress}
+        | {firmware_version, string()}
+        | {ipmi_version, string()}
+        | {device_support, [device_support()]}
+        | {manufacturer_id, non_neg_integer()}
+        | {product_id, non_neg_integer()}
+    ].
 
 -type self_test() ::
-        [{result,
-          self_tests_passed |
-          self_tests_not_implemented |
-          {{corrupted_devices,
-            [sel | sdr | fru | ipmb_signal_lines]},
-           {inaccessible_devices,
-            [sdr | fru | boot_firmware | optional_firmware]}} |
-          {fatal_hardware_error, non_neg_integer()},
-          {device_specific_error, non_neg_integer(), non_neg_integer()}}].
+    [
+        {result,
+            self_tests_passed
+            | self_tests_not_implemented
+            | {{corrupted_devices, [sel | sdr | fru | ipmb_signal_lines]},
+                {inaccessible_devices, [
+                    sdr | fru | boot_firmware | optional_firmware
+                ]}}
+            | {fatal_hardware_error, non_neg_integer()},
+            {device_specific_error, non_neg_integer(), non_neg_integer()}}
+    ].
 
 -type power_state() ::
-        [{system,
-          {s0_g0, working} |
-          {s1, clocks_stopped} |
-          {s2, clocks_stopped} |
-          {s3, suspend_to_ram} |
-          {s4, suspend_to_disk} |
-          {s5_g2, soft_off} |
-          {s4_s5, soft_off} |
-          {g3, mechanical_off} |
-          {s1_s2_s3, sleeping} |
-          {g1, sleeping} |
-          {s5, override} |
-          legacy_on |
-          legacy_off |
-          unknown}|
-         {device, d0 | d1 | d2 | d3 | unknown}].
+    [
+        {system,
+            {s0_g0, working}
+            | {s1, clocks_stopped}
+            | {s2, clocks_stopped}
+            | {s3, suspend_to_ram}
+            | {s4, suspend_to_disk}
+            | {s5_g2, soft_off}
+            | {s4_s5, soft_off}
+            | {g3, mechanical_off}
+            | {s1_s2_s3, sleeping}
+            | {g1, sleeping}
+            | {s5, override}
+            | legacy_on
+            | legacy_off
+            | unknown}
+        | {device, d0 | d1 | d2 | d3 | unknown}
+    ].
 
 -type network_statistics() ::
-        [{ip_packets_received, non_neg_integer()} |
-         {ip_header_errors, non_neg_integer()} |
-         {ip_address_errors, non_neg_integer()} |
-         {ip_fragmented_packets_received, non_neg_integer()} |
-         {ip_packets_transmitted, non_neg_integer()} |
-         {udp_packets_received, non_neg_integer()} |
-         {udp_proxy_packets_received, non_neg_integer()} |
-         {udp_proxy_packets_dropped, non_neg_integer()} |
-         {rmcp_packets_received, non_neg_integer()}].
+    [
+        {ip_packets_received, non_neg_integer()}
+        | {ip_header_errors, non_neg_integer()}
+        | {ip_address_errors, non_neg_integer()}
+        | {ip_fragmented_packets_received, non_neg_integer()}
+        | {ip_packets_transmitted, non_neg_integer()}
+        | {udp_packets_received, non_neg_integer()}
+        | {udp_proxy_packets_received, non_neg_integer()}
+        | {udp_proxy_packets_dropped, non_neg_integer()}
+        | {rmcp_packets_received, non_neg_integer()}
+    ].
 
 -type lan_configurations() ::
-        [{set, 0..15} |
-         {parameter, 0..19} |
-         {set_in_progress, set_complete | set_in_progress | commit_write} |
-         {auth_types, [eipmi_auth:type() | oem]} |
-         {callback_level_auth_types, [eipmi_auth:type() | oem]} |
-         {user_level_auth_types, [eipmi_auth:type() | oem]} |
-         {operator_level_auth_types, [eipmi_auth:type() | oem]} |
-         {administrator_level_auth_types, [eipmi_auth:type() | oem]} |
-         {oem_level_auth_types, [eipmi_auth:type() | oem]} |
-         {ip_assignment, bios_or_system | dhcp | static | other} |
-         {subnet_mask, inet:ip4_address()} |
-         {ttl, byte()} |
-         {precendence, 0..15} |
-         {type_of_service, 0..7} |
-         {primary_port, inet:port_number()} |
-         {secondary_port, inet:port_number()} |
-         {ip_address, inet:ip4_address()} |
-         {mac_address, {byte(), byte(), byte(), byte(), byte(), byte()}} |
-         {default_gateway, inet:ip4_address()} |
-         {default_gateway_mac_address, {byte(), byte(), byte(), byte(), byte(), byte()}} |
-         {backup_gateway, inet:ip4_address()} |
-         {backup_gateway_mac_address, {byte(), byte(), byte(), byte(), byte(), byte()}} |
-         {community, string()} |
-         {num_destinations, 0..15} |
-         {acknowledge, boolean()} |
-         {timeout, byte()} |
-         {retries, 0..3} |
-         {gateway, default|backup}].
+    [
+        {set, 0..15}
+        | {parameter, 0..19}
+        | {set_in_progress, set_complete | set_in_progress | commit_write}
+        | {auth_types, [eipmi_auth:type() | oem]}
+        | {callback_level_auth_types, [eipmi_auth:type() | oem]}
+        | {user_level_auth_types, [eipmi_auth:type() | oem]}
+        | {operator_level_auth_types, [eipmi_auth:type() | oem]}
+        | {administrator_level_auth_types, [eipmi_auth:type() | oem]}
+        | {oem_level_auth_types, [eipmi_auth:type() | oem]}
+        | {ip_assignment, bios_or_system | dhcp | static | other}
+        | {subnet_mask, inet:ip4_address()}
+        | {ttl, byte()}
+        | {precendence, 0..15}
+        | {type_of_service, 0..7}
+        | {primary_port, inet:port_number()}
+        | {secondary_port, inet:port_number()}
+        | {ip_address, inet:ip4_address()}
+        | {mac_address, {byte(), byte(), byte(), byte(), byte(), byte()}}
+        | {default_gateway, inet:ip4_address()}
+        | {default_gateway_mac_address,
+            {byte(), byte(), byte(), byte(), byte(), byte()}}
+        | {backup_gateway, inet:ip4_address()}
+        | {backup_gateway_mac_address,
+            {byte(), byte(), byte(), byte(), byte(), byte()}}
+        | {community, string()}
+        | {num_destinations, 0..15}
+        | {acknowledge, boolean()}
+        | {timeout, byte()}
+        | {retries, 0..3}
+        | {gateway, default | backup}
+    ].
 
 -type picmg_properties() ::
-        [{picmg_extension, string()} |
-         {max_fru_id, 0..254} |
-         {ipmc_fru_id, 0..254}].
+    [
+        {picmg_extension, string()}
+        | {max_fru_id, 0..254}
+        | {ipmc_fru_id, 0..254}
+    ].
 -type picmg_site_type() ::
-        picmg_board | power_entry | shelf_fru_information |
-        dedicated_shelf_management_controller | fan_tray | fan_filter_tray |
-        alarm | amc | pmc | rear_transition_module | mch | power_module.
+    picmg_board
+    | power_entry
+    | shelf_fru_information
+    | dedicated_shelf_management_controller
+    | fan_tray
+    | fan_filter_tray
+    | alarm
+    | amc
+    | pmc
+    | rear_transition_module
+    | mch
+    | power_module.
 -type picmg_address_info() ::
-        [{mch_site_number, non_neg_integer()} |
-         {ipmb_address, non_neg_integer()} |
-         {fru_id, 0..254} |
-         {site_number, non_neg_integer()} |
-         {site_type, picmg_site_type()} |
-         {carrier_number, non_neg_integer()}].
+    [
+        {mch_site_number, non_neg_integer()}
+        | {ipmb_address, non_neg_integer()}
+        | {fru_id, 0..254}
+        | {site_number, non_neg_integer()}
+        | {site_type, picmg_site_type()}
+        | {carrier_number, non_neg_integer()}
+    ].
 -type picmg_fru_control() ::
-        cold_reset | warm_reset | graceful_reboot | diagnostic_interrupt |
-        quiesce.
+    cold_reset
+    | warm_reset
+    | graceful_reboot
+    | diagnostic_interrupt
+    | quiesce.
 
--export_type([target/0,
-              session/0,
-              req_net_fn/0,
-              request/0,
-              response/0,
-              privilege/0,
-              chassis_command/0,
-              power_policy/0,
-              restart_cause/0,
-              option/0,
-              option_name/0,
-              fru_info/0,
-              fru_inventory/0,
-              sdr_info/0,
-              sdr/0,
-              sdr_reading/0,
-              sdr_repository/0,
-              sel_info/0,
-              sel_entry/0,
-              trap/0,
-              device_info/0,
-              self_test/0,
-              power_state/0,
-              network_statistics/0,
-              lan_configurations/0,
-              picmg_properties/0,
-              picmg_site_type/0,
-              picmg_address_info/0,
-              picmg_fru_control/0]).
+-export_type([
+    target/0,
+    session/0,
+    req_net_fn/0,
+    request/0,
+    response/0,
+    privilege/0,
+    chassis_command/0,
+    power_policy/0,
+    restart_cause/0,
+    option/0,
+    option_name/0,
+    fru_info/0,
+    fru_inventory/0,
+    sdr_info/0,
+    sdr/0,
+    sdr_reading/0,
+    sdr_repository/0,
+    sel_info/0,
+    sel_entry/0,
+    trap/0,
+    device_info/0,
+    self_test/0,
+    power_state/0,
+    network_statistics/0,
+    lan_configurations/0,
+    picmg_properties/0,
+    picmg_site_type/0,
+    picmg_address_info/0,
+    picmg_fru_control/0
+]).
 
 %%%=============================================================================
 %%% API
@@ -448,7 +513,7 @@ ping(IPAddress, Timeout) when is_integer(Timeout) andalso Timeout > 0 ->
 %% @end
 %%------------------------------------------------------------------------------
 -spec open(inet:ip4_address() | inet:hostname()) ->
-                  {ok, eipmi:session()} | {error, term()}.
+    {ok, eipmi:session()} | {error, term()}.
 open(Host) ->
     open(Host, []).
 
@@ -555,7 +620,7 @@ open(Host) ->
 %% @end
 %%------------------------------------------------------------------------------
 -spec open(inet:ip4_address() | inet:hostname(), [option()]) ->
-                  {ok, eipmi:session()} | {error, term()}.
+    {ok, eipmi:session()} | {error, term()}.
 open(Host, Options) ->
     {ok, IPAddress} = inet:getaddr(Host, inet),
     Port = proplists:get_value(port, Options, ?RMCP_PORT_NUMBER),
@@ -655,16 +720,22 @@ get_device_guid(Session) ->
 %% '''
 %% @end
 %%------------------------------------------------------------------------------
--spec send_message(session(),
-                   0..255,
-                   0..4,
-                   0..15,
-                   req_net_fn(),
-                   0..255,
-                   proplists:proplist()) ->
-                          ok | {ok, proplists:proplist()} | {error, term()}.
+-spec send_message(
+    session(),
+    0..255,
+    0..4,
+    0..15,
+    req_net_fn(),
+    0..255,
+    proplists:proplist()
+) -> ok | {ok, proplists:proplist()} | {error, term()}.
 send_message(Session, TargetAddr, TargetLun, Channel, NetFn, Cmd, Properties) ->
-    Data = [{net_fn, NetFn}, {cmd, Cmd}, {rs_addr, TargetAddr}, {rs_lun, TargetLun}],
+    Data = [
+        {net_fn, NetFn},
+        {cmd, Cmd},
+        {rs_addr, TargetAddr},
+        {rs_lun, TargetLun}
+    ],
     Args = [{channel, Channel}, {request, Data ++ Properties}],
     raw(Session, ?IPMI_NETFN_APPLICATION_REQUEST, ?SEND_MESSAGE, Args).
 
@@ -685,8 +756,8 @@ get_system_guid(Session) ->
 %% @end
 %%------------------------------------------------------------------------------
 -spec set_session_privilege_level(session(), privilege()) ->
-                                         {ok, [{privilege, privilege()}]} |
-                                         {error, term()}.
+    {ok, [{privilege, privilege()}]}
+    | {error, term()}.
 set_session_privilege_level(Session, Privilege) ->
     Args = [{privilege, Privilege}],
     Command = ?SET_SESSION_PRIVILEGE_LEVEL,
@@ -727,7 +798,8 @@ chassis_identify(Session, Interval) ->
 %% left unset. See {@link set_chassis_capabilities/6} for more info.
 %% @end
 %%------------------------------------------------------------------------------
--spec set_chassis_capabilities(session(), byte(), byte(), byte(), byte()) -> ok | {error, term()}.
+-spec set_chassis_capabilities(session(), byte(), byte(), byte(), byte()) ->
+    ok | {error, term()}.
 set_chassis_capabilities(Session, FruAddr, SdrAddr, SelAddr, SmAddr) ->
     set_chassis_capabilities(Session, FruAddr, SdrAddr, SelAddr, SmAddr, []).
 
@@ -740,12 +812,22 @@ set_chassis_capabilities(Session, FruAddr, SdrAddr, SelAddr, SmAddr) ->
 %%   provided, assumed to be the BMC address (0x20).
 %% @end
 %%------------------------------------------------------------------------------
--spec set_chassis_capabilities(session(), byte(), byte(), byte(), byte(), proplists:proplist()) -> ok | {error, term()}.
+-spec set_chassis_capabilities(
+    session(),
+    byte(),
+    byte(),
+    byte(),
+    byte(),
+    proplists:proplist()
+) -> ok | {error, term()}.
 set_chassis_capabilities(Session, FruAddr, SdrAddr, SelAddr, SmAddr, Extra) ->
-    Args = [{fru_address, FruAddr},
-            {sdr_address, SdrAddr},
-            {sel_address, SelAddr},
-            {sm_address, SmAddr} | Extra],
+    Args = [
+        {fru_address, FruAddr},
+        {sdr_address, SdrAddr},
+        {sel_address, SelAddr},
+        {sm_address, SmAddr}
+        | Extra
+    ],
     Command = ?SET_CHASSIS_CAPABILITIES,
     raw(Session, ?IPMI_NETFN_CHASSIS_REQUEST, Command, Args).
 
@@ -757,7 +839,8 @@ set_chassis_capabilities(Session, FruAddr, SdrAddr, SelAddr, SmAddr, Extra) ->
 %% interrupt (`diagnostic`).
 %% @end
 %%------------------------------------------------------------------------------
--spec get_chassis_capabilities(session()) -> {ok, proplists:proplist()} | {error, term()}.
+-spec get_chassis_capabilities(session()) ->
+    {ok, proplists:proplist()} | {error, term()}.
 get_chassis_capabilities(Session) ->
     raw(Session, ?IPMI_NETFN_CHASSIS_REQUEST, ?GET_CHASSIS_CAPABILITIES, []).
 
@@ -766,7 +849,8 @@ get_chassis_capabilities(Session) ->
 %% Returns high-level status of chassis and main power subsystem.
 %% @end
 %%------------------------------------------------------------------------------
--spec get_chassis_status(session()) -> {ok, proplists:proplist()} | {error, term()}.
+-spec get_chassis_status(session()) ->
+    {ok, proplists:proplist()} | {error, term()}.
 get_chassis_status(Session) ->
     raw(Session, ?IPMI_NETFN_CHASSIS_REQUEST, ?GET_CHASSIS_STATUS, []).
 
@@ -775,12 +859,20 @@ get_chassis_status(Session) ->
 %% Issues a "Set Front Panel Enables" request by specifying `true` for each
 %% button to *disable*.
 %%-------------------------------------------------------------------------------
--spec disable_front_panel_buttons(session(), boolean(), boolean(), boolean(), boolean()) -> ok | {error, term()}.
+-spec disable_front_panel_buttons(
+    session(),
+    boolean(),
+    boolean(),
+    boolean(),
+    boolean()
+) -> ok | {error, term()}.
 disable_front_panel_buttons(Session, Standby, Diagnostic, Reset, Power) ->
-    Args = [{disable_standby, Standby},
-            {disable_diagnostic_interrupt, Diagnostic},
-            {disable_reset, Reset},
-            {disable_power, Power}],
+    Args = [
+        {disable_standby, Standby},
+        {disable_diagnostic_interrupt, Diagnostic},
+        {disable_reset, Reset},
+        {disable_power, Power}
+    ],
     Command = ?SET_FRONT_PANEL_ENABLES,
     raw(Session, ?IPMI_NETFN_CHASSIS_REQUEST, Command, Args).
 
@@ -789,7 +881,8 @@ disable_front_panel_buttons(Session, Standby, Diagnostic, Reset, Power) ->
 %% Sets the behavior of the power subsystem when AC power is restored.
 %% @end
 %%-------------------------------------------------------------------------------
--spec set_power_restore_policy(session(), power_policy()) -> {ok, proplists:proplist()} | {error, term()}.
+-spec set_power_restore_policy(session(), power_policy()) ->
+    {ok, proplists:proplist()} | {error, term()}.
 set_power_restore_policy(Session, Policy) ->
     Args = [{policy, Policy}],
     Command = ?SET_POWER_RESTORE_POLICY,
@@ -813,7 +906,8 @@ set_power_cycle_interval(Session, Interval) ->
 %% value contains `restart_cause` and `channel` properties.
 %% @end
 %%-------------------------------------------------------------------------------
--spec get_system_restart_cause(session()) -> {ok, proplists:proplist()} | {error, term()}.
+-spec get_system_restart_cause(session()) ->
+    {ok, proplists:proplist()} | {error, term()}.
 get_system_restart_cause(Session) ->
     raw(Session, ?IPMI_NETFN_CHASSIS_REQUEST, ?GET_SYSTEM_RESTART_CAUSE, []).
 
@@ -823,7 +917,8 @@ get_system_restart_cause(Session) ->
 %% `minutes_per_count` properties.
 %% @end
 %%-------------------------------------------------------------------------------
--spec get_poh_counter(session()) -> {ok, proplists:proplist()} | {error, term()}.
+-spec get_poh_counter(session()) ->
+    {ok, proplists:proplist()} | {error, term()}.
 get_poh_counter(Session) ->
     raw(Session, ?IPMI_NETFN_CHASSIS_REQUEST, ?GET_POH_COUNTER, []).
 
@@ -849,16 +944,20 @@ read_fru(Session, FruId) ->
 -spec read_frus(session(), [0..254]) -> {ok, [fru_info()]} | {error, term()}.
 read_frus(Session, FruIds) ->
     lists:foldr(
-      fun(FruId, {ok, FruInfos}) ->
-              case read_fru(Session, FruId) of
-                  {ok, FruInfo} ->
-                      {ok, [FruInfo | FruInfos]};
-                  Error ->
-                      Error
-              end;
-         (_, Error) ->
-              Error
-      end, {ok, []}, FruIds).
+        fun
+            (FruId, {ok, FruInfos}) ->
+                case read_fru(Session, FruId) of
+                    {ok, FruInfo} ->
+                        {ok, [FruInfo | FruInfos]};
+                    Error ->
+                        Error
+                end;
+            (_, Error) ->
+                Error
+        end,
+        {ok, []},
+        FruIds
+    ).
 
 %%------------------------------------------------------------------------------
 %% @doc
@@ -868,7 +967,7 @@ read_frus(Session, FruIds) ->
 %% @end
 %%------------------------------------------------------------------------------
 -spec read_fru_inventory(session(), [eipmi_sdr:entry()]) ->
-                                {ok, fru_inventory()} | {error, [term()]}.
+    {ok, fru_inventory()} | {error, [term()]}.
 read_fru_inventory(Session, SdrRepository) ->
     read_frus(Session, get_fru_ids(SdrRepository)).
 
@@ -897,15 +996,17 @@ get_sdr(Session, RecordId) ->
 %% @end
 %%------------------------------------------------------------------------------
 -spec get_sdr(0..254, eipmi_sensor:type(), sdr_repository()) ->
-                     {ok, [sdr()]} | {error, term()}.
+    {ok, [sdr()]} | {error, term()}.
 get_sdr(FruId, SensorType, SdrRepository) ->
     case id_to_fru(FruId, SdrRepository) of
         {ok, {fru_device_locator, LocatorProps}} ->
-            {ok, get_elements_by_properties(
-                   maybe_keyfind(entity_id, 1, LocatorProps)
-                   ++ maybe_keyfind(entity_instance, 1, LocatorProps)
-                   ++ [{sensor_type, SensorType}],
-                   SdrRepository)};
+            {ok,
+                get_elements_by_properties(
+                    maybe_keyfind(entity_id, 1, LocatorProps) ++
+                        maybe_keyfind(entity_instance, 1, LocatorProps) ++
+                        [{sensor_type, SensorType}],
+                    SdrRepository
+                )};
         Error ->
             Error
     end.
@@ -929,11 +1030,11 @@ read_sdr(Session, Sdr) ->
 %% @end
 %%------------------------------------------------------------------------------
 -spec read_sdr(session(), non_neg_integer(), sdr_repository()) ->
-                      {ok, sdr_reading()} | {error, term()}.
+    {ok, sdr_reading()} | {error, term()}.
 read_sdr(Session, SensorNumber, SdrRepository) ->
     F = fun(Pid) ->
-                eipmi_sdr:get_sensor_reading(Pid, SensorNumber, SdrRepository)
-        end,
+        eipmi_sdr:get_sensor_reading(Pid, SensorNumber, SdrRepository)
+    end,
     to_ok_tuple(with_session(Session, F)).
 
 %%------------------------------------------------------------------------------
@@ -967,7 +1068,7 @@ get_sdr_repository(Session) ->
 %% @end
 %%------------------------------------------------------------------------------
 -spec get_sdr_repository(session(), sdr_repository()) ->
-                                {ok, sdr_repository()} | {error, term()}.
+    {ok, sdr_repository()} | {error, term()}.
 get_sdr_repository(Session, Previous) ->
     F = fun(Pid) -> eipmi_sdr:maybe_get_repository(Pid, Previous) end,
     to_ok_tuple(with_session(Session, F)).
@@ -1022,7 +1123,7 @@ poll_sel(Session) ->
 %% @end
 %%------------------------------------------------------------------------------
 -spec poll_sel(session(), non_neg_integer(), boolean()) ->
-                      {ok, pid()} | {error, term()}.
+    {ok, pid()} | {error, term()}.
 poll_sel(Session = {session, _, _}, Interval, Clear) when Interval > 0 ->
     Children = supervisor:which_children(?MODULE),
     poll_sel(get_session(Session, Children), Session, Interval, Clear).
@@ -1057,15 +1158,18 @@ get_sel_info(Session) ->
 %% can be used.
 %% @end
 %%------------------------------------------------------------------------------
--spec set_lan_configuration_parameters(session(),
-                                       0..19,
-                                       lan_configurations()) ->
-          ok | {error, term()}.
+-spec set_lan_configuration_parameters(
+    session(),
+    0..19,
+    lan_configurations()
+) -> ok | {error, term()}.
 set_lan_configuration_parameters(Session, Parameter, Properties) ->
-    raw(Session,
+    raw(
+        Session,
         ?IPMI_NETFN_TRANSPORT_REQUEST,
         ?SET_LAN_CONFIGURATION_PARAMETERS,
-        [{parameter, Parameter} | Properties]).
+        [{parameter, Parameter} | Properties]
+    ).
 
 %%------------------------------------------------------------------------------
 %% @doc
@@ -1075,22 +1179,26 @@ set_lan_configuration_parameters(Session, Parameter, Properties) ->
 %% @end
 %%------------------------------------------------------------------------------
 -spec get_lan_configuration_parameters(session(), 0..19, 0..15) ->
-          {ok, lan_configurations()} | {error, term()}.
+    {ok, lan_configurations()} | {error, term()}.
 get_lan_configuration_parameters(Session, Parameter, SetSelector) ->
     case
-        raw(Session,
+        raw(
+            Session,
             ?IPMI_NETFN_TRANSPORT_REQUEST,
             ?GET_LAN_CONFIGURATION_PARAMETERS,
-            [{parameter, Parameter}, {set, SetSelector}])
+            [{parameter, Parameter}, {set, SetSelector}]
+        )
     of
         {ok, RawResult} ->
             RawData = proplists:get_value(data, RawResult, <<>>),
             case
-                eipmi_response:decode_lan_configuration_parameters(Parameter,
-                                                                   SetSelector,
-                                                                   RawData)
+                eipmi_response:decode_lan_configuration_parameters(
+                    Parameter,
+                    SetSelector,
+                    RawData
+                )
             of
-                []     -> {error, unsupported};
+                [] -> {error, unsupported};
                 Result -> {ok, Result}
             end;
         Error ->
@@ -1104,8 +1212,8 @@ get_lan_configuration_parameters(Session, Parameter, SetSelector) ->
 %% @end
 %%------------------------------------------------------------------------------
 -spec get_ip_udp_rmcp_statistics(session(), boolean()) ->
-                                        {ok, network_statistics()} |
-                                        {error, term()}.
+    {ok, network_statistics()}
+    | {error, term()}.
 get_ip_udp_rmcp_statistics(Session, Clear) ->
     A = [{clear_statistics, Clear}],
     raw(Session, ?IPMI_NETFN_TRANSPORT_REQUEST, ?GET_IP_UDP_RMCP_STATISTICS, A).
@@ -1118,7 +1226,7 @@ get_ip_udp_rmcp_statistics(Session, Clear) ->
 %% @end
 %%------------------------------------------------------------------------------
 -spec get_picmg_properties(session()) ->
-                                  {ok, picmg_properties()} | {error, term()}.
+    {ok, picmg_properties()} | {error, term()}.
 get_picmg_properties(Session) ->
     raw(Session, ?IPMI_NETFN_PICMG_REQUEST, ?GET_PICMG_PROPERTIES, []).
 
@@ -1129,7 +1237,7 @@ get_picmg_properties(Session) ->
 %% @end
 %%------------------------------------------------------------------------------
 -spec get_address_info(session()) ->
-                              {ok, picmg_address_info()} | {error, term()}.
+    {ok, picmg_address_info()} | {error, term()}.
 get_address_info(Session) ->
     raw(Session, ?IPMI_NETFN_PICMG_REQUEST, ?GET_ADDRESS_INFO, []).
 
@@ -1140,7 +1248,7 @@ get_address_info(Session) ->
 %% @end
 %%------------------------------------------------------------------------------
 -spec get_address_info(session(), 0..254) ->
-                              {ok, picmg_address_info()} | {error, term()}.
+    {ok, picmg_address_info()} | {error, term()}.
 get_address_info(Session, FruId) ->
     Args = [{fru_id, FruId}],
     raw(Session, ?IPMI_NETFN_PICMG_REQUEST, ?GET_ADDRESS_INFO, Args).
@@ -1152,7 +1260,7 @@ get_address_info(Session, FruId) ->
 %% @end
 %%------------------------------------------------------------------------------
 -spec get_address_info(session(), 0..254, picmg_site_type()) ->
-                              {ok, picmg_address_info()} | {error, term()}.
+    {ok, picmg_address_info()} | {error, term()}.
 get_address_info(Session, SiteType, SiteNumber) ->
     Args = [{site_type, SiteType}, {site_number, SiteNumber}],
     raw(Session, ?IPMI_NETFN_PICMG_REQUEST, ?GET_ADDRESS_INFO, Args).
@@ -1165,10 +1273,10 @@ get_address_info(Session, SiteType, SiteNumber) ->
 %% @end
 %%------------------------------------------------------------------------------
 -spec set_fru_activation_policy(
-        session(),
-        0..254,
-        [{locked, boolean()} | {deactivation_locked, boolean()}]) ->
-                                       ok | {error, term()}.
+    session(),
+    0..254,
+    [{locked, boolean()} | {deactivation_locked, boolean()}]
+) -> ok | {error, term()}.
 set_fru_activation_policy(Session, FruId, Flags) ->
     Args = [{fru_id, FruId}] ++ Flags,
     raw(Session, ?IPMI_NETFN_PICMG_REQUEST, ?SET_FRU_ACTIVATION_POLICY, Args).
@@ -1180,9 +1288,11 @@ set_fru_activation_policy(Session, FruId, Flags) ->
 %% @end
 %%------------------------------------------------------------------------------
 -spec get_fru_activation_policy(session(), 0..254) ->
-                                       {ok, [{locked, boolean()} |
-                                             {deactivation_locked, boolean()}]} |
-                                       {error, term()}.
+    {ok, [
+        {locked, boolean()}
+        | {deactivation_locked, boolean()}
+    ]}
+    | {error, term()}.
 get_fru_activation_policy(Session, FruId) ->
     Args = [{fru_id, FruId}],
     raw(Session, ?IPMI_NETFN_PICMG_REQUEST, ?GET_FRU_ACTIVATION_POLICY, Args).
@@ -1204,7 +1314,8 @@ set_fru_activation(Session, FruId, Activate) ->
 %% be used to power cycle, reset, etc. the requested FRU.
 %% @end
 %%------------------------------------------------------------------------------
--spec fru_control(session(), 0..254, picmg_fru_control()) -> ok | {error, term()}.
+-spec fru_control(session(), 0..254, picmg_fru_control()) ->
+    ok | {error, term()}.
 fru_control(Session, FruId, Action) ->
     Args = [{fru_id, FruId}, {control, Action}],
     raw(Session, ?IPMI_NETFN_PICMG_REQUEST, ?FRU_CONTROL, Args).
@@ -1221,11 +1332,16 @@ fru_control(Session, FruId, Action) ->
 %% @end
 %%------------------------------------------------------------------------------
 -spec get_device_locator_record_id(session(), 0..254) ->
-                                          {ok, [{record_id, non_neg_integer()}]} |
-                                          {error, term()}.
+    {ok, [{record_id, non_neg_integer()}]}
+    | {error, term()}.
 get_device_locator_record_id(Session, FruId) ->
     Args = [{fru_id, FruId}],
-    raw(Session, ?IPMI_NETFN_PICMG_REQUEST, ?GET_DEVICE_LOCATOR_RECORD_ID, Args).
+    raw(
+        Session,
+        ?IPMI_NETFN_PICMG_REQUEST,
+        ?GET_DEVICE_LOCATOR_RECORD_ID,
+        Args
+    ).
 
 %%------------------------------------------------------------------------------
 %% @doc
@@ -1235,7 +1351,7 @@ get_device_locator_record_id(Session, FruId) ->
 %% @end
 %%------------------------------------------------------------------------------
 -spec oem(session(), req_net_fn(), 0..255, binary()) ->
-                 ok | {ok, binary()} | {error, term()}.
+    ok | {ok, binary()} | {error, term()}.
 oem(Session, NetFn, Command, Binary) ->
     case raw(Session, NetFn, Command, [{data, Binary}]) of
         {ok, [{data, <<>>} | _]} ->
@@ -1254,7 +1370,7 @@ oem(Session, NetFn, Command, Binary) ->
 %% @end
 %%------------------------------------------------------------------------------
 -spec raw(session(), req_net_fn(), 0..255, proplists:proplist()) ->
-                 ok | {ok, proplists:proplist()} | {error, term()}.
+    ok | {ok, proplists:proplist()} | {error, term()}.
 raw(Session, NetFn, Command, Properties) ->
     F = fun(Pid) -> eipmi_session:rpc(Pid, {NetFn, Command}, Properties) end,
     maybe_ok_return(with_session(Session, F)).
@@ -1265,13 +1381,15 @@ raw(Session, NetFn, Command, Properties) ->
 %% an entry in the System Event Log (SEL), if any.
 %% @end
 %%------------------------------------------------------------------------------
--spec sel_to_sdr(sel_entry(), sdr_repository()) -> {ok, sdr()} | {error, term()}.
+-spec sel_to_sdr(sel_entry(), sdr_repository()) ->
+    {ok, sdr()} | {error, term()}.
 sel_to_sdr({_, SelEntryProps}, SdrRepository) ->
     get_element_by_properties(
-      maybe_keyfind(sensor_number, 1, SelEntryProps)
-      ++ maybe_keyfind(sensor_addr, 1, SelEntryProps)
-      ++ maybe_keyfind(software_id, 1, SelEntryProps),
-      SdrRepository).
+        maybe_keyfind(sensor_number, 1, SelEntryProps) ++
+            maybe_keyfind(sensor_addr, 1, SelEntryProps) ++
+            maybe_keyfind(software_id, 1, SelEntryProps),
+        SdrRepository
+    ).
 
 %%------------------------------------------------------------------------------
 %% @doc
@@ -1279,7 +1397,8 @@ sel_to_sdr({_, SelEntryProps}, SdrRepository) ->
 %% Event Log (SEL), if any.
 %% @end
 %%------------------------------------------------------------------------------
--spec sel_to_fru(sel_entry(), sdr_repository()) -> {ok, sdr()} | {error, term()}.
+-spec sel_to_fru(sel_entry(), sdr_repository()) ->
+    {ok, sdr()} | {error, term()}.
 sel_to_fru(SelEntry, SdrRepository) ->
     case sel_to_sdr(SelEntry, SdrRepository) of
         {ok, Sdr} ->
@@ -1295,7 +1414,7 @@ sel_to_fru(SelEntry, SdrRepository) ->
 %% @end
 %%------------------------------------------------------------------------------
 -spec sel_to_fru(sel_entry(), sdr_repository(), fru_inventory()) ->
-                        {ok, fru_info()} | {error, term()}.
+    {ok, fru_info()} | {error, term()}.
 sel_to_fru(SelEntry, SdrRepository, FruInventory) ->
     case sel_to_sdr(SelEntry, SdrRepository) of
         {ok, Sdr} ->
@@ -1321,13 +1440,14 @@ sdr_to_fru({_, SensorProps}, SdrRepository) ->
 %% @end
 %%------------------------------------------------------------------------------
 -spec sdr_to_fru(sdr(), sdr_repository(), fru_inventory()) ->
-                        {ok, fru_info()} | {error, term()}.
+    {ok, fru_info()} | {error, term()}.
 sdr_to_fru(Sdr, SdrRepository, FruInventory) ->
     case sdr_to_fru(Sdr, SdrRepository) of
         {ok, {fru_device_locator, Props}} ->
             get_element_by_properties(
-              maybe_keyfind(fru_id, 1, Props),
-              FruInventory);
+                maybe_keyfind(fru_id, 1, Props),
+                FruInventory
+            );
         Error ->
             Error
     end.
@@ -1339,12 +1459,13 @@ sdr_to_fru(Sdr, SdrRepository, FruInventory) ->
 %% @end
 %%------------------------------------------------------------------------------
 -spec props_to_fru([eipmi_sdr:property()], sdr_repository()) ->
-          {ok, sdr()} | {error, term()}.
+    {ok, sdr()} | {error, term()}.
 props_to_fru(Props, SdrRepository) ->
     get_element_by_properties(
-      maybe_keyfind(entity_id, 1, Props)
-      ++ maybe_keyfind(entity_instance, 1, Props),
-      filter_by_key(fru_device_locator, SdrRepository)).
+        maybe_keyfind(entity_id, 1, Props) ++
+            maybe_keyfind(entity_instance, 1, Props),
+        filter_by_key(fru_device_locator, SdrRepository)
+    ).
 
 %%------------------------------------------------------------------------------
 %% @doc
@@ -1355,8 +1476,9 @@ props_to_fru(Props, SdrRepository) ->
 -spec id_to_fru(0..254, sdr_repository()) -> {ok, sdr()} | {error, term()}.
 id_to_fru(FruId, SdrRepository) ->
     get_element_by_properties(
-      [{fru_id, FruId}],
-      filter_by_key(fru_device_locator, SdrRepository)).
+        [{fru_id, FruId}],
+        filter_by_key(fru_device_locator, SdrRepository)
+    ).
 
 %%------------------------------------------------------------------------------
 %% @doc
@@ -1454,7 +1576,7 @@ with_session_(Error, _Fun) -> Error.
 %%------------------------------------------------------------------------------
 get_session(S, Cs) ->
     get_session([P || {Id, P, _, _} <- Cs, Id =:= S andalso is_pid(P)]).
-get_session([])  -> {error, no_session};
+get_session([]) -> {error, no_session};
 get_session([P]) -> {ok, P}.
 
 %%------------------------------------------------------------------------------
@@ -1482,9 +1604,9 @@ do_ping_receive(IPAddress, Timeout, Socket) ->
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-to_ok_tuple(Error = {error, _})      -> Error;
-to_ok_tuple(Result = {ok, _})        -> Result;
-to_ok_tuple(Result)                  -> {ok, Result}.
+to_ok_tuple(Error = {error, _}) -> Error;
+to_ok_tuple(Result = {ok, _}) -> Result;
+to_ok_tuple(Result) -> {ok, Result}.
 
 %%------------------------------------------------------------------------------
 %% @private
@@ -1507,7 +1629,7 @@ get_element_by_properties([], _List) ->
     {error, unresolvable};
 get_element_by_properties(Props, List) ->
     case get_elements_by_properties(Props, List) of
-        []            -> {error, {not_found, Props}};
+        [] -> {error, {not_found, Props}};
         [Element | _] -> {ok, Element}
     end.
 

@@ -22,33 +22,46 @@
 
 -module(eipmi_auth).
 
--export([encrypt/3,
-         decrypt/3,
-         encode_encrypt_type/1,
-         encode_integrity_type/1,
-         encode_payload_type/1,
-         encode_rakp_type/1,
-         encode_type/1,
-         decode_encrypt_type/1,
-         decode_integrity_type/1,
-         decode_payload_type/1,
-         decode_rakp_type/1,
-         decode_type/1,
-         hash/2,
-         hash/3,
-         extra_key/3,
-         rakp_hash/4
-        ]).
+-export([
+    encrypt/3,
+    decrypt/3,
+    encode_encrypt_type/1,
+    encode_integrity_type/1,
+    encode_payload_type/1,
+    encode_rakp_type/1,
+    encode_type/1,
+    decode_encrypt_type/1,
+    decode_integrity_type/1,
+    decode_payload_type/1,
+    decode_rakp_type/1,
+    decode_type/1,
+    hash/2,
+    hash/3,
+    extra_key/3,
+    rakp_hash/4
+]).
 
 -type encrypt_type() :: none | aes_cbc.
--type integrity_type() :: none | hmac_sha1_96 | hmac_md5_128 | md5_128 | hmac_sha256_128.
--type payload_type() :: ipmi | open_session_rq | open_session_rs |
-                        rakp1 | rakp2 | rakp3 | rakp4.
+-type integrity_type() ::
+    none | hmac_sha1_96 | hmac_md5_128 | md5_128 | hmac_sha256_128.
+-type payload_type() ::
+    ipmi
+    | open_session_rq
+    | open_session_rs
+    | rakp1
+    | rakp2
+    | rakp3
+    | rakp4.
 -type rakp_type() :: none | hmac_sha1 | hmac_md5 | hmac_sha256.
 -type type() :: none | md2 | md5 | pwd.
 
--export_type([encrypt_type/0, integrity_type/0, payload_type/0,
-              rakp_type/0, type/0]).
+-export_type([
+    encrypt_type/0,
+    integrity_type/0,
+    payload_type/0,
+    rakp_type/0,
+    type/0
+]).
 
 %%%=============================================================================
 %%% API
@@ -85,7 +98,11 @@ hash(hmac_md5_128, K, B) ->
 hash(hmac_sha256_128, K, B) ->
     crypto:macN(hmac, sha256, K, B, 16).
 
--spec extra_key(encrypt_type() | 1..255, rakp_type() | integrity_type(), binary()) -> binary().
+-spec extra_key(
+    encrypt_type() | 1..255,
+    rakp_type() | integrity_type(),
+    binary()
+) -> binary().
 extra_key(none, _Ht, _Sk) ->
     <<>>;
 extra_key(aes_cbc, Ht, Sk) ->
@@ -140,15 +157,25 @@ encrypt(aes_cbc, Key, Binary) ->
     PadLength = 15 - size(Binary) rem 16,
     Padding = list_to_binary(lists:seq(1, PadLength)),
     ToEncrypt = <<Binary/binary, Padding/binary, PadLength:8>>,
-    Encrypted = crypto:crypto_one_time(aes_128_cbc, Key, Iv, ToEncrypt,
-                                       [{encrypt, true}, {padding, none}]),
+    Encrypted = crypto:crypto_one_time(
+        aes_128_cbc,
+        Key,
+        Iv,
+        ToEncrypt,
+        [{encrypt, true}, {padding, none}]
+    ),
     <<Iv/binary, Encrypted/binary>>.
 
 decrypt(none, _Key, Binary) ->
     Binary;
 decrypt(aes_cbc, Key, <<Iv:16/binary, Encrypted/binary>>) ->
-    Result = crypto:crypto_one_time(aes_128_cbc, Key, Iv, Encrypted,
-                                    [{encrypt, false}, {padding, none}]),
+    Result = crypto:crypto_one_time(
+        aes_128_cbc,
+        Key,
+        Iv,
+        Encrypted,
+        [{encrypt, false}, {padding, none}]
+    ),
     PadLength = binary:last(Result),
     % PadLength does not count its own byte.
     binary_part(Result, {0, size(Result) - 1 - PadLength}).

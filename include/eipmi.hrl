@@ -222,48 +222,88 @@
 %%%=============================================================================
 
 %% Global (Application)
--define(GET_DEVICE_ID, 16#01).                                      %% mandatory
--define(COLD_RESET, 16#02).                                         %%  optional
--define(WARM_RESET, 16#03).                                         %%  optional
--define(GET_SELF_TEST_RESULTS, 16#04).                              %% mandatory
--define(SET_ACPI_POWER_STATE, 16#06).                               %%  optional
--define(GET_ACPI_POWER_STATE, 16#07).                               %%  optional
--define(GET_DEVICE_GUID, 16#08).                                    %%  optional
+
+%% mandatory
+-define(GET_DEVICE_ID, 16#01).
+%%  optional
+-define(COLD_RESET, 16#02).
+%%  optional
+-define(WARM_RESET, 16#03).
+%% mandatory
+-define(GET_SELF_TEST_RESULTS, 16#04).
+%%  optional
+-define(SET_ACPI_POWER_STATE, 16#06).
+%%  optional
+-define(GET_ACPI_POWER_STATE, 16#07).
+%%  optional
+-define(GET_DEVICE_GUID, 16#08).
 
 %% BMC Watchdog (Application)
--define(RESET_WATCHDOG_TIMER, 16#22).                               %% mandatory
--define(SET_WATCHDOG_TIMER, 16#24).                                 %% mandatory
--define(GET_WATCHDOG_TIMER, 16#25).                                 %% mandatory
+
+%% mandatory
+-define(RESET_WATCHDOG_TIMER, 16#22).
+%% mandatory
+-define(SET_WATCHDOG_TIMER, 16#24).
+%% mandatory
+-define(GET_WATCHDOG_TIMER, 16#25).
 
 %% BMC Messaging (Application)
--define(SET_BMC_GLOBAL_ENABLES, 16#2e).                             %% mandatory
--define(GET_BMC_GLOBAL_ENABLES, 16#2f).                             %% mandatory
--define(CLEAR_MESSAGE_FLAGS, 16#30).                                %% mandatory
--define(GET_MESSAGE_FLAGS, 16#31).                                  %% mandatory
--define(GET_MESSAGE, 16#33).                                        %% mandatory
--define(SEND_MESSAGE, 16#34).                                       %% mandatory
--define(GET_SYSTEM_GUID, 16#37).                                    %%  optional
--define(GET_CHANNEL_AUTHENTICATION_CAPABILITIES, 16#38).            %% mandatory
--define(GET_SESSION_CHALLENGE, 16#39).                              %% mandatory
--define(ACTIVATE_SESSION, 16#3a).                                   %% mandatory
--define(SET_SESSION_PRIVILEGE_LEVEL, 16#3b).                        %% mandatory
--define(CLOSE_SESSION, 16#3c).                                      %% mandatory
--define(GET_SESSION_INFO, 16#3d).                                   %% mandatory
--define(GET_AUTHCODE, 16#3f).                                       %%  optional
--define(SET_CHANNEL_ACCESS, 16#40).                                 %% mandatory
--define(GET_CHANNEL_ACCESS, 16#41).                                 %% mandatory
--define(GET_CHANNEL_INFO, 16#42).                                   %% mandatory
--define(SET_USER_ACCESS, 16#43).                                    %% mandatory
--define(GET_USER_ACCESS, 16#44).                                    %% mandatory
--define(SET_USER_NAME, 16#45).                                      %%  optional
--define(GET_USER_NAME, 16#46).                                      %% mandatory
--define(SET_USER_PASSWORD, 16#47).                                  %% mandatory
--define(MASTER_WRITE_READ, 16#52).                                  %% mandatory
+
+%% mandatory
+-define(SET_BMC_GLOBAL_ENABLES, 16#2e).
+%% mandatory
+-define(GET_BMC_GLOBAL_ENABLES, 16#2f).
+%% mandatory
+-define(CLEAR_MESSAGE_FLAGS, 16#30).
+%% mandatory
+-define(GET_MESSAGE_FLAGS, 16#31).
+%% mandatory
+-define(GET_MESSAGE, 16#33).
+%% mandatory
+-define(SEND_MESSAGE, 16#34).
+%%  optional
+-define(GET_SYSTEM_GUID, 16#37).
+%% mandatory
+-define(GET_CHANNEL_AUTHENTICATION_CAPABILITIES, 16#38).
+%% mandatory
+-define(GET_SESSION_CHALLENGE, 16#39).
+%% mandatory
+-define(ACTIVATE_SESSION, 16#3a).
+%% mandatory
+-define(SET_SESSION_PRIVILEGE_LEVEL, 16#3b).
+%% mandatory
+-define(CLOSE_SESSION, 16#3c).
+%% mandatory
+-define(GET_SESSION_INFO, 16#3d).
+%%  optional
+-define(GET_AUTHCODE, 16#3f).
+%% mandatory
+-define(SET_CHANNEL_ACCESS, 16#40).
+%% mandatory
+-define(GET_CHANNEL_ACCESS, 16#41).
+%% mandatory
+-define(GET_CHANNEL_INFO, 16#42).
+%% mandatory
+-define(SET_USER_ACCESS, 16#43).
+%% mandatory
+-define(GET_USER_ACCESS, 16#44).
+%%  optional
+-define(SET_USER_NAME, 16#45).
+%% mandatory
+-define(GET_USER_NAME, 16#46).
+%% mandatory
+-define(SET_USER_PASSWORD, 16#47).
+%% mandatory
+-define(MASTER_WRITE_READ, 16#52).
 
 %% Chassis
--define(GET_CHASSIS_CAPABILITIES, 16#00).                           %% mandatory
--define(GET_CHASSIS_STATUS, 16#01).                                 %% mandatory
--define(CHASSIS_CONTROL, 16#02).                                    %% mandatory
+
+%% mandatory
+-define(GET_CHASSIS_CAPABILITIES, 16#00).
+%% mandatory
+-define(GET_CHASSIS_STATUS, 16#01).
+%% mandatory
+-define(CHASSIS_CONTROL, 16#02).
 -define(CHASSIS_RESET, 16#03).
 -define(CHASSIS_IDENTIFY, 16#04).
 -define(SET_CHASSIS_CAPABILITIES, 16#05).
@@ -309,9 +349,13 @@
 -define(SET_SENSOR_READING_AND_EVENT_STATUS, 16#30).
 
 %% FRU (Storage)
--define(GET_FRU_INVENTORY_AREA_INFO, 16#10).                        %% mandatory
--define(READ_FRU_DATA, 16#11).                                      %% mandatory
--define(WRITE_FRU_DATA, 16#12).                                     %% mandatory
+
+%% mandatory
+-define(GET_FRU_INVENTORY_AREA_INFO, 16#10).
+%% mandatory
+-define(READ_FRU_DATA, 16#11).
+%% mandatory
+-define(WRITE_FRU_DATA, 16#12).
 
 %% SDR (Storage)
 -define(GET_SDR_REPOSITORY_INFO, 16#20).
@@ -388,47 +432,57 @@
 %% The RMCP message header.
 %%------------------------------------------------------------------------------
 -record(rmcp_header, {
-          version = ?RMCP_VERSION :: 0..255,
-          seq_nr  = ?RMCP_NOREPLY :: 0..255,
-          class   = ?RMCP_ASF     :: 0..255}).
+    version = ?RMCP_VERSION :: 0..255,
+    seq_nr = ?RMCP_NOREPLY :: 0..255,
+    class = ?RMCP_ASF :: 0..255
+}).
 
 %%------------------------------------------------------------------------------
 %% The RMCP ACK Message.
 %%------------------------------------------------------------------------------
 -record(rmcp_ack, {
-          header :: #rmcp_header{}}).
+    header :: #rmcp_header{}
+}).
 
 %%------------------------------------------------------------------------------
 %% The ASF Ping payload.
 %%------------------------------------------------------------------------------
 -record(asf_ping, {
-          iana = ?ASF_IANA :: non_neg_integer(), %% the IANA enterprise number
-          tag = 0          :: 0..255}).
+    %% the IANA enterprise number
+    iana = ?ASF_IANA :: non_neg_integer(),
+    tag = 0 :: 0..255
+}).
 
 %%------------------------------------------------------------------------------
 %% The ASF Pong payload.
 %%------------------------------------------------------------------------------
 -record(asf_pong, {
-          iana = ?ASF_IANA :: non_neg_integer(), %% the IANA enterprise number
-          tag = 0          :: 0..255,
-          oem = 0          :: non_neg_integer(), %% OEM defined values
-          entities = []    :: [ipmi]}).          %% supported entities
+    %% the IANA enterprise number
+    iana = ?ASF_IANA :: non_neg_integer(),
+    tag = 0 :: 0..255,
+    %% OEM defined values
+    oem = 0 :: non_neg_integer(),
+    %% supported entities
+    entities = [] :: [ipmi]
+}).
 
 %%------------------------------------------------------------------------------
 %% An RMCP ASF Message.
 %%------------------------------------------------------------------------------
 -record(rmcp_asf, {
-          header  :: #rmcp_header{},
-          payload :: #asf_ping{} | #asf_pong{} | undefined}).
+    header :: #rmcp_header{},
+    payload :: #asf_ping{} | #asf_pong{} | undefined
+}).
 
 %%------------------------------------------------------------------------------
 %% An RMCP IPMI Message.
 %%------------------------------------------------------------------------------
 -record(rmcp_ipmi, {
-          header          :: #rmcp_header{} | undefined,
-          properties = [] :: proplists:proplist(),
-          cmd             :: eipmi:request() | eipmi:response() | undefined,
-          data = <<>>     :: binary()}).
+    header :: #rmcp_header{} | undefined,
+    properties = [] :: proplists:proplist(),
+    cmd :: eipmi:request() | eipmi:response() | undefined,
+    data = <<>> :: binary()
+}).
 
 %%%=============================================================================
 %%% Utilities
@@ -438,11 +492,13 @@
 %% A try-catch expression returning '{error, term()}' on badmatch.
 %%------------------------------------------------------------------------------
 -define(EIPMI_CATCH(Expression),
-        try Expression of
-            Result_Dont_Look -> Result_Dont_Look
-        catch
-            error:{badmatch, Error_Dont_Look = {error, _}} -> Error_Dont_Look;
-            error:{badmatch, Error_Dont_Look} -> {error, Error_Dont_Look}
-        end).
+    try Expression of
+        Result_Dont_Look -> Result_Dont_Look
+    catch
+        error:{badmatch, Error_Dont_Look = {error, _}} -> Error_Dont_Look;
+        error:{badmatch, Error_Dont_Look} -> {error, Error_Dont_Look}
+    end
+).
 
--endif. %% eipmi_hrl_
+%% eipmi_hrl_
+-endif.
