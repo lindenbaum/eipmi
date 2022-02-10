@@ -20,10 +20,11 @@
 
 -module(eipmi_decoder).
 
--export([packet/1,
+-export([packet/2,
          response/1]).
 
 -include("eipmi.hrl").
+-include_lib("stdlib/include/assert.hrl").
 
 %%%=============================================================================
 %%% API
@@ -35,15 +36,16 @@
 %% representation.
 %% @end
 %%------------------------------------------------------------------------------
--spec packet(binary()) ->
+-spec packet(binary(), [eipmi_session:property()]) ->
                     {ok, #rmcp_ack{} | #rmcp_asf{} | #rmcp_ipmi{}} |
                     {error, term()}.
-packet(<<?RMCP_VERSION:8, ?EIPMI_RESERVED:8, SeqNr:8, Rest/binary>>) ->
-    try class(SeqNr, Rest)
+packet(<<?RMCP_VERSION:8, ?EIPMI_RESERVED:8, SeqNr:8, Rest/binary>>,
+       SessionState) ->
+    try class(SeqNr, Rest, SessionState)
     catch
         C:E -> {error, {C, E}}
     end;
-packet(Binary) ->
+packet(Binary, _) ->
     {error, {not_rmcp_packet, Binary}}.
 
 %%------------------------------------------------------------------------------
@@ -64,16 +66,19 @@ response(Binary) -> response(#rmcp_ipmi{}, byte_size(Binary) - 4, Binary).
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-class(SeqNr, <<?RMCP_ACK:1, ?EIPMI_RESERVED:2, Class:5>>) ->
+class(SeqNr, <<?RMCP_ACK:1, ?EIPMI_RESERVED:2, Class:5>>, _) ->
     Header = #rmcp_header{seq_nr = SeqNr, class = Class},
     {ok, #rmcp_ack{header = Header}};
-class(SeqNr, <<?RMCP_NORMAL:1, ?EIPMI_RESERVED:2, ?RMCP_ASF:5, Rest/binary>>) ->
+class(SeqNr, <<?RMCP_NORMAL:1, ?EIPMI_RESERVED:2, ?RMCP_ASF:5, Rest/binary>>,
+      _) ->
     Header = #rmcp_header{seq_nr = SeqNr, class = ?RMCP_ASF},
     asf(#rmcp_asf{header = Header}, Rest);
-class(SeqNr, <<?RMCP_NORMAL:1, ?EIPMI_RESERVED:2, ?RMCP_IPMI:5, Rest/binary>>) ->
+class(SeqNr,
+      <<?RMCP_NORMAL:1, ?EIPMI_RESERVED:2, ?RMCP_IPMI:5, Rest/binary>>,
+      SessionState) ->
     Header = #rmcp_header{seq_nr = SeqNr, class = ?RMCP_IPMI},
-    ipmi(#rmcp_ipmi{header = Header}, Rest);
-class(_SeqNr, _Binary) ->
+    ipmi(#rmcp_ipmi{header = Header}, SessionState, Rest);
+class(_SeqNr, _Binary, _) ->
     {error, unsupported_rmcp_packet}.
 
 %%------------------------------------------------------------------------------
@@ -90,9 +95,74 @@ asf(_Asf, _Binary) ->
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-ipmi(Ipmi, Binary) ->
-    {SessionProps, <<Size:8, Rest:Size/binary>>} = session(Binary),
-    response(Ipmi#rmcp_ipmi{properties = SessionProps}, Size - 4, Rest).
+ipmi(Ipmi, SessionState, Binary) ->
+    {SessionProps, Size, Response} = session(Binary, SessionState),
+    AllProperties = SessionProps ++ SessionState,
+    I = Ipmi#rmcp_ipmi{properties = SessionProps},
+    A = proplists:get_value(auth_type, AllProperties),
+    P = proplists:get_value(payload_type, AllProperties),
+    case {A, P} of
+        {rmcp_plus, ipmi} ->
+            case proplists:get_value(authenticated, AllProperties) of
+                true -> authenticate(AllProperties, Binary);
+                _    -> ok
+            end,
+            <<Data:Size/binary, _/binary>> = Response,
+            maybe_encrypted(I, AllProperties, Size, Data);
+        {rmcp_plus, _} ->
+            %% Open Session and RAKP messages should be neither encrypted nor
+            %% authenticated. There are also no completion code or checksums.
+            rakp(I, Response);
+        {_, _} ->
+            response(I, Size - 4, Response)
+    end.
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+authenticate(Ps, Binary) ->
+    <<SessionHeader:10/binary,
+      Size:16/little,
+      Data:Size/binary,
+      SessionTrailer/binary>> = Binary,
+    %% PadLength = (6 - Size rem 4) rem 4,
+    PadLength = case Size rem 4 of
+                    0 -> 2;
+                    1 -> 1;
+                    2 -> 0;
+                    3 -> 3
+                end,
+    <<Padding:PadLength/binary,
+      PadLength:8,
+      16#07:8,
+      AuthCode/binary>> = SessionTrailer,
+    H = proplists:get_value(integrity_type, Ps),
+    SIK = proplists:get_value(session_key, Ps),
+    K1 = eipmi_auth:extra_key(1, H, SIK),
+    Hashed = <<SessionHeader/binary,
+               Size:16/little,
+               Data/binary,
+               Padding/binary,
+               PadLength:8, 16#07:8>>,
+    ?assertEqual(AuthCode,
+                 eipmi_auth:hash(H, K1, Hashed),
+                 "AuthCode does not match").
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+maybe_encrypted(I, AllProperties, Len, Data) ->
+    case proplists:get_value(encrypted, AllProperties) of
+        true ->
+            E = proplists:get_value(encrypt_type, AllProperties, none),
+            H = proplists:get_value(integrity_type, AllProperties),
+            SIK = proplists:get_value(session_key, AllProperties),
+            K2 = eipmi_auth:extra_key(E, H, SIK),
+            Resp = eipmi_auth:decrypt(E, K2, Data),
+            response(I, size(Resp) - 4, Resp);
+        _ ->
+            response(I, Len - 4, Data)
+    end.
 
 %%------------------------------------------------------------------------------
 %% @private
@@ -109,14 +179,60 @@ response(I, Len, Rest) ->
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-session(<<?EIPMI_RESERVED:4, 0:4, S:32/little, I:32/little, Rest/binary>>) ->
-    {[{auth_type, none}, {outbound_seq_nr, S}, {session_id, I}], Rest};
-session(<<?EIPMI_RESERVED:4, 1:4, S:32/little, I:32/little, _:128, Rest/binary>>) ->
-    {[{auth_type, md2}, {outbound_seq_nr, S}, {session_id, I}], Rest};
-session(<<?EIPMI_RESERVED:4, 2:4, S:32/little, I:32/little, _:128, Rest/binary>>) ->
-    {[{auth_type, md5}, {outbound_seq_nr, S}, {session_id, I}], Rest};
-session(<<?EIPMI_RESERVED:4, 3:4, S:32/little, I:32/little, _:128, Rest/binary>>) ->
-    {[{auth_type, pwd}, {outbound_seq_nr, S}, {session_id, I}], Rest}.
+session(<<?EIPMI_RESERVED:4, 0:4, S:32/little, I:32/little, L:8, Rest/binary>>,
+        _) ->
+    {[{auth_type, none}, {outbound_seq_nr, S}, {session_id, I}], L, Rest};
+session(<<?EIPMI_RESERVED:4, 1:4,
+          S:32/little,
+          I:32/little,
+          H:16/binary,
+          L:8,
+          Rest/binary>>,
+        SessionState) ->
+    Password = proplists:get_value(password, SessionState),
+    C = eipmi_util:normalize(16, Password),
+    ToHash = <<C/binary, I:32/little, Rest/binary, S:32/little, C/binary>>,
+    ?assertEqual(H, eipmi_auth:hash(md2, ToHash), "AuthCode does not match"),
+    {[{auth_type, md2}, {outbound_seq_nr, S}, {session_id, I}], L, Rest};
+session(<<?EIPMI_RESERVED:4, 2:4,
+          S:32/little,
+          I:32/little,
+          H:16/binary,
+          L:8,
+          Rest/binary>>,
+        SessionState) ->
+    Password = proplists:get_value(password, SessionState),
+    C = eipmi_util:normalize(16, Password),
+    ToHash = <<C/binary, I:32/little, Rest/binary, S:32/little, C/binary>>,
+    ?assertEqual(H, eipmi_auth:hash(md5, ToHash), "AuthCode does not match"),
+    {[{auth_type, md5}, {outbound_seq_nr, S}, {session_id, I}], L, Rest};
+session(<<?EIPMI_RESERVED:4, 4:4,
+          S:32/little,
+          I:32/little,
+          _:128,
+          L:8,
+          Rest/binary>>,
+        _) ->
+    {[{auth_type, pwd}, {outbound_seq_nr, S}, {session_id, I}], L, Rest};
+session(<<?EIPMI_RESERVED:4, 6:4,
+          E:1, A:1, P:6,
+          I:32/little,
+          S:32/little,
+          L:16/little,
+          Rest/binary>>,
+        _) ->
+    Seq = case A of
+              0 -> outbound_unauth_seq_nr;
+              1 -> outbound_auth_seq_nr
+          end,
+    {[{auth_type, rmcp_plus},
+      {encrypted, eipmi_util:get_bool(E)},
+      {authenticated, eipmi_util:get_bool(A)},
+      {payload_type, eipmi_auth:decode_payload_type(P)},
+      {Seq, S},
+      {session_id, I}],
+     L,
+     Rest}.
 
 %%------------------------------------------------------------------------------
 %% @private
@@ -140,6 +256,16 @@ lan(_Ipmi, _Head, _Tail) ->
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
+rakp(Ipmi = #rmcp_ipmi{properties = Ps}, <<_Tag:8, Code:8, Data/binary>>) ->
+    Payload = proplists:get_value(payload_type, Ps),
+    {ok, Ipmi#rmcp_ipmi{
+           properties = [{completion, completion_code(Payload, Code)} | Ps],
+           cmd = Payload,
+           data = Data}}.
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
 has_integrity(Binary, Checksum) ->
     (Checksum + sum(Binary, 0)) rem 256 =:= 0.
 
@@ -150,6 +276,50 @@ sum(<<>>, Sum) ->
     Sum;
 sum(<<Byte:8, Rest/binary>>, Sum) ->
     sum(Rest, Sum + Byte).
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+completion_code(_,               16#00) ->
+    normal;
+completion_code(_,               16#01) ->
+    insufficient_resources;
+completion_code(_,               16#02) ->
+    invalid_session_id;
+completion_code(open_session_rs, 16#03) ->
+    invalid_payload_type;
+completion_code(open_session_rs, 16#04) ->
+    invalid_auth_type;
+completion_code(open_session_rs, 16#05) ->
+    invalid_integrity_type;
+completion_code(open_session_rs, 16#06) ->
+    no_matching_auth_payload;
+completion_code(open_session_rs, 16#07) ->
+    no_matching_integrity_payload;
+completion_code(_,               16#08) ->
+    inactive_session_id;
+completion_code(_,               16#09) ->
+    invalid_role;
+completion_code(rakp2,           16#0a) ->
+    unauthorized_role_or_privilege_level;
+completion_code(rakp2,           16#0b) ->
+    insufficient_resources_at_role;
+completion_code(rakp2,           16#0c) ->
+    invalid_name_length;
+completion_code(rakp2,           16#0d) ->
+    unauthorized_name;
+completion_code(rakp3,           16#0e) ->
+    unauthorized_guid;
+completion_code(rakp4,           16#0f) ->
+    invalid_integrity_value;
+completion_code(open_session_rs, 16#10) ->
+    invalid_encrypt_type;
+completion_code(open_session_rs, 16#11) ->
+    no_matching_cipher_suite;
+completion_code(_,               16#12) ->
+    parameter_not_supported;
+completion_code(_,               _) ->
+    reserved.
 
 %%------------------------------------------------------------------------------
 %% @private

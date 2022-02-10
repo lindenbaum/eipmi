@@ -27,22 +27,22 @@
 not_rmcp_packet_test() ->
     ?assertEqual(
        {error, {not_rmcp_packet, <<>>}},
-       eipmi_decoder:packet(<<>>)).
+       eipmi_decoder:packet(<<>>, [])).
 
 unsupported_rmcp_packet_test() ->
     ?assertEqual(
        {error, unsupported_rmcp_packet},
-       eipmi_decoder:packet(<<16#06, 16#00, 16#01, 16#00>>)).
+       eipmi_decoder:packet(<<16#06, 16#00, 16#01, 16#00>>, [])).
 
 unsupported_asf_packet_test() ->
     ?assertEqual(
        {error, unsupported_asf_packet},
-       eipmi_decoder:packet(<<16#06, 16#00, 16#01, 16#06, 16#00, 16#00>>)).
+       eipmi_decoder:packet(<<16#06, 16#00, 16#01, 16#06, 16#00, 16#00>>, [])).
 
 ack_test() ->
     ?assertEqual(
        {ok, #rmcp_ack{header = #rmcp_header{seq_nr = 1}}},
-       eipmi_decoder:packet(<<16#06, 16#00, 16#01, 16#86>>)).
+       eipmi_decoder:packet(<<16#06, 16#00, 16#01, 16#86>>, [])).
 
 pong_test() ->
     ?assertEqual(
@@ -53,7 +53,7 @@ pong_test() ->
          <<16#06, 16#00, 16#01, 16#06, 16#00, 16#00, 16#11,
            16#be, 16#40, 16#00, 16#00, 16#10, 16#00, 16#00,
            16#11, 16#be, 16#00, 16#00, 16#00, 16#00, 16#81,
-           16#00, 16#00, 16#00, 16#00, 16#00, 16#00, 16#00>>)).
+           16#00, 16#00, 16#00, 16#00, 16#00, 16#00, 16#00>>, [])).
 
 ipmi_response_test() ->
     {ok, Ipmi} =
@@ -62,7 +62,7 @@ ipmi_response_test() ->
             16#00, 16#00, 16#00, 16#00, 16#00, 16#00, 16#10,
             16#81, 16#1c, 16#63, 16#20, 16#00, 16#38, 16#00,
             16#00, 16#01, 16#19, 16#00, 16#00, 16#00, 16#00,
-            16#00, 16#8e>>),
+            16#00, 16#8e>>, []),
     ?assertMatch(
        #rmcp_ipmi{
           header = #rmcp_header{class = ?RMCP_IPMI},

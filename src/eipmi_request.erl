@@ -22,7 +22,7 @@
 
 -module(eipmi_request).
 
--export([encode/2]).
+-export([encode/2, encode_privilege/1]).
 
 -include("eipmi.hrl").
 
@@ -36,7 +36,7 @@
 %% values will be retrieved from the provided property list.
 %% @end
 %%------------------------------------------------------------------------------
--spec encode(eipmi:request(), proplists:proplist()) -> binary().
+-spec encode(eipmi:request() | open_session_rq | rakp1 | rakp3, proplists:proplist()) -> binary().
 encode({?IPMI_NETFN_SENSOR_EVENT_REQUEST, Cmd}, Properties) ->
     encode_sensor_event(Cmd, Properties);
 encode({?IPMI_NETFN_APPLICATION_REQUEST, Cmd}, Properties) ->
@@ -50,7 +50,13 @@ encode({?IPMI_NETFN_CHASSIS_REQUEST, Cmd}, Properties) ->
 encode({?IPMI_NETFN_PICMG_REQUEST, Cmd}, Properties) ->
     encode_picmg(Cmd, Properties);
 encode({NetFn, Cmd}, Properties) when NetFn >= 16#2e ->
-    encode_oem(NetFn, Cmd, Properties).
+    encode_oem(NetFn, Cmd, Properties);
+encode(open_session_rq, Properties) ->
+    encode_open_session_rq(Properties);
+encode(rakp1, Properties) ->
+    encode_rakp1(Properties);
+encode(rakp3, Properties) ->
+    encode_rakp3(Properties).
 
 %%%=============================================================================
 %%% Internal functions
@@ -99,9 +105,9 @@ encode_application(?SEND_MESSAGE, Properties) ->
     <<1:2, 0:2, Channel:4, Request/binary>>;
 encode_application(?GET_CHANNEL_AUTHENTICATION_CAPABILITIES, Properties) ->
     P = encode_privilege(proplists:get_value(privilege, Properties)),
-    <<0:1, 0:3, ?IPMI_REQUESTED_CHANNEL:4, 0:4,P:4>>;
+    <<1:1, 0:3, ?IPMI_REQUESTED_CHANNEL:4, 0:4,P:4>>;
 encode_application(?GET_SESSION_CHALLENGE, Properties) ->
-    A = eipmi_auth:encode_type(proplists:get_value(auth_type, Properties)),
+    A = eipmi_auth:encode_type(proplists:get_value(rq_auth_type, Properties)),
     U = eipmi_util:normalize(16, proplists:get_value(user, Properties)),
     <<0:4, A:4, U/binary>>;
 encode_application(?ACTIVATE_SESSION, Properties) ->
@@ -348,6 +354,51 @@ encode_picmg(?GET_DEVICE_LOCATOR_RECORD_ID, Properties) ->
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
+encode_open_session_rq(Properties) ->
+    Tag = proplists:get_value(message_tag, Properties),
+    P = encode_privilege(proplists:get_value(privilege, Properties)),
+    S = proplists:get_value(rq_session_id, Properties),
+    A = eipmi_auth:encode_rakp_type(proplists:get_value(rakp_auth_type, Properties)),
+    I = eipmi_auth:encode_integrity_type(proplists:get_value(integrity_type, Properties)),
+    E = eipmi_auth:encode_encrypt_type(proplists:get_value(encrypt_type, Properties)),
+    <<Tag:8, 0:4, P:4, 0:16, S:32/little,
+      0:8, 0:16, 8:8, 0:2, A:6, 0:24,
+      1:8, 0:16, 8:8, 0:2, I:6, 0:24,
+      2:8, 0:16, 8:8, 0:2, E:6, 0:24>>.
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+encode_rakp1(Properties) ->
+    Tag = proplists:get_value(message_tag, Properties),
+    S = proplists:get_value(rs_session_id, Properties),
+    R = proplists:get_value(rq_nonce, Properties),
+    L = proplists:get_value(lookup_type, Properties),
+    P = encode_privilege(proplists:get_value(privilege, Properties)),
+    U = iolist_to_binary(proplists:get_value(user, Properties, <<>>)),
+    <<Tag:8, 0:24, S:32/little, R:16/binary,
+      0:3, L:1, P:4, 0:16, (byte_size(U)):8, U/binary>>.
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+encode_rakp3(Properties) ->
+    Tag = proplists:get_value(message_tag, Properties),
+    Rs = proplists:get_value(rs_nonce, Properties),
+    L = proplists:get_value(lookup_type, Properties),
+    P = encode_privilege(proplists:get_value(privilege, Properties)),
+    Sq = proplists:get_value(rq_session_id, Properties),
+    Ss = proplists:get_value(rs_session_id, Properties),
+    A = proplists:get_value(rakp_auth_type, Properties),
+    U = iolist_to_binary(proplists:get_value(user, Properties, "")),
+    K = eipmi_util:normalize(20, proplists:get_value(password, Properties)),
+    ToHash = <<Rs/binary, Sq:32/little, L:4, P:4, (byte_size(U)):8, U/binary>>,
+    Hmac = eipmi_auth:rakp_hash(A, rakp3, K, ToHash),
+    <<Tag:8, 0:8, 0:16, Ss:32/little, Hmac/binary>>.
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
 encode_oem(_, _, Properties) -> proplists:get_value(data, Properties).
 
 %%------------------------------------------------------------------------------
@@ -379,7 +430,9 @@ chassis_command(diagnostic_interrupt) -> 4;
 chassis_command(acpi_shutdown) -> 5.
 
 %%------------------------------------------------------------------------------
-%% @private
+%% @doc
+%% Encodes privilege level as an integer.
+%% @end
 %%------------------------------------------------------------------------------
 encode_privilege(present) -> 0;
 encode_privilege(callback) -> 1;
