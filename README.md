@@ -228,17 +228,18 @@ History
 
 ### Master
 
+* Add support for RMCP+ (IPMI v2.0, big thanks to @IslandUsurper)
+* Add support for the *Get/Set Chassis Capabilities* command (thanks to @IslandUsurper)
+* Add support for the *Get Chassis Status* command (thanks to @IslandUsurper)
+* Add support for the *Chassis Control* command (thanks to @IslandUsurper)
+* Add support for the *Chassis Reset* command (thanks to @IslandUsurper)
+* Add support for the *Chassis Identify* command (thanks to @IslandUsurper)
+* Add support for the *Set Power Restore Policy* command (thanks to @IslandUsurper)
+* Add support for the *Get System Restart Cause* command (thanks to @IslandUsurper)
+* Add support for the *Set Front Panel Enables* command (thanks to @IslandUsurper)
+* Add support for the *Set Power Cycle Interval* command (thanks to @IslandUsurper)
+* Add support for the *Get POH Counter* command (thanks to @IslandUsurper)
 * Drop support for OTP releases older than 21.
-* Add support for the *Get/Set Chassis Capabilities* command
-* Add support for the *Get Chassis Status* command
-* Add support for the *Chassis Control* command
-* Add support for the *Chassis Reset* command
-* Add support for the *Chassis Identify* command
-* Add support for the *Set Power Restore Policy* command
-* Add support for the *Get System Restart Cause* command
-* Add support for the *Set Front Panel Enables* command
-* Add support for the *Set Power Cycle Interval* command
-* Add support for the *Get POH Counter* command
 
 ### Version 3.0.0
 
