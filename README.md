@@ -1,21 +1,20 @@
 EIPMI
 =====
 
-EIPMI is a native Erlang/OTP application for RMCP/IPMI 1.5. It implements the
+EIPMI is a native Erlang/OTP application for RMCP/IPMI. It implements the
 remote console part of the IPMI LAN interface, as specified
 [here](http://www.intel.com/design/servers/ipmi/spec.htm). To provide a low
 threshold for learning and using EIPMI it is designed close to the well known
-`inet` API (think of `gen_udp`).
+`inet` API (think of `gen_udp`). It supports IPMI v1.5 as well as v2.0 (RMCP+).
 
 Contributing
 ------------
 
-If you whish to contribute fixes or enhancements, please make your code look
-nice, for example using the Emacs Erlang-mode, formatting your code before
-committing. Also, you should always write proper `edoc` module documentation.
-When writing documentation, please try to keep the tone simple and on a higher
-abstraction level, so that users may understand the concepts without having to
-know too much of the standard.
+If you whish to contribute fixes or enhancements, use `rebar3 fmt -w` to format
+your code before committing. Also, you should always write proper `edoc` module
+documentation. When writing documentation, please try to keep the tone simple
+and on a higher abstraction level, so that users may understand the concepts
+without having to know too much of the standard.
 
 The modules `eipmi_request` and `eipmi_response` are a starting point for
 developers that want add support for not yet implemented request/response pairs.
@@ -228,17 +227,17 @@ History
 
 ### Master
 
-* #9 Add support for RMCP+ (IPMI v2.0, big thanks to @IslandUsurper)
-* #8 Add support for the *Get/Set Chassis Capabilities* command (thanks to @IslandUsurper)
-* #8 Add support for the *Get Chassis Status* command (thanks to @IslandUsurper)
-* #8 Add support for the *Chassis Control* command (thanks to @IslandUsurper)
-* #8 Add support for the *Chassis Reset* command (thanks to @IslandUsurper)
-* #8 Add support for the *Chassis Identify* command (thanks to @IslandUsurper)
-* #8 Add support for the *Set Power Restore Policy* command (thanks to @IslandUsurper)
-* #8 Add support for the *Get System Restart Cause* command (thanks to @IslandUsurper)
-* #8 Add support for the *Set Front Panel Enables* command (thanks to @IslandUsurper)
-* #8 Add support for the *Set Power Cycle Interval* command (thanks to @IslandUsurper)
-* #8 Add support for the *Get POH Counter* command (thanks to @IslandUsurper)
+* Add support for RMCP+ (IPMI v2.0, big thanks to @IslandUsurper)
+* Add support for the *Get/Set Chassis Capabilities* command (thanks to @IslandUsurper)
+* Add support for the *Get Chassis Status* command (thanks to @IslandUsurper)
+* Add support for the *Chassis Control* command (thanks to @IslandUsurper)
+* Add support for the *Chassis Reset* command (thanks to @IslandUsurper)
+* Add support for the *Chassis Identify* command (thanks to @IslandUsurper)
+* Add support for the *Set Power Restore Policy* command (thanks to @IslandUsurper)
+* Add support for the *Get System Restart Cause* command (thanks to @IslandUsurper)
+* Add support for the *Set Front Panel Enables* command (thanks to @IslandUsurper)
+* Add support for the *Set Power Cycle Interval* command (thanks to @IslandUsurper)
+* Add support for the *Get POH Counter* command (thanks to @IslandUsurper)
 * Drop support for OTP releases older than 22.2
 
 ### Version 3.0.0
