@@ -157,25 +157,19 @@ encrypt(aes_cbc, Key, Binary) ->
     PadLength = 15 - size(Binary) rem 16,
     Padding = list_to_binary(lists:seq(1, PadLength)),
     ToEncrypt = <<Binary/binary, Padding/binary, PadLength:8>>,
-    Encrypted = crypto:crypto_one_time(
-        aes_128_cbc,
-        Key,
-        Iv,
-        ToEncrypt,
-        [{encrypt, true}, {padding, none}]
-    ),
+    Encrypted = crypto_one_time_aes_128_cbc(Key, Iv, ToEncrypt, true),
     <<Iv/binary, Encrypted/binary>>.
 
+%%-------------------------------------------------------------------------------
+%% @doc
+%% Decrypts a given binary according to the requested confidentiality
+%% algorithm.
+%%-------------------------------------------------------------------------------
+-spec decrypt(encrypt_type(), binary(), binary()) -> binary().
 decrypt(none, _Key, Binary) ->
     Binary;
 decrypt(aes_cbc, Key, <<Iv:16/binary, Encrypted/binary>>) ->
-    Result = crypto:crypto_one_time(
-        aes_128_cbc,
-        Key,
-        Iv,
-        Encrypted,
-        [{encrypt, false}, {padding, none}]
-    ),
+    Result = crypto_one_time_aes_128_cbc(Key, Iv, Encrypted, false),
     PadLength = binary:last(Result),
     % PadLength does not count its own byte.
     binary_part(Result, {0, size(Result) - 1 - PadLength}).
@@ -293,3 +287,30 @@ decode_type(1) -> md2;
 decode_type(2) -> md5;
 decode_type(4) -> pwd;
 decode_type(6) -> rmcp_plus.
+
+%%%=============================================================================
+%%% Internal functions
+%%%=============================================================================
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+-if(?OTP_RELEASE < 23).
+crypto_one_time_aes_128_cbc(Key, IV, Data, EncryptFlag) ->
+    crypto:crypto_one_time(
+        aes_128_cbc,
+        Key,
+        IV,
+        Data,
+        EncryptFlag
+    ).
+-else.
+crypto_one_time_aes_128_cbc(Key, IV, Data, EncryptFlag) ->
+    crypto:crypto_one_time(
+        aes_128_cbc,
+        Key,
+        IV,
+        Data,
+        [{encrypt, EncryptFlag}, {padding, none}]
+    ).
+-endif.
