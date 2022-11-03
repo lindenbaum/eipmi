@@ -380,6 +380,36 @@ decode_chassis_restart_cause_test() ->
         eipmi_response:decode(Resp, Bin)
     ).
 
+decode_chassis_set_boot_options_test() ->
+    Resp = {?IPMI_NETFN_CHASSIS_RESPONSE, ?SET_SYSTEM_BOOT_OPTIONS},
+    Bin = <<>>,
+    ?assertEqual({ok, []}, eipmi_response:decode(Resp, Bin)).
+
+decode_chassis_get_boot_options_test() ->
+    Resp = {?IPMI_NETFN_CHASSIS_RESPONSE, ?GET_SYSTEM_BOOT_OPTIONS},
+    Bin = <<1:8, 1:1, 5:7, 7:3, 0:7, 1:4, 0:6, 1:1, 0:19>>,
+    ?assertEqual(
+        {ok, [
+            {valid, 1},
+            {boot_flags_valid, 1},
+            {persist, 1},
+            {boot_type, 1},
+            {clear_cmos, 0},
+            {lock_keyboard, 0},
+            {boot_device, pxe},
+            {screen_blank, 0},
+            {lock_reset, 0},
+            {lock_power, 0},
+            {bios_verbosity, 0},
+            {progress_traps, 0},
+            {password_bypass, 1},
+            {lock_sleep, 0},
+            {console_redirection, 0},
+            {device_instance, 0}
+        ]},
+        eipmi_response:decode(Resp, Bin)
+    ).
+
 decode_chassis_set_power_restore_policy_test() ->
     Resp = {?IPMI_NETFN_CHASSIS_RESPONSE, ?SET_POWER_RESTORE_POLICY},
     Bin = <<4:8>>,

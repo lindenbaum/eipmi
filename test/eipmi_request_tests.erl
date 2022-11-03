@@ -294,6 +294,25 @@ encode_get_poh_count_test() ->
     Req = {?IPMI_NETFN_CHASSIS_REQUEST, ?GET_POH_COUNTER},
     ?assertEqual(<<>>, eipmi_request:encode(Req, [])).
 
+encode_set_system_boot_options_test() ->
+    Req = {?IPMI_NETFN_CHASSIS_REQUEST, ?SET_SYSTEM_BOOT_OPTIONS},
+    Properties = [
+        {parameter, 5},
+        {persist, true},
+        {boot_type, efi},
+        {boot_device, pxe},
+        {password_bypass, true}
+    ],
+    ?assertEqual(
+        <<5:8, 7:3, 0:7, 1:4, 0:6, 1:1, 0:19>>,
+        eipmi_request:encode(Req, Properties)
+    ).
+
+encode_get_system_boot_options_test() ->
+    Req = {?IPMI_NETFN_CHASSIS_REQUEST, ?GET_SYSTEM_BOOT_OPTIONS},
+    Properties = [{parameter, 5}],
+    ?assertEqual(<<5:8, 0:16>>, eipmi_request:encode(Req, Properties)).
+
 encode_get_picmg_properties_test() ->
     Req = {?IPMI_NETFN_PICMG_REQUEST, ?GET_PICMG_PROPERTIES},
     ?assertEqual(<<16#00>>, eipmi_request:encode(Req, [])).

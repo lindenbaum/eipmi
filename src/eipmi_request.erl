@@ -379,14 +379,14 @@ encode_picmg(?GET_DEVICE_LOCATOR_RECORD_ID, Properties) ->
 encode_boot_flags(Properties) ->
     Persist = get_encoded_bool(persist, Properties),
     Type =
-        case proplists:get_value(boot_type, Properties) of
+        case proplists:get_value(boot_type, Properties, legacy) of
             legacy -> 0;
             efi -> 1
         end,
     ClrCmos = get_encoded_bool(clear_cmos, Properties),
     LockKbd = get_encoded_bool(lock_keyboard, Properties),
     Device =
-        case proplists:get_value(boot_device, Properties) of
+        case proplists:get_value(boot_device, Properties, no_override) of
             no_override -> 0;
             pxe -> 1;
             hdd -> 2;
@@ -404,7 +404,7 @@ encode_boot_flags(Properties) ->
     LockReset = get_encoded_bool(lock_reset, Properties),
     LockPower = get_encoded_bool(lock_power, Properties),
     V =
-        case proplists:get_value(bios_verbosity, Properties) of
+        case proplists:get_value(bios_verbosity, Properties, default) of
             default -> 0;
             quiet -> 1;
             verbose -> 2
@@ -413,12 +413,12 @@ encode_boot_flags(Properties) ->
     PwdBypass = get_encoded_bool(password_bypass, Properties),
     LockSleep = get_encoded_bool(lock_sleeep, Properties),
     Redirection =
-        case proplists:get_value(console_redirection, Properties) of
+        case proplists:get_value(console_redirection, Properties, default) of
             default -> 0;
             disable -> 1;
             enable -> 2
         end,
-    Inst = proplists:get_value(device_instance, Properties),
+    Inst = proplists:get_value(device_instance, Properties, 0),
     % Data1
     <<1:1, Persist:1, Type:1, 0:5,
         % Data2
@@ -426,7 +426,7 @@ encode_boot_flags(Properties) ->
         % Data3
         LockPower:1, V:2, Traps:1, PwdBypass:1, LockSleep:1, Redirection:2,
         % Data4
-        0:4, 0:1, 0:2,
+        0:4, 0:1, 0:3,
         % Data5
         0:3, Inst:5>>.
 
