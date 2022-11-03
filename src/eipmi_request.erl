@@ -304,6 +304,16 @@ encode_chassis(?SET_POWER_RESTORE_POLICY, Properties) ->
             always_off -> 0
         end,
     <<0:5, P:3>>;
+encode_chassis(?SET_SYSTEM_BOOT_OPTIONS, Properties) ->
+    Param = proplists:get_value(parameter, Properties),
+    Data =
+        case Param of
+            5 -> encode_boot_flags(Properties)
+        end,
+    <<0:1, Param:7, Data/binary>>;
+encode_chassis(?GET_SYSTEM_BOOT_OPTIONS, Properties) ->
+    Param = proplists:get_value(parameter, Properties),
+    <<0:1, Param:7, 0:8, 0:8>>;
 encode_chassis(?SET_FRONT_PANEL_ENABLES, Properties) ->
     S = get_encoded_bool(disable_standby, Properties),
     D = get_encoded_bool(disable_diagnostic_interrupt, Properties),
@@ -362,6 +372,63 @@ encode_picmg(?FRU_CONTROL, Properties) ->
 encode_picmg(?GET_DEVICE_LOCATOR_RECORD_ID, Properties) ->
     FruId = proplists:get_value(fru_id, Properties),
     <<?PICMG_ID:8, FruId:8>>.
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+encode_boot_flags(Properties) ->
+    Persist = get_encoded_bool(persist, Properties),
+    Type =
+        case proplists:get_value(boot_type, Properties) of
+            legacy -> 0;
+            efi -> 1
+        end,
+    ClrCmos = get_encoded_bool(clear_cmos, Properties),
+    LockKbd = get_encoded_bool(lock_keyboard, Properties),
+    Device =
+        case proplists:get_value(boot_device, Properties) of
+            no_override -> 0;
+            pxe -> 1;
+            hdd -> 2;
+            safe_mode -> 3;
+            diag_part -> 4;
+            cd_dvd -> 5;
+            bios_setup -> 6;
+            remote_floppy -> 7;
+            remote_cd -> 8;
+            remote_primary -> 9;
+            remote_hdd -> 11;
+            floppy -> 15
+        end,
+    ScrBlnk = get_encoded_bool(screen_blank, Properties),
+    LockReset = get_encoded_bool(lock_reset, Properties),
+    LockPower = get_encoded_bool(lock_power, Properties),
+    V =
+        case proplists:get_value(bios_verbosity, Properties) of
+            default -> 0;
+            quiet -> 1;
+            verbose -> 2
+        end,
+    Traps = get_encoded_bool(progress_traps, Properties),
+    PwdBypass = get_encoded_bool(password_bypass, Properties),
+    LockSleep = get_encoded_bool(lock_sleeep, Properties),
+    Redirection =
+        case proplists:get_value(console_redirection, Properties) of
+            default -> 0;
+            disable -> 1;
+            enable -> 2
+        end,
+    Inst = proplists:get_value(device_instance, Properties),
+    % Data1
+    <<1:1, Persist:1, Type:1, 0:5,
+        % Data2
+        ClrCmos:1, LockKbd:1, Device:4, ScrBlnk:1, LockReset:1,
+        % Data3
+        LockPower:1, V:2, Traps:1, PwdBypass:1, LockSleep:1, Redirection:2,
+        % Data4
+        0:4, 0:1, 0:2,
+        % Data5
+        0:3, Inst:5>>.
 
 %%------------------------------------------------------------------------------
 %% @private
