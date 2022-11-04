@@ -52,6 +52,8 @@
     set_chassis_capabilities/6,
     get_chassis_capabilities/1,
     get_chassis_status/1,
+    set_system_boot_options/2,
+    get_system_boot_options/1,
     disable_front_panel_buttons/5,
     set_power_restore_policy/2,
     set_power_cycle_interval/2,
@@ -875,6 +877,19 @@ disable_front_panel_buttons(Session, Standby, Diagnostic, Reset, Power) ->
     ],
     Command = ?SET_FRONT_PANEL_ENABLES,
     raw(Session, ?IPMI_NETFN_CHASSIS_REQUEST, Command, Args).
+
+-spec set_system_boot_options(session(), proplists:proplist()) ->
+    {ok, proplists:proplist()} | {error, term()}.
+set_system_boot_options(Session, Args) ->
+    Command = ?SET_SYSTEM_BOOT_OPTIONS,
+    raw(Session, ?IPMI_NETFN_CHASSIS_REQUEST, Command, Args).
+
+-spec get_system_boot_options(session()) ->
+    {ok, proplists:proplist()} | {error, term()}.
+get_system_boot_options(Session) ->
+    raw(Session, ?IPMI_NETFN_CHASSIS_REQUEST, ?GET_SYSTEM_BOOT_OPTIONS, [
+        {parameter, 5}
+    ]).
 
 %%-------------------------------------------------------------------------------
 %% @doc
