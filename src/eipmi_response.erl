@@ -597,11 +597,17 @@ decode_chassis(
         {supports_last_state, LastState},
         {supports_always_off, PowerOff}
     ];
+decode_chassis(
+    ?GET_SYSTEM_BOOT_OPTIONS,
+    <<?EIPMI_RESERVED:5, 1:3, Valid:1, Param:7, Data/binary>>
+) ->
+    [{valid, Valid} | decode_boot_options(Param, Data)];
 decode_chassis(Cmd, _) when
     Cmd =:= ?CHASSIS_CONTROL orelse
         Cmd =:= ?CHASSIS_IDENTIFY orelse
         Cmd =:= ?CHASSIS_RESET orelse
         Cmd =:= ?SET_CHASSIS_CAPABILITIES orelse
+        Cmd =:= ?SET_SYSTEM_BOOT_OPTIONS orelse
         Cmd =:= ?SET_FRONT_PANEL_ENABLES orelse
         Cmd =:= ?SET_POWER_CYCLE_INTERVAL
 ->
@@ -684,6 +690,52 @@ decode_picmg_(?GET_DEVICE_LOCATOR_RECORD_ID, [Id]) ->
 %% @private
 %%------------------------------------------------------------------------------
 decode_oem(_, _, Data) -> [{data, Data}].
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+decode_boot_options(
+    5,
+    <<Valid:1, Persist:1, Type:1, ?EIPMI_RESERVED:5, ClrCmos:1, LockKbd:1,
+        Device:4, ScrBlnk:1, LockReset:1, LockPower:1, Verbosity:2, Traps:1,
+        PwdBypass:1, LockSleep:1, Redirection:2, ?EIPMI_RESERVED:8,
+        ?EIPMI_RESERVED:3, Instance:5>>
+) ->
+    Dev =
+        case Device of
+            0 -> no_override;
+            1 -> pxe;
+            2 -> hdd;
+            3 -> safe_mode;
+            4 -> diag_part;
+            5 -> cd_dvd;
+            6 -> bios_setup;
+            7 -> remote_floppy;
+            8 -> remote_cd;
+            9 -> remote_primary;
+            11 -> remote_hdd;
+            15 -> floppy;
+            _ -> invalid
+        end,
+    [
+        {boot_flags_valid, Valid},
+        {persist, Persist},
+        {boot_type, Type},
+        {clear_cmos, ClrCmos},
+        {lock_keyboard, LockKbd},
+        {boot_device, Dev},
+        {screen_blank, ScrBlnk},
+        {lock_reset, LockReset},
+        {lock_power, LockPower},
+        {bios_verbosity, Verbosity},
+        {progress_traps, Traps},
+        {password_bypass, PwdBypass},
+        {lock_sleep, LockSleep},
+        {console_redirection, Redirection},
+        {device_instance, Instance}
+    ];
+decode_boot_options(_, Data) ->
+    [{data, Data}].
 
 %%------------------------------------------------------------------------------
 %% @private

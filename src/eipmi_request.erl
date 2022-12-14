@@ -177,12 +177,7 @@ encode_storage(Req, _Properties) when
 %% @private
 %%------------------------------------------------------------------------------
 encode_transport(?GET_IP_UDP_RMCP_STATISTICS, Properties) ->
-    Clear = proplists:get_value(clear_statistics, Properties, false),
-    C =
-        case Clear of
-            true -> 1;
-            false -> 0
-        end,
+    C = get_encoded_bool(clear_statistics, Properties),
     <<0:4, ?IPMI_REQUESTED_CHANNEL:4, 0:7, C:1>>;
 encode_transport(?SET_LAN_CONFIGURATION_PARAMETERS, Properties) ->
     P = proplists:get_value(parameter, Properties),
@@ -239,11 +234,7 @@ encode_transport(?SET_LAN_CONFIGURATION_PARAMETERS, Properties) ->
                         oem1 -> 6;
                         oem2 -> 7
                     end,
-                A =
-                    case proplists:get_value(acknowledge, Properties, false) of
-                        true -> 1;
-                        false -> 0
-                    end,
+                A = get_encoded_bool(acknowledge, Properties),
                 To = proplists:get_value(timeout, Properties, 0),
                 R = proplists:get_value(retries, Properties, 0),
                 <<0:4, S:4, A:1, 0:4, T:3, To:8, 0:5, R:3>>;
@@ -291,18 +282,8 @@ encode_chassis(?CHASSIS_IDENTIFY, Properties) ->
             <<0:8, 0:7, 1:1>>
     end;
 encode_chassis(?SET_CHASSIS_CAPABILITIES, Properties) ->
-    Lockout = proplists:get_bool(lockout, Properties),
-    L =
-        case Lockout of
-            true -> 1;
-            false -> 0
-        end,
-    Intrusion = proplists:get_bool(intrusion, Properties),
-    I =
-        case Intrusion of
-            true -> 1;
-            false -> 0
-        end,
+    L = get_encoded_bool(lockout, Properties),
+    I = get_encoded_bool(intrusion, Properties),
     F = proplists:get_value(fru_address, Properties),
     Sdr = proplists:get_value(sdr_address, Properties),
     Sel = proplists:get_value(sel_address, Properties),
@@ -323,31 +304,21 @@ encode_chassis(?SET_POWER_RESTORE_POLICY, Properties) ->
             always_off -> 0
         end,
     <<0:5, P:3>>;
+encode_chassis(?SET_SYSTEM_BOOT_OPTIONS, Properties) ->
+    Param = proplists:get_value(parameter, Properties),
+    Data =
+        case Param of
+            5 -> encode_boot_flags(Properties)
+        end,
+    <<0:1, Param:7, Data/binary>>;
+encode_chassis(?GET_SYSTEM_BOOT_OPTIONS, Properties) ->
+    Param = proplists:get_value(parameter, Properties),
+    <<0:1, Param:7, 0:8, 0:8>>;
 encode_chassis(?SET_FRONT_PANEL_ENABLES, Properties) ->
-    Standby = proplists:get_bool(disable_standby, Properties),
-    S =
-        case Standby of
-            true -> 1;
-            false -> 0
-        end,
-    Diagnostic = proplists:get_bool(disable_diagnostic_interrupt, Properties),
-    D =
-        case Diagnostic of
-            true -> 1;
-            false -> 0
-        end,
-    Reset = proplists:get_bool(disable_reset, Properties),
-    R =
-        case Reset of
-            true -> 1;
-            false -> 0
-        end,
-    Power = proplists:get_bool(disable_power, Properties),
-    P =
-        case Power of
-            true -> 1;
-            false -> 0
-        end,
+    S = get_encoded_bool(disable_standby, Properties),
+    D = get_encoded_bool(disable_diagnostic_interrupt, Properties),
+    R = get_encoded_bool(disable_reset, Properties),
+    P = get_encoded_bool(disable_power, Properties),
     <<0:4, S:1, D:1, R:1, P:1>>;
 encode_chassis(?SET_POWER_CYCLE_INTERVAL, Properties) ->
     I = proplists:get_value(interval, Properties, 0),
@@ -392,12 +363,8 @@ encode_picmg(?GET_FRU_ACTIVATION_POLICY, Properties) ->
     <<?PICMG_ID:8, FruId:8>>;
 encode_picmg(?SET_FRU_ACTIVATION, Properties) ->
     FruId = proplists:get_value(fru_id, Properties),
-    Activate = proplists:get_value(activate, Properties),
-    <<?PICMG_ID:8, FruId:8,
-        (case Activate of
-            true -> 1;
-            false -> 0
-        end):8>>;
+    Activate = get_encoded_bool(activate, Properties),
+    <<?PICMG_ID:8, FruId:8, Activate:8>>;
 encode_picmg(?FRU_CONTROL, Properties) ->
     FruId = proplists:get_value(fru_id, Properties),
     Control = proplists:get_value(control, Properties),
@@ -405,6 +372,63 @@ encode_picmg(?FRU_CONTROL, Properties) ->
 encode_picmg(?GET_DEVICE_LOCATOR_RECORD_ID, Properties) ->
     FruId = proplists:get_value(fru_id, Properties),
     <<?PICMG_ID:8, FruId:8>>.
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+encode_boot_flags(Properties) ->
+    Persist = get_encoded_bool(persist, Properties),
+    Type =
+        case proplists:get_value(boot_type, Properties, legacy) of
+            legacy -> 0;
+            efi -> 1
+        end,
+    ClrCmos = get_encoded_bool(clear_cmos, Properties),
+    LockKbd = get_encoded_bool(lock_keyboard, Properties),
+    Device =
+        case proplists:get_value(boot_device, Properties, no_override) of
+            no_override -> 0;
+            pxe -> 1;
+            hdd -> 2;
+            safe_mode -> 3;
+            diag_part -> 4;
+            cd_dvd -> 5;
+            bios_setup -> 6;
+            remote_floppy -> 7;
+            remote_cd -> 8;
+            remote_primary -> 9;
+            remote_hdd -> 11;
+            floppy -> 15
+        end,
+    ScrBlnk = get_encoded_bool(screen_blank, Properties),
+    LockReset = get_encoded_bool(lock_reset, Properties),
+    LockPower = get_encoded_bool(lock_power, Properties),
+    V =
+        case proplists:get_value(bios_verbosity, Properties, default) of
+            default -> 0;
+            quiet -> 1;
+            verbose -> 2
+        end,
+    Traps = get_encoded_bool(progress_traps, Properties),
+    PwdBypass = get_encoded_bool(password_bypass, Properties),
+    LockSleep = get_encoded_bool(lock_sleeep, Properties),
+    Redirection =
+        case proplists:get_value(console_redirection, Properties, default) of
+            default -> 0;
+            disable -> 1;
+            enable -> 2
+        end,
+    Inst = proplists:get_value(device_instance, Properties, 0),
+    % Data1
+    <<1:1, Persist:1, Type:1, 0:5,
+        % Data2
+        ClrCmos:1, LockKbd:1, Device:4, ScrBlnk:1, LockReset:1,
+        % Data3
+        LockPower:1, V:2, Traps:1, PwdBypass:1, LockSleep:1, Redirection:2,
+        % Data4
+        0:4, 0:1, 0:3,
+        % Data5
+        0:3, Inst:5>>.
 
 %%------------------------------------------------------------------------------
 %% @private
@@ -523,3 +547,9 @@ encode_picmg_site_type(pmc) -> 16#08;
 encode_picmg_site_type(rear_transition_module) -> 16#09;
 encode_picmg_site_type(mch) -> 16#0a;
 encode_picmg_site_type(power_module) -> 16#0b.
+
+get_encoded_bool(Prop, List) ->
+    case proplists:get_bool(Prop, List) of
+        true -> 1;
+        false -> 0
+    end.
