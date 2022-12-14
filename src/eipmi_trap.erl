@@ -274,21 +274,21 @@ trap_pdu(Trap = #trappdu{generic_trap = 1}) ->
 trap_pdu(Trap = #trappdu{generic_trap = 2, varbinds = Vs}) ->
     Ps = [
         {if_index, If}
-        || #varbind{
-               variabletype = 'INTEGER',
-               oid = [1, 3, 6, 1, 2, 1, 2, 2, 1, 8 | _],
-               value = If
-           } <- Vs
+     || #varbind{
+            variabletype = 'INTEGER',
+            oid = [1, 3, 6, 1, 2, 1, 2, 2, 1, 8 | _],
+            value = If
+        } <- Vs
     ],
     {ok, {trap, [{type, link_down} | trap_misc(Trap)] ++ Ps}};
 trap_pdu(Trap = #trappdu{generic_trap = 3, varbinds = Vs}) ->
     Ps = [
         {if_index, If}
-        || #varbind{
-               variabletype = 'INTEGER',
-               oid = [1, 3, 6, 1, 2, 1, 2, 2, 1, 8 | _],
-               value = If
-           } <- Vs
+     || #varbind{
+            variabletype = 'INTEGER',
+            oid = [1, 3, 6, 1, 2, 1, 2, 2, 1, 8 | _],
+            value = If
+        } <- Vs
     ],
     {ok, {trap, [{type, link_up} | trap_misc(Trap)] ++ Ps}};
 trap_pdu(Trap = #trappdu{generic_trap = 4}) ->
@@ -296,11 +296,11 @@ trap_pdu(Trap = #trappdu{generic_trap = 4}) ->
 trap_pdu(Trap = #trappdu{generic_trap = 5, varbinds = Vs}) ->
     Ps = [
         {neighbor_addr, list_to_tuple(IP)}
-        || #varbind{
-               variabletype = 'IpAddress',
-               oid = [1, 3, 6, 1, 2, 1, 8, 5, 1, 2 | _],
-               value = IP
-           } <- Vs
+     || #varbind{
+            variabletype = 'IpAddress',
+            oid = [1, 3, 6, 1, 2, 1, 8, 5, 1, 2 | _],
+            value = IP
+        } <- Vs
     ],
     {ok, {trap, [{type, egp_neighbor_loss} | trap_misc(Trap)] ++ Ps}};
 trap_pdu(

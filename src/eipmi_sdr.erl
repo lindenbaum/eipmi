@@ -114,22 +114,26 @@
     | {sensor_tolerance, {number(), eipmi_sensor:unit()}}
     | {sensor_resolution, {number(), eipmi_sensor:unit()}}
     | {sensor_accuracy, {number(), percent}}
-    | {sensor_coefficients,
-        {linear
-            | ln
-            | log10
-            | log2
-            | e
-            | exp10
-            | exp2
-            | '1/x'
-            | sqr
-            | cube
-            | sqrt
-            | 'cube-1'
-            | non_linear
-            | oem_non_linear,
-            integer(), integer(), integer(), integer()}}
+    | {sensor_coefficients, {
+        linear
+        | ln
+        | log10
+        | log2
+        | e
+        | exp10
+        | exp2
+        | '1/x'
+        | sqr
+        | cube
+        | sqrt
+        | 'cube-1'
+        | non_linear
+        | oem_non_linear,
+        integer(),
+        integer(),
+        integer(),
+        integer()
+    }}
     | {sensor_number, non_neg_integer()}
     | {sensor_numbers, [non_neg_integer()]}
     | {sensor_type, eipmi_sensor:type()}
@@ -727,8 +731,9 @@ get_sensor_properties(
     L = get_linearization(Linearization),
     LFun = get_linearization_fun(L),
     [
-        {sensor_tolerance,
-            {LFun(M * Tolerance / 2 * math:pow(10, ResultExp)), Unit}},
+        {sensor_tolerance, {
+            LFun(M * Tolerance / 2 * math:pow(10, ResultExp)), Unit
+        }},
         {sensor_resolution, {abs(M * math:pow(10, ResultExp)), Unit}},
         {sensor_accuracy, {math:pow(Accuracy, AccuracyExp) / 100, percent}},
         {sensor_coefficients, {L, M, B, BExp, ResultExp}}
@@ -884,7 +889,7 @@ get_contained_from_range(<<0:32, Rest/binary>>, Acc) ->
 get_contained_from_range(<<Id:8, I0:8, Id:8, I1:8, Rest/binary>>, Acc) ->
     Es = [
         {containee, eipmi_sensor:get_entity(Id, I)}
-        || I <- lists:seq(I0, I1)
+     || I <- lists:seq(I0, I1)
     ],
     get_contained_from_range(Rest, Acc ++ Es).
 
@@ -913,7 +918,7 @@ get_rel_contained_from_range(
 ) ->
     Es = [
         {containee, eipmi_sensor:get_entity(Id, I) ++ get_relative_addr(A)}
-        || I <- lists:seq(I0, I1)
+     || I <- lists:seq(I0, I1)
     ],
     get_rel_contained_from_range(R, Acc ++ Es).
 
@@ -956,21 +961,21 @@ get_states(R, T, <<First:8/bitstring, 0:8, _/binary>>) ->
     lists:append(
         [
             eipmi_sensor:get_value(R, T, O, 1, 16#ff, 16#ff)
-            || O <- get_offsets(First, 7, [])
+         || O <- get_offsets(First, 7, [])
         ]
     );
 get_states(R, T, <<First:8/bitstring, _:1, Second:7/bitstring, _/binary>>) ->
     lists:append(
         [
             eipmi_sensor:get_value(R, T, O, 1, 16#ff, 16#ff)
-            || O <- get_offsets(<<Second/bitstring, First/bitstring>>, 14, [])
+         || O <- get_offsets(<<Second/bitstring, First/bitstring>>, 14, [])
         ]
     );
 get_states(R, T, <<First:8/bitstring, _/binary>>) ->
     lists:append(
         [
             eipmi_sensor:get_value(R, T, O, 1, 16#ff, 16#ff)
-            || O <- get_offsets(First, 7, [])
+         || O <- get_offsets(First, 7, [])
         ]
     );
 get_states(_, _, _) ->

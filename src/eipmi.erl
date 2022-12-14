@@ -219,10 +219,12 @@
         {result,
             self_tests_passed
             | self_tests_not_implemented
-            | {{corrupted_devices, [sel | sdr | fru | ipmb_signal_lines]},
+            | {
+                {corrupted_devices, [sel | sdr | fru | ipmb_signal_lines]},
                 {inaccessible_devices, [
                     sdr | fru | boot_firmware | optional_firmware
-                ]}}
+                ]}
+            }
             | {fatal_hardware_error, non_neg_integer()},
             {device_specific_error, non_neg_integer(), non_neg_integer()}}
     ].
@@ -281,11 +283,13 @@
         | {ip_address, inet:ip4_address()}
         | {mac_address, {byte(), byte(), byte(), byte(), byte(), byte()}}
         | {default_gateway, inet:ip4_address()}
-        | {default_gateway_mac_address,
-            {byte(), byte(), byte(), byte(), byte(), byte()}}
+        | {default_gateway_mac_address, {
+            byte(), byte(), byte(), byte(), byte(), byte()
+        }}
         | {backup_gateway, inet:ip4_address()}
-        | {backup_gateway_mac_address,
-            {byte(), byte(), byte(), byte(), byte(), byte()}}
+        | {backup_gateway_mac_address, {
+            byte(), byte(), byte(), byte(), byte(), byte()
+        }}
         | {community, string()}
         | {num_destinations, 0..15}
         | {acknowledge, boolean()}

@@ -234,7 +234,8 @@ session(
             0 -> outbound_unauth_seq_nr;
             1 -> outbound_auth_seq_nr
         end,
-    {[
+    {
+        [
             {auth_type, rmcp_plus},
             {encrypted, eipmi_util:get_bool(E)},
             {authenticated, eipmi_util:get_bool(A)},
@@ -242,7 +243,9 @@ session(
             {Seq, S},
             {session_id, I}
         ],
-        L, Rest}.
+        L,
+        Rest
+    }.
 
 %%------------------------------------------------------------------------------
 %% @private

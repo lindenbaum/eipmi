@@ -389,10 +389,12 @@ decode_dc_output(
         {provides_standby_output, eipmi_util:get_bool(Standby)},
         {output, maybe_value({OutputNumber, number}, unknown)},
         {nominal_voltage, {NominalVoltage / 100, unit(4)}},
-        {maximum_negative_voltage_deviation,
-            {MaximumNegativeVoltageDeviation / 100, unit(4)}},
-        {maximum_positive_voltage_deviation,
-            {MaximumPositiveVoltageDeviation / 100, unit(4)}},
+        {maximum_negative_voltage_deviation, {
+            MaximumNegativeVoltageDeviation / 100, unit(4)
+        }},
+        {maximum_positive_voltage_deviation, {
+            MaximumPositiveVoltageDeviation / 100, unit(4)
+        }},
         {ripple_and_noise, {RippleAndNoise / 1000, unit(4)}},
         {minimum_current_draw, {MinimumCurrentDraw / 1000, unit(5)}},
         {maximum_current_draw, {MaximumCurrentDraw / 1000, unit(5)}}

@@ -89,14 +89,15 @@ decode_get_self_test_results_test() ->
     Bin = <<16#57, 16#ff>>,
     ?assertEqual(
         {ok, [
-            {result,
-                {{corrupted_devices, [sel, sdr, fru, ipmb_signal_lines]},
-                    {inaccessible_devices, [
-                        sdr,
-                        fru,
-                        boot_firmware,
-                        optional_firmware
-                    ]}}}
+            {result, {
+                {corrupted_devices, [sel, sdr, fru, ipmb_signal_lines]},
+                {inaccessible_devices, [
+                    sdr,
+                    fru,
+                    boot_firmware,
+                    optional_firmware
+                ]}
+            }}
         ]},
         eipmi_response:decode(Resp, Bin)
     ).
@@ -157,8 +158,24 @@ decode_get_session_challenge_test() ->
     {ok, Properties} = eipmi_response:decode(Resp, Bin),
     ?assertEqual(16#11223344, proplists:get_value(session_id, Properties)),
     ?assertEqual(
-        <<$h, $e, $l, $l, $o, $_, $w, $o, $r, $l, $d, 16#00, 16#00, 16#00,
-            16#00, 16#00>>,
+        <<
+            $h,
+            $e,
+            $l,
+            $l,
+            $o,
+            $_,
+            $w,
+            $o,
+            $r,
+            $l,
+            $d,
+            16#00,
+            16#00,
+            16#00,
+            16#00,
+            16#00
+        >>,
         proplists:get_value(challenge, Properties)
     ).
 

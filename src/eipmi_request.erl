@@ -548,6 +548,9 @@ encode_picmg_site_type(rear_transition_module) -> 16#09;
 encode_picmg_site_type(mch) -> 16#0a;
 encode_picmg_site_type(power_module) -> 16#0b.
 
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
 get_encoded_bool(Prop, List) ->
     case proplists:get_bool(Prop, List) of
         true -> 1;

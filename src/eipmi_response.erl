@@ -833,8 +833,10 @@ get_self_test_result(16#57, Bitfield) ->
             2#1 -> [optional_firmware];
             _ -> []
         end,
-    {{corrupted_devices, A ++ B ++ C ++ D},
-        {inaccessible_devices, E ++ F ++ G ++ H}};
+    {
+        {corrupted_devices, A ++ B ++ C ++ D},
+        {inaccessible_devices, E ++ F ++ G ++ H}
+    };
 get_self_test_result(16#58, Detail) ->
     {fatal_hardware_error, Detail};
 get_self_test_result(Result, Detail) ->
