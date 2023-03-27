@@ -225,7 +225,11 @@ error_logger:info_msg("New privilege level is ~p.~n", [NewPrivilege]),
 History
 -------
 
-### Master (4.0.0)
+### Master (4.0.1)
+
+Currently no difference to latest tag.
+
+### Version 4.0.0
 
 * Add support for the *Get/Set System Boot Options* command (thanks to @IslandUsurper)
 * Add support for RMCP+ (IPMI v2.0, big thanks to @IslandUsurper)
