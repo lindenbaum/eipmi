@@ -1142,9 +1142,9 @@ poll_sel(Session) ->
 %%------------------------------------------------------------------------------
 -spec poll_sel(session(), non_neg_integer(), boolean()) ->
     {ok, pid()} | {error, term()}.
-poll_sel(Session = {session, _, _}, Interval, Clear) when Interval > 0 ->
+poll_sel(Session = {session, Target, _}, Interval, Clear) when Interval > 0 ->
     Result =
-        case ets:lookup(eipmi_sessions, Session) of
+        case ets:lookup(eipmi_sessions, {session, Target}) of
             [{_, Pid, _}] ->
                 {ok, Pid};
             [] ->
@@ -1514,7 +1514,7 @@ sessions() ->
     ets:select(eipmi_sessions, [
         {
             {'$1', '$2'},
-            [{'=:=', session, {element, '$1', 1}}, {is_pid, '$2'}],
+            [{'=:=', session, {element, 1, '$1'}}, {is_pid, '$2'}],
             ['$1']
         }
     ]).
@@ -1600,7 +1600,12 @@ start_session(Spec = {Id, _, _, _, _, _}) ->
         Error = {error, _} ->
             Error;
         {ok, Pid} ->
-            ets:insert(eipmi_sessions, {Id, Pid}),
+            case Id of
+                {session, Target, _Owner} ->
+                    ets:insert(eipmi_sessions, {{session, Target}, Pid});
+                Id_ ->
+                    ets:insert(eipmi_sessions, {Id_, Pid})
+            end,
             {ok, Id}
     end.
 
@@ -1615,8 +1620,8 @@ with_session_(Error, _Fun) -> Error.
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-get_session(S) ->
-    case ets:lookup(eipmi_sessions, S) of
+get_session({session, T, _}) ->
+    case ets:lookup(eipmi_sessions, {session, T}) of
         [] -> {error, no_session};
         [{_, Pid}] -> {ok, Pid}
     end.
