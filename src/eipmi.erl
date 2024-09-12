@@ -169,7 +169,7 @@
     | {privilege, privilege()}
     | {rakp_auth_type, eipmi_auth:rakp_type()}
     | {rq_addr, 16#81..16#8d}
-    | {rq_auth_type, eimpi_auth:type() | rmcp_plus}
+    | {rq_auth_type, eipmi_auth:type() | rmcp_plus}
     | {timeout, non_neg_integer()}
     | {user, string()}.
 
