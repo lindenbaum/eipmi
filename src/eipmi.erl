@@ -169,7 +169,7 @@
     | {privilege, privilege()}
     | {rakp_auth_type, eipmi_auth:rakp_type()}
     | {rq_addr, 16#81..16#8d}
-    | {rq_auth_type, eimpi_auth:type() | rmcp_plus}
+    | {rq_auth_type, eipmi_auth:type() | rmcp_plus}
     | {timeout, non_neg_integer()}
     | {user, string()}.
 
@@ -641,9 +641,8 @@ open(Host, Options) ->
 %%------------------------------------------------------------------------------
 -spec close(eipmi:session()) -> ok | {error, term()}.
 close(Session) ->
-    Result = supervisor:terminate_child(?MODULE, Session),
-    supervisor:delete_child(?MODULE, Session),
-    Result.
+    ets:delete(eipmi_sessions, Session),
+    supervisor:terminate_child(?MODULE, Session).
 
 %%------------------------------------------------------------------------------
 %% @doc
@@ -1143,9 +1142,15 @@ poll_sel(Session) ->
 %%------------------------------------------------------------------------------
 -spec poll_sel(session(), non_neg_integer(), boolean()) ->
     {ok, pid()} | {error, term()}.
-poll_sel(Session = {session, _, _}, Interval, Clear) when Interval > 0 ->
-    Children = supervisor:which_children(?MODULE),
-    poll_sel(get_session(Session, Children), Session, Interval, Clear).
+poll_sel(Session = {session, Target, _}, Interval, Clear) when Interval > 0 ->
+    Result =
+        case ets:lookup(eipmi_sessions, {session, Target}) of
+            [{_, Pid, _}] ->
+                {ok, Pid};
+            [] ->
+                {error, no_session}
+        end,
+    poll_sel(Result, Session, Interval, Clear).
 poll_sel({ok, Pid}, Session, Interval, Clear) ->
     start_poll(Pid, Session, [{read_sel, Interval}, {clear_sel, Clear}]);
 poll_sel(Error, _Session, _Interval, _Clear) ->
@@ -1506,8 +1511,13 @@ id_to_fru(FruId, SdrRepository) ->
 %%------------------------------------------------------------------------------
 -spec sessions() -> [session()].
 sessions() ->
-    Cs = supervisor:which_children(?MODULE),
-    [S || {S = {session, _, _}, P, _, _} <- Cs, is_pid(P)].
+    ets:select(eipmi_sessions, [
+        {
+            {'$1', '$2'},
+            [{'=:=', session, {element, 1, '$1'}}, {is_pid, '$2'}],
+            ['$1']
+        }
+    ]).
 
 %%------------------------------------------------------------------------------
 %% @doc
@@ -1544,6 +1554,12 @@ stop(_State) -> ok.
 %% @private
 %%------------------------------------------------------------------------------
 init([]) ->
+    ets:new(eipmi_sessions, [
+        named_table,
+        public,
+        {write_concurrency, auto},
+        {read_concurrency, true}
+    ]),
     TrapPorts = application:get_env(?MODULE, trap_ports, []),
     {ok, {{one_for_one, 5, 1000}, [trap_spec(Port) || Port <- TrapPorts]}}.
 
@@ -1565,12 +1581,7 @@ start_session(Target, Options) ->
     Session = {session, Target, {self(), make_ref()}},
     Start = {eipmi_session, start_link, [Session, Options]},
     Spec = {Session, Start, temporary, 2000, worker, [eipmi_session]},
-    case supervisor:start_child(?MODULE, Spec) of
-        Error = {error, _} ->
-            Error;
-        Ok when element(1, Ok) =:= ok ->
-            {ok, Session}
-    end.
+    start_session(Spec).
 
 %%------------------------------------------------------------------------------
 %% @private
@@ -1579,24 +1590,41 @@ start_poll(SessionPid, Session = {session, _, _}, Options) ->
     Id = {poll, erlang:make_ref()},
     Start = {eipmi_poll, start_link, [SessionPid, Session, Options]},
     Spec = {Id, Start, temporary, brutal_kill, worker, [eipmi_poll]},
-    supervisor:start_child(?MODULE, Spec).
+    start_session(Spec).
+
+%%------------------------------------------------------------------------------
+%% @private
+%%------------------------------------------------------------------------------
+start_session(Spec = {Id, _, _, _, _, _}) ->
+    case supervisor:start_child(?MODULE, Spec) of
+        Error = {error, _} ->
+            Error;
+        {ok, Pid} ->
+            case Id of
+                {session, Target, _Owner} ->
+                    ets:insert(eipmi_sessions, {{session, Target}, Pid});
+                Id_ ->
+                    ets:insert(eipmi_sessions, {Id_, Pid})
+            end,
+            {ok, Id}
+    end.
 
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
 with_session(Session, Fun) ->
-    Children = supervisor:which_children(?MODULE),
-    with_session_(get_session(Session, Children), Fun).
+    with_session_(get_session(Session), Fun).
 with_session_({ok, Pid}, Fun) -> ?EIPMI_CATCH(Fun(Pid));
 with_session_(Error, _Fun) -> Error.
 
 %%------------------------------------------------------------------------------
 %% @private
 %%------------------------------------------------------------------------------
-get_session(S, Cs) ->
-    get_session([P || {Id, P, _, _} <- Cs, Id =:= S andalso is_pid(P)]).
-get_session([]) -> {error, no_session};
-get_session([P]) -> {ok, P}.
+get_session({session, T, _}) ->
+    case ets:lookup(eipmi_sessions, {session, T}) of
+        [] -> {error, no_session};
+        [{_, Pid}] -> {ok, Pid}
+    end.
 
 %%------------------------------------------------------------------------------
 %% @private
