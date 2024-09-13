@@ -1,5 +1,5 @@
 %%%=============================================================================
-%%% Copyright (c) 2012-2019 Lindenbaum GmbH
+%%% Copyright (c) 2012-2024 Lindenbaum GmbH
 %%%
 %%% Permission to use, copy, modify, and/or distribute this software for any
 %%% purpose with or without fee is hereby granted, provided that the above
@@ -1145,10 +1145,8 @@ poll_sel(Session) ->
 poll_sel(Session = {session, Target, _}, Interval, Clear) when Interval > 0 ->
     Result =
         case ets:lookup(eipmi_sessions, {session, Target}) of
-            [{_, Pid, _}] ->
-                {ok, Pid};
-            [] ->
-                {error, no_session}
+            [{_, Pid, _}] -> {ok, Pid};
+            [] -> {error, no_session}
         end,
     poll_sel(Result, Session, Interval, Clear).
 poll_sel({ok, Pid}, Session, Interval, Clear) ->
@@ -1554,12 +1552,12 @@ stop(_State) -> ok.
 %% @private
 %%------------------------------------------------------------------------------
 init([]) ->
-    ets:new(eipmi_sessions, [
-        named_table,
-        public,
-        {write_concurrency, auto},
-        {read_concurrency, true}
-    ]),
+    EtsOptions = [named_table, public, {read_concurrency, true}],
+    try
+        ets:new(eipmi_sessions, [{write_concurrency, auto} | EtsOptions])
+    catch
+        error:badarg -> ets:new(eipmi_sessions, EtsOptions)
+    end,
     TrapPorts = application:get_env(?MODULE, trap_ports, []),
     {ok, {{one_for_one, 5, 1000}, [trap_spec(Port) || Port <- TrapPorts]}}.
 

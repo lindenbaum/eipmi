@@ -227,7 +227,9 @@ History
 
 ### Master (4.0.1)
 
-Currently no difference to latest tag.
+* Enhance performance of session lookups (thanks to @IslandUsurper)
+* Drop (official) support for OTP releases older than 24.3 (currently it should
+  still work with older versions)
 
 ### Version 4.0.0
 
