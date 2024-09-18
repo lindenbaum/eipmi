@@ -225,7 +225,7 @@ error_logger:info_msg("New privilege level is ~p.~n", [NewPrivilege]),
 History
 -------
 
-### Master (4.0.1)
+### Version 4.1.0
 
 * Enhance performance of session lookups (thanks to @IslandUsurper)
 * Drop (official) support for OTP releases older than 24.3 (currently it should
