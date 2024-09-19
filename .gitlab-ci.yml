@@ -1,6 +1,6 @@
 check:
   stage: test
-  image: erlang:23
+  image: erlang:24
   script:
     - rebar3 do clean,compile,dialyzer
     - rebar3 as test eunit
