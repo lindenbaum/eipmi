@@ -1286,7 +1286,11 @@ get_os_boot_event(16#02) -> [{sensor_value, completed_pxe}];
 get_os_boot_event(16#03) -> [{sensor_value, completed_diagnostic}];
 get_os_boot_event(16#04) -> [{sensor_value, completed_cdrom}];
 get_os_boot_event(16#05) -> [{sensor_value, completed_rom}];
-get_os_boot_event(16#06) -> [{sensor_value, completed}].
+get_os_boot_event(16#06) -> [{sensor_value, completed}];
+get_os_boot_event(16#07) -> [{sensor_value, installation_started}];
+get_os_boot_event(16#08) -> [{sensor_value, installation_completed}];
+get_os_boot_event(16#09) -> [{sensor_value, installation_aborted}];
+get_os_boot_event(16#0a) -> [{sensor_value, installatino_failed}].
 
 %%------------------------------------------------------------------------------
 %% @private
