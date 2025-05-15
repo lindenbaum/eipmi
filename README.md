@@ -225,9 +225,9 @@ error_logger:info_msg("New privilege level is ~p.~n", [NewPrivilege]),
 History
 -------
 
-### Master (4.1.1)
+### Version 4.1.1
 
-Currently no difference to latest tag.
+* Add missing sensor values for the *Base OS Boot/Installation Status* sensor (thanks to @IslandUsurper)
 
 ### Version 4.1.0
 
