@@ -251,7 +251,16 @@ encode_transport(?SET_LAN_CONFIGURATION_PARAMETERS, Properties) ->
                 DefMA = {0, 0, 0, 0, 0, 0},
                 MA = proplists:get_value(mac_address, Properties, DefMA),
                 M = list_to_binary(tuple_to_list(MA)),
-                <<0:4, S:4, 0:4, 0:4, 0:7, G:1, I/binary, M/binary>>
+                <<0:4, S:4, 0:4, 0:4, 0:7, G:1, I/binary, M/binary>>;
+            ?IPMI_LAN_CONFIGURATION_PARAMETER_VLAN_ID ->
+                E = get_encoded_bool(enable, Properties),
+                Vlan =
+                    case E of
+                        0 -> 0;
+                        1 -> proplists:get_value(vlan, Properties, 0)
+                    end,
+                <<0:4, Hi:4, Low:8>> = binary:encode_unsigned(Vlan, little),
+                <<Low:8, E:1, 0:3, Hi:4>>
         end,
     <<0:4, ?IPMI_REQUESTED_CHANNEL:4, P:8, D/binary>>;
 encode_transport(?GET_LAN_CONFIGURATION_PARAMETERS, Properties) ->

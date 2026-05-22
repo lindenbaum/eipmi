@@ -309,6 +309,15 @@ decode_lan_configuration_parameters(
         {ip_address, {I1, I2, I3, I4}},
         {mac_address, {M1, M2, M3, M4, M5, M6}}
     ];
+decode_lan_configuration_parameters(
+    ?IPMI_LAN_CONFIGURATION_PARAMETER_VLAN_ID,
+    _,
+    <<Low:8, E:1, ?EIPMI_RESERVED:3, Hi:4>>
+) ->
+    [
+        {enabled, eipmi_util:get_bool(E)},
+        {vlan, binary:decode_unsigned(<<0:4, Hi:4, Low:8>>, little)}
+    ];
 decode_lan_configuration_parameters(_, _, _) ->
     [].
 
