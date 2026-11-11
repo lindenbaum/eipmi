@@ -1118,16 +1118,18 @@ get_system_event(16#01, _) ->
     [{sensor_value, oem_boot_event}];
 get_system_event(16#02, _) ->
     [{sensor_value, hardware_failure}];
-get_system_event(16#04, 16#ff) ->
-    [{sensor_value, pef_actions}, {pef_actions, []}];
-get_system_event(16#04, Data) ->
-    [{sensor_value, pef_actions}, {pef_actions, get_pef_actions(Data)}];
 get_system_event(16#03, 16#ff) ->
     [{sensor_value, auxiliary_log}];
 get_system_event(16#03, Data) ->
     Type = get_auxiliary_log_type(Data band 16#0f),
     Action = get_auxiliary_log_action(Data band 16#f0 bsr 4),
-    [{sensor_value, auxiliary_log}, {log_action, Action}, {log_type, Type}].
+    [{sensor_value, auxiliary_log}, {log_action, Action}, {log_type, Type}];
+get_system_event(16#04, 16#ff) ->
+    [{sensor_value, pef_actions}, {pef_actions, []}];
+get_system_event(16#04, Data) ->
+    [{sensor_value, pef_actions}, {pef_actions, get_pef_actions(Data)}];
+get_system_event(16#05, _) ->
+    [{sensor_value, clock_synch}].
 
 %%------------------------------------------------------------------------------
 %% @private
