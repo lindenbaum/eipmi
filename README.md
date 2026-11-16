@@ -225,6 +225,10 @@ error_logger:info_msg("New privilege level is ~p.~n", [NewPrivilege]),
 History
 -------
 
+### Master (4.2.1)
+
+Currently no difference to latest tag.
+
 ### Version 4.2.0
 
 * Add VLAN ID support for the *Get/Set LAN Configuration Parameters* command (thanks to @IslandUsurper)
