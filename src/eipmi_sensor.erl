@@ -917,7 +917,9 @@ get_power_supply_event(16#06, 16#03) ->
 get_power_supply_event(16#06, 16#04) ->
     [{sensor_value, configuration_error}, {reason, voltage_rating_mismatch}];
 get_power_supply_event(16#06, _) ->
-    [{sensor_value, configuration_error}, {reason, unknown}].
+    [{sensor_value, configuration_error}, {reason, unknown}];
+get_power_supply_event(16#07, _) ->
+    [{sensor_value, inactive}].
 
 %%------------------------------------------------------------------------------
 %% @private
@@ -1118,16 +1120,18 @@ get_system_event(16#01, _) ->
     [{sensor_value, oem_boot_event}];
 get_system_event(16#02, _) ->
     [{sensor_value, hardware_failure}];
-get_system_event(16#04, 16#ff) ->
-    [{sensor_value, pef_actions}, {pef_actions, []}];
-get_system_event(16#04, Data) ->
-    [{sensor_value, pef_actions}, {pef_actions, get_pef_actions(Data)}];
 get_system_event(16#03, 16#ff) ->
     [{sensor_value, auxiliary_log}];
 get_system_event(16#03, Data) ->
     Type = get_auxiliary_log_type(Data band 16#0f),
     Action = get_auxiliary_log_action(Data band 16#f0 bsr 4),
-    [{sensor_value, auxiliary_log}, {log_action, Action}, {log_type, Type}].
+    [{sensor_value, auxiliary_log}, {log_action, Action}, {log_type, Type}];
+get_system_event(16#04, 16#ff) ->
+    [{sensor_value, pef_actions}, {pef_actions, []}];
+get_system_event(16#04, Data) ->
+    [{sensor_value, pef_actions}, {pef_actions, get_pef_actions(Data)}];
+get_system_event(16#05, _) ->
+    [{sensor_value, clock_synch}].
 
 %%------------------------------------------------------------------------------
 %% @private
@@ -1290,7 +1294,7 @@ get_os_boot_event(16#06) -> [{sensor_value, completed}];
 get_os_boot_event(16#07) -> [{sensor_value, installation_started}];
 get_os_boot_event(16#08) -> [{sensor_value, installation_completed}];
 get_os_boot_event(16#09) -> [{sensor_value, installation_aborted}];
-get_os_boot_event(16#0a) -> [{sensor_value, installatino_failed}].
+get_os_boot_event(16#0a) -> [{sensor_value, installation_failed}].
 
 %%------------------------------------------------------------------------------
 %% @private
